@@ -16,7 +16,7 @@ import type { ExtractedFieldName, ExtractedValues } from './types';
 
 export function normalizeForQuoteMatch(text: string): string {
   return text
-    .replace(/[    ]/g, ' ')
+    .replace(/[    ]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();

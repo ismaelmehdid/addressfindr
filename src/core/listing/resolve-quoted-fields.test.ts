@@ -63,12 +63,26 @@ describe('resolveQuotedFields', () => {
     expect(values.surfaceM2).toBeUndefined();
   });
 
-  it('does not let a metro station become a street address', () => {
+  it('rejects a street address the model invented', () => {
     const values = resolveQuotedFields({
       source: SOURCE,
       quotes: { streetAddress: 'Rue Guénot' },
     });
     expect(values.streetAddress).toBeUndefined();
+  });
+
+  // Ce fichier ne peut PAS distinguer une rue d'une station de metro : les deux
+  // sont des chaines presentes dans la page. La protection contre "Rue des
+  // Boulets" est la precedence — la couche structuree fournit la vraie rue avant
+  // que le LLM ne soit consulte (voir merge-extractions et extract-listing).
+  // Ce test fige ce que la couche garantit reellement, pour qu'on ne se croie
+  // pas protege ici.
+  it('accepts a present-but-wrong street quote — precedence is what protects, not this gate', () => {
+    const values = resolveQuotedFields({
+      source: SOURCE,
+      quotes: { streetAddress: 'Rue des Boulets' },
+    });
+    expect(values.streetAddress).toBe('Rue des Boulets');
   });
 
   it('reads a DPE letter from a real quote', () => {
@@ -81,5 +95,36 @@ describe('resolveQuotedFields', () => {
 
   it('ignores a field with no quote', () => {
     expect(resolveQuotedFields({ source: SOURCE, quotes: {} })).toEqual({});
+  });
+
+  it('matches across a unicode space divergence on either side', () => {
+    expect(
+      resolveQuotedFields({
+        source: 'Surface habitable : 80,5 m²',
+        quotes: { surfaceM2: 'Surface habitable : 80,5 m²' },
+      }).surfaceM2,
+    ).toBe(80.5);
+
+    expect(
+      resolveQuotedFields({
+        source: 'Surface habitable : 80,5 m²',
+        quotes: { surfaceM2: 'Surface habitable : 80,5 m²' },
+      }).surfaceM2,
+    ).toBe(80.5);
+  });
+
+  it('never lets the model supply listingId or publishedAt', () => {
+    const source = 'Annonce n°123456 publiée le 2024-01-15. Appartement 80 m²';
+    const values = resolveQuotedFields({
+      source,
+      quotes: {
+        listingId: 'Annonce n°123456',
+        publishedAt: 'publiée le 2024-01-15',
+        surfaceM2: 'Appartement 80 m²',
+      },
+    });
+    expect(values.listingId).toBeUndefined();
+    expect(values.publishedAt).toBeUndefined();
+    expect(values.surfaceM2).toBe(80);
   });
 });
