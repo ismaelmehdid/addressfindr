@@ -1,6 +1,7 @@
 import 'server-only';
 
 import * as v from 'valibot';
+import { hasRedeemedCode } from '@/application/early-access/has-redeemed-code';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { claimCode } from '@/infra/data-access/early-access/early-access-repo';
 import { hashEarlyAccessCode } from '@/shared/early-access-hash';
@@ -26,6 +27,11 @@ export async function redeem(input: RedeemInput): Promise<RedeemResult> {
   if (currentUser.isErr()) return { success: false, error: 'unauthenticated' };
 
   const me = currentUser.value;
+
+  // Idempotent retry: re-POSTing an already-redeemed code must succeed, not invalid_code.
+  const already = await hasRedeemedCode({ userId: me.id });
+  if (already.isOk() && already.value) return { success: true };
+
   const codeHash = hashEarlyAccessCode(parsed.output.code);
 
   const claimed = await claimCode({ codeHash, userId: me.id });

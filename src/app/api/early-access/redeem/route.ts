@@ -23,9 +23,7 @@ const ERROR_STATUS: Record<
 };
 
 export async function POST(req: Request): Promise<Response> {
-  // Redemption must work before the user has redeemed a code and needs its
-  // own rate-limit namespace, so the standard authed-route guard is not used
-  // here.
+  // Own rate-limit namespace, distinct from the shared 'default' bucket other routes use.
   const me = await getCurrentUser();
   if (me.isErr()) return jsonError(unauthorized(me.error.message));
 

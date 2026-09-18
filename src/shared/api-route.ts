@@ -6,7 +6,7 @@ import {
   applyRateLimit,
   type RateLimitBucket,
 } from '@/application/rate-limit/apply-rate-limit';
-import { unauthorized, validation } from '@/core/errors';
+import { forbidden, unauthorized, validation } from '@/core/errors';
 import { jsonError } from '@/shared/errors-http';
 import { log } from '@/shared/logger';
 
@@ -23,6 +23,12 @@ export async function requireAuthedRoute(args: {
   const me = await getCurrentUser();
   if (me.isErr()) {
     return { ok: false, response: jsonError(unauthorized(me.error.message)) };
+  }
+  if (!me.value.hasRedeemedAccess) {
+    return {
+      ok: false,
+      response: jsonError(forbidden('Early access required')),
+    };
   }
   const identifier = me.value.id;
   const rl = await applyRateLimit({ identifier, limit: args.rateLimit });

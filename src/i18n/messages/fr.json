@@ -13,7 +13,7 @@
   },
   "Onboarding": {
     "title": "Saisissez votre code d'accès",
-    "subtitle": "Saisissez le code d'accès anticipé que vous avez reçu pour continuer.",
+    "subtitle": "Utilisez le code d'accès anticipé que vous avez reçu pour continuer.",
     "orgName": "Nom de l'organisation",
     "code": "Code d'accès anticipé",
     "submit": "Continuer",

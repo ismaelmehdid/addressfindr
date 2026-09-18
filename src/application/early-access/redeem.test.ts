@@ -9,6 +9,10 @@ vi.mock('@/application/me/get-current-user', () => ({
   getCurrentUser: vi.fn(),
 }));
 
+vi.mock('@/application/early-access/has-redeemed-code', () => ({
+  hasRedeemedCode: vi.fn(),
+}));
+
 vi.mock('@/infra/data-access/early-access/early-access-repo', () => ({
   claimCode: vi.fn(),
 }));
@@ -17,6 +21,7 @@ vi.mock('@/shared/early-access-hash', () => ({
   hashEarlyAccessCode: (s: string) => `hash-${s}`,
 }));
 
+import { hasRedeemedCode } from '@/application/early-access/has-redeemed-code';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { unauthorized, unknown as unknownError } from '@/core/errors';
 import { claimCode } from '@/infra/data-access/early-access/early-access-repo';
@@ -24,9 +29,11 @@ import { redeem } from './redeem';
 
 const mockedUser = vi.mocked(getCurrentUser);
 const mockedClaim = vi.mocked(claimCode);
+const mockedRedeemed = vi.mocked(hasRedeemedCode);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedRedeemed.mockResolvedValue(ok(false));
 });
 
 function mockAuthedUser(): void {
@@ -69,5 +76,13 @@ describe('redeem', () => {
     mockedClaim.mockResolvedValueOnce(ok(true));
     const r = await redeem({ code: 'fresh' });
     expect(r).toEqual({ success: true });
+  });
+
+  it('returns success without re-claiming when the user already redeemed a code', async () => {
+    mockAuthedUser();
+    mockedRedeemed.mockResolvedValueOnce(ok(true));
+    const r = await redeem({ code: 'already-used-by-me' });
+    expect(r).toEqual({ success: true });
+    expect(mockedClaim).not.toHaveBeenCalled();
   });
 });

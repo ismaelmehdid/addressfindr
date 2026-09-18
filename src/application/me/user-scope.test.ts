@@ -20,7 +20,16 @@ describe('requireUserScope — authz gate', () => {
 
   it('returns the user id for a signed-in user', async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(
-      ok({ id: 'user-1', email: 'a@b.c', organizationId: 'org-1' } as never),
+      ok({
+        id: 'user-1',
+        email: 'a@b.c',
+        firstName: 'A',
+        lastName: 'B',
+        image: null,
+        locale: 'en',
+        sessionId: 'sess-1',
+        hasRedeemedAccess: true,
+      }),
     );
     const result = await requireUserScope();
     expect(result.isOk()).toBe(true);
