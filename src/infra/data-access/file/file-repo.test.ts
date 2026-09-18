@@ -229,6 +229,8 @@ import {
   getFilesByIds,
   listFilesForUser,
   markUploaded,
+  renameFileForUser,
+  setFileVisionDescription,
 } from './file-repo';
 
 beforeEach(() => {
@@ -328,5 +330,64 @@ describe('deleteFileRow', () => {
     expect(stillThere.isOk()).toBe(true);
     if (stillThere.isErr()) return;
     expect(stillThere.value).toHaveLength(1);
+  });
+});
+
+describe('renameFileForUser', () => {
+  it('does not rename a file belonging to another user', async () => {
+    const b = await createFile({
+      userId: 'user-b',
+      originalName: 'b.pdf',
+      storageKey: 'k-b',
+      mimeType: 'application/pdf',
+      fileType: FileType.PDF,
+      sizeBytes: 1,
+    });
+    expect(b.isOk()).toBe(true);
+    if (b.isErr()) return;
+
+    const renamed = await renameFileForUser({
+      fileId: b.value.id,
+      userId: 'user-a',
+      originalName: 'hacked.pdf',
+    });
+    expect(renamed.isErr()).toBe(true);
+
+    const stillThere = await getFilesByIds({
+      ids: [b.value.id],
+      userId: 'user-b',
+    });
+    expect(stillThere.isOk()).toBe(true);
+    if (stillThere.isErr()) return;
+    expect(stillThere.value[0]?.originalName).toBe('b.pdf');
+  });
+});
+
+describe('setFileVisionDescription', () => {
+  it('does not set a vision description on a file belonging to another user', async () => {
+    const b = await createFile({
+      userId: 'user-b',
+      originalName: 'b.png',
+      storageKey: 'k-b',
+      mimeType: 'image/png',
+      fileType: FileType.PNG,
+      sizeBytes: 1,
+    });
+    expect(b.isOk()).toBe(true);
+    if (b.isErr()) return;
+
+    await setFileVisionDescription({
+      fileId: b.value.id,
+      userId: 'user-a',
+      visionDescription: 'hacked description',
+    });
+
+    const stillThere = await getFilesByIds({
+      ids: [b.value.id],
+      userId: 'user-b',
+    });
+    expect(stillThere.isOk()).toBe(true);
+    if (stillThere.isErr()) return;
+    expect(stillThere.value[0]?.visionDescription).toBeNull();
   });
 });

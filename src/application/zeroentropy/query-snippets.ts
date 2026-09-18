@@ -152,6 +152,7 @@ async function searchUserFilesImpl(
   const enriched: FileSnippet[] = [];
   for (const { snippet, parsedPath } of parsedSnippets) {
     if (!parsedPath) continue;
+    if (!fileNameById.has(parsedPath.entityId)) continue;
     enriched.push({
       content: snippet.content,
       score: snippet.score,

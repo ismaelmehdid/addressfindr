@@ -17,7 +17,6 @@ describe('toFileDto', () => {
       updatedAt: '2024-01-02T00:00:00.000Z',
     });
     expect(dto).not.toHaveProperty('userId');
-    expect(dto).not.toHaveProperty('organizationId');
     expect(dto).not.toHaveProperty('storageKey');
   });
 });

@@ -25,11 +25,8 @@ export async function ensureCollection(
     return ok(fastPath.value);
   }
 
-  // No per-user display name is available from a stateless/cron context
-  // (retryDueOperations rebuilds the event from a DB row, no live session),
-  // so the collection name always uses the deterministic hash form. Every
-  // caller must resolve to the same name for a given userId — see
-  // claimCollectionCreation's overwrite-on-claim behavior below.
+  // Always null: no stateless (cron-safe) user-name lookup exists, and every
+  // caller must derive the same name for a userId — see claimCollectionCreation.
   const collectionName = generateCollectionName({ userId, userName: null });
 
   const claimed = await claimCollectionCreation({ userId, collectionName });
