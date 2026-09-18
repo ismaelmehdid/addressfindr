@@ -1,4 +1,4 @@
-# startup-boilerplate — Engineering Guide
+# addressfindr — Engineering Guide
 
 You are a **senior engineer working in production**.
 This is a real system with real users.
@@ -6,8 +6,78 @@ This is a real system with real users.
 > Build code that is **correct, simple, and maintainable**.
 > **Correctness > cleverness · Simplicity > abstraction · Explicitness > magic · Consistency > preference.**
 
-Single Next.js app. This repo is a **reusable startup boilerplate** — the user-facing brand is per-startup and undecided; **never hard-code a product name in user-visible copy**.
-Included product surface: auth, organizations, file upload + RAG indexing, and an AI chat workspace over uploaded files. Startup-specific features are built on top of this base.
+Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth, organizations, file upload + RAG indexing, and an AI chat workspace over uploaded files. **The product is built on top of that base — it does not replace it.**
+
+The user-facing brand is still undecided, so **never hard-code a product name in user-visible copy**; everything user-facing goes through `next-intl`.
+
+---
+
+## What we are building
+
+**Given the URL of a French property listing, return the exact postal address of the property.**
+
+Listing portals deliberately hide the address — they show "Lyon 3e", a photo and a price. The product recovers it.
+
+### Why it is possible at all
+
+French listings are legally required to display the **DPE** (energy) and **GES** labels. ADEME publishes **every DPE issued in France as open data, with the full postal address**, plus surface, construction year, dwelling type and floor.
+
+So the listing leaks a fingerprint of itself. We do **no geolocation**. We do **record linkage**: match the listing's attributes to a row in the ADEME base, and read the address off that row.
+
+The discriminating fields, roughly in order of value: **DPE class**, surface m², commune (INSEE code, not postal code — a postal code can span several communes), rooms, floor, construction year, property type.
+
+`precisement.fr` is the existing player and the reference implementation to study. Their declared sources: ADEME (DPE base), IGN/Géoplateforme (address reference, basemaps), DGFiP (cadastre), CSTB (BDNB), plus a commune reference.
+
+### The rule that governs every design decision here
+
+**A wrong address costs far more than no address.** The matching produces a *confident* answer; if the inputs are wrong, the output is confidently wrong, and the product's entire credibility is the claim "this is the address". Whenever a choice is between a plausible guess and an absent field, **choose the absent field.**
+
+This is why, throughout the `listing` domain:
+
+- **The LLM localises; deterministic code parses.** The model never returns a value. It returns the *exact quote* from the page where the value can be read. The quote is verified to exist literally in the source, then a deterministic parser extracts the value from it. A hallucinated value is structurally impossible because the value never comes from the model.
+- **Structured data beats prose, always.** Precedence is `hydration` → `json-ld` → `llm` → `absent`, first non-null wins, nothing later overwrites.
+- Out-of-bounds values become `null`, never clamped and never guessed.
+
+### Pipeline
+
+1. **Ingest** — user pastes a listing URL; the backend scrapes it via Firecrawl, asking for `markdown` + `rawHtml` in one call.
+2. **Extract** — structured first (`__NEXT_DATA__` / `__NUXT__`, then JSON-LD), LLM on the markdown only for fields still empty.
+3. **Normalise** — commune resolution, surface conventions (habitable/Carrez vs terrain), French number formats.
+4. **Candidates** — filter the ADEME base on commune + type + surface range + DPE. *(not built yet)*
+5. **Score and disambiguate** — return an address with a confidence, or nothing. *(not built yet)*
+
+### Current state
+
+- **Built:** the `listing` domain — ingestion + extraction. `URL → normalised fields + per-field provenance`.
+- **Not started:** everything ADEME — data access, candidate generation, scoring, and the UI.
+- Spec: `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md`
+- Plan: `docs/superpowers/plans/2026-09-17-listing-ingestion-extraction.md`
+
+### Measured facts — do not re-derive these
+
+Verified 2026-09-17 against one real listing per portal via the Firecrawl API. A strong signal, not a census.
+
+| Portal | Usable structured source | DPE in it? |
+|---|---|---|
+| `leboncoin.fr` | `__NEXT_DATA__` — the complete record | **yes** (`energy_rate`, `ges`) |
+| `immobilier.lefigaro.fr` | `__NUXT__` (paths not yet mapped) | yes, plus `inseeCode` |
+| `proprietes.lefigaro.fr` | `__NUXT__` (paths not yet mapped) | yes, plus `inseeCode` |
+| `iadfrance.fr` | JSON-LD `Apartment` | partial; has `yearBuilt` |
+| `seloger.com` | JSON-LD `RealEstateListing` | no |
+| `pap.fr` | JSON-LD `Product` | no — but exposes **`streetAddress`** outright |
+| `century21.fr`, `orpi.com`, `logic-immo.com`, `bellesdemeures.com` | none | — |
+
+- **No portal exposes the DPE in JSON-LD.** The most discriminating field is never in the standard markup. It comes from hydration payloads or from the page text.
+- **Firecrawl gets past DataDome on leboncoin** (verified in both `basic` and `stealth` modes). Do not assume it is blocked.
+- `logic-immo.com` returns a JS shell even with `waitFor: 8000`.
+- The DPE survives Firecrawl's markdown conversion only by accident: clean on seloger, present on century21 only because the agent typed it in free text, present on orpi only in an image `alt`, and **entirely absent on pap.fr**.
+- A listing page's markdown contains neighbouring properties ("biens similaires") and nearby metro stations. On the pap.fr listing measured, the markdown lists `Rue des Boulets` (a metro stop) while the real street `Rue Guénot` appears only in the JSON-LD. **Never trust a street name that came from page prose.**
+
+### Traps that have already bitten us
+
+- Invisible Unicode spaces (U+00A0, U+202F, U+2009, U+2007) are everywhere in French listings, especially in prices. A `\uXXXX` escape written into a TypeScript string literal has been flattened to an ordinary space **three times** in this repo, twice producing a test that passed while asserting nothing. **Build these characters with `String.fromCharCode` and assert their presence before using them.**
+- `parsePostalCode` grabs the first standalone 5-digit run. A price under €100 000 in a listing title (`89000 € Lyon (69001)`) looks exactly like a postal code. Free-text heuristics must run *after* structured fields, never before.
+- INSEE commune codes are 5 characters, and Corsica uses `2A`/`2B` (`2A004`). `\d{5}` alone rejects Corsica; `[0-9AB]\d{4}` also rejects it.
 
 ---
 

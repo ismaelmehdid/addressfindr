@@ -642,6 +642,19 @@ describe('parsePostalCode and parseInseeCode', () => {
 
   it('reads a corsican insee code', () => {
     expect(parseInseeCode('2A004')).toBe('2A004');
+    expect(parseInseeCode('2B033')).toBe('2B033');
+  });
+
+  it('reads a mainland insee code', () => {
+    expect(parseInseeCode('commune 78250')).toBe('78250');
+  });
+
+  it('refuses a four character code', () => {
+    expect(parseInseeCode('7825')).toBeNull();
+  });
+
+  it('refuses a letter that is not A or B', () => {
+    expect(parseInseeCode('2C004')).toBeNull();
   });
 });
 
@@ -764,8 +777,11 @@ export function parsePostalCode(raw: string): string | null {
   return match ? match[1] : null;
 }
 
+// why: un code INSEE fait exactement 5 caracteres — soit 5 chiffres,
+// soit le format corse 2A/2B (ex. 2A004). Les deux alternatives sont
+// necessaires : \d{5} seul rejette la Corse, [0-9AB]\d{4} aussi.
 export function parseInseeCode(raw: string): string | null {
-  const match = /(?<![0-9A-Za-z])([0-9AB]\d{4})(?![0-9A-Za-z])/.exec(raw);
+  const match = /(?<![0-9A-Za-z])(\d[AB]\d{3}|\d{5})(?![0-9A-Za-z])/.exec(raw);
   return match ? match[1].toUpperCase() : null;
 }
 
@@ -898,6 +914,20 @@ describe('mapJsonLdToValues', () => {
   it('returns an empty object when no listing node exists', () => {
     expect(mapJsonLdToValues([])).toEqual({});
   });
+
+  it('never lets a five-digit price in the title beat the structured postal code', () => {
+    const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente maison 5 pièces 120 m² 89000 € Lyon (69001)","offers":{"@type":"Offer","price":"89000"},"address":{"@type":"PostalAddress","addressLocality":"Lyon 1er","postalCode":"69001"}}</script>`;
+    const values = mapJsonLdToValues(extractJsonLdNodes(html));
+    expect(values.postalCode).toBe('69001');
+    expect(values.priceEur).toBe(89000);
+  });
+
+  it('still falls back to the title when no structured address exists', () => {
+    const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Apartment","name":"Appartement 2 pièces Hardricourt (78250)"}</script>`;
+    const values = mapJsonLdToValues(extractJsonLdNodes(html));
+    expect(values.postalCode).toBe('78250');
+    expect(values.propertyType).toBe('apartment');
+  });
 });
 ```
 
@@ -1025,6 +1055,7 @@ export function mapJsonLdToValues(
   nodes: Record<string, unknown>[],
 ): Partial<ExtractedValues> {
   const values: Partial<ExtractedValues> = {};
+  const titles: string[] = [];
 
   for (const node of nodes) {
     const type = typeOf(node);
@@ -1053,13 +1084,18 @@ export function mapJsonLdToValues(
     if (posted) values.publishedAt ??= posted;
 
     const name = asString(node.name);
-    if (name) {
-      values.propertyType ??= parsePropertyType(name);
-      values.postalCode ??= parsePostalCode(name);
-    }
+    if (name) titles.push(name);
 
     readAddress(node, values);
     readAdditionalProperties(node, values);
+  }
+
+  // why: le titre est une heuristique et doit passer APRES tous les champs
+  // structures, sinon un prix a 5 chiffres ("89000 € Lyon (69001)") est capte
+  // comme code postal et ??= empeche l'adresse structuree de le corriger
+  for (const title of titles) {
+    values.propertyType ??= parsePropertyType(title);
+    values.postalCode ??= parsePostalCode(title);
   }
 
   for (const key of Object.keys(values) as (keyof ExtractedValues)[]) {
@@ -1250,6 +1286,51 @@ describe('mapHydrationToValues — leboncoin', () => {
   it('returns an empty object for a null payload', () => {
     expect(mapHydrationToValues('leboncoin', null)).toEqual({});
   });
+
+  it('never reads a neighbouring listing nested under the ad', () => {
+    const payload = {
+      props: {
+        pageProps: {
+          ad: {
+            list_id: 111,
+            attributes: [
+              { key: 'square', value: '102' },
+              { key: 'energy_rate', value: 'b', value_label: 'B' },
+            ],
+            similar: [
+              {
+                list_id: 222,
+                attributes: [
+                  { key: 'square', value: '42' },
+                  { key: 'energy_rate', value: 'g', value_label: 'G' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    };
+    const values = mapHydrationToValues('leboncoin', payload);
+    expect(values.listingId).toBe('111');
+    expect(values.surfaceM2).toBe(102);
+    expect(values.dpeClass).toBe('B');
+  });
+
+  it('prefers the shallowest ad node when a sibling block also has attributes', () => {
+    const payload = {
+      props: {
+        pageProps: {
+          ad: { list_id: 111, attributes: [{ key: 'square', value: '102' }] },
+          carousel: {
+            items: [
+              { list_id: 333, attributes: [{ key: 'square', value: '42' }] },
+            ],
+          },
+        },
+      },
+    };
+    expect(mapHydrationToValues('leboncoin', payload).surfaceM2).toBe(102);
+  });
 });
 ```
 
@@ -1279,17 +1360,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const RELATED_LISTING_KEYS = new Set([
+  'similar',
+  'similar_ads',
+  'related',
+  'recommendations',
+]);
+
+// why: le noeud annonce se reconnait a son tableau `attributes`, mais un bloc
+// "annonces similaires" porte la meme forme. Un parcours en profondeur peut
+// donc rendre le DPE du voisin. En largeur, le plus proche de la racine gagne,
+// et on ne descend pas du tout dans les conteneurs d'annonces liees.
 function findAdNode(payload: unknown): Record<string, unknown> | null {
-  const stack: unknown[] = [payload];
-  while (stack.length > 0) {
-    const current = stack.pop();
+  const queue: unknown[] = [payload];
+  while (queue.length > 0) {
+    const current = queue.shift();
     if (Array.isArray(current)) {
-      stack.push(...current);
+      queue.push(...current);
       continue;
     }
     if (!isRecord(current)) continue;
     if (Array.isArray(current.attributes)) return current;
-    stack.push(...Object.values(current));
+    for (const [key, value] of Object.entries(current)) {
+      if (RELATED_LISTING_KEYS.has(key)) continue;
+      queue.push(value);
+    }
   }
   return null;
 }
@@ -1647,12 +1742,68 @@ describe('resolveQuotedFields', () => {
     expect(values.surfaceM2).toBeUndefined();
   });
 
-  it('does not let a metro station become a street address', () => {
+  it('rejects a street address the model invented', () => {
     const values = resolveQuotedFields({
       source: SOURCE,
       quotes: { streetAddress: 'Rue Guénot' },
     });
     expect(values.streetAddress).toBeUndefined();
+  });
+
+  // Ce fichier ne peut PAS distinguer une rue d'une station de metro : les deux
+  // sont des chaines presentes dans la page. La protection contre "Rue des
+  // Boulets" est la precedence — la couche structuree fournit la vraie rue avant
+  // que le LLM ne soit consulte (voir merge-extractions et extract-listing).
+  // Ce test fige ce que la couche garantit reellement, pour qu'on ne se croie
+  // pas protege ici.
+  it('accepts a present-but-wrong street quote — precedence is what protects, not this gate', () => {
+    const values = resolveQuotedFields({
+      source: SOURCE,
+      quotes: { streetAddress: 'Rue des Boulets' },
+    });
+    expect(values.streetAddress).toBe('Rue des Boulets');
+  });
+
+  // why: ces espaces sont invisibles et un echappement \uXXXX ecrit dans un
+  // litteral a deja ete aplati en espace ordinaire trois fois dans ce plan. On
+  // les construit par code point, et on verifie leur presence AVANT de s'en
+  // servir — sinon le test passerait en ne testant rien.
+  it('matches across a unicode space divergence on either side', () => {
+    const nbsp = String.fromCharCode(0x00a0);
+    const narrowNbsp = String.fromCharCode(0x202f);
+
+    const sourceWithNbsp = `Surface habitable : 80,5${nbsp}m²`;
+    expect(sourceWithNbsp).toContain(nbsp);
+    expect(
+      resolveQuotedFields({
+        source: sourceWithNbsp,
+        quotes: { surfaceM2: 'Surface habitable : 80,5 m²' },
+      }).surfaceM2,
+    ).toBe(80.5);
+
+    const quoteWithNarrowNbsp = `Surface habitable : 80,5${narrowNbsp}m²`;
+    expect(quoteWithNarrowNbsp).toContain(narrowNbsp);
+    expect(
+      resolveQuotedFields({
+        source: 'Surface habitable : 80,5 m²',
+        quotes: { surfaceM2: quoteWithNarrowNbsp },
+      }).surfaceM2,
+    ).toBe(80.5);
+  });
+
+  it('never lets the model supply listingId or publishedAt', () => {
+    const source = 'Annonce n°123456 publiée le 2024-01-15. Appartement 80 m²';
+    const values = resolveQuotedFields({
+      source,
+      quotes: {
+        listingId: 'Annonce n°123456',
+        publishedAt: 'publiée le 2024-01-15',
+        surfaceM2: 'Appartement 80 m²',
+      },
+    });
+    expect(values.listingId).toBeUndefined();
+    expect(values.publishedAt).toBeUndefined();
+    expect(values.surfaceM2).toBe(80);
   });
 
   it('reads a DPE letter from a real quote', () => {
