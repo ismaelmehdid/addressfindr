@@ -1,0 +1,13 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "master": false
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/zeroentropy-retry",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

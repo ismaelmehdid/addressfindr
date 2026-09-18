@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "type": "http",
+      "url": "https://mcp.supabase.com/mcp"
+    },
+    "autumn": {
+      "type": "http",
+      "url": "https://mcp.useautumn.com/mcp"
+    },
+    "vercel": {
+      "type": "http",
+      "url": "https://mcp.vercel.com"
+    },
+    "next-devtools": {
+      "type": "stdio",
+      "command": "pnpm",
+      "args": ["dlx", "next-devtools-mcp@latest"],
+      "env": {}
+    },
+    "firecrawl": {
+      "type": "http",
+      "url": "https://mcp.firecrawl.dev/v2/mcp"
+    }
+  }
+}

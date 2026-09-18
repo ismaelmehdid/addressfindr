@@ -1,0 +1,141 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  pull_request:
+    branches:
+      - master
+      - dev
+
+jobs:
+  boundaries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    concurrency:
+      group: boundaries-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check domain boundaries
+        run: pnpm check:boundaries
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    concurrency:
+      group: test-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+  type-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    concurrency:
+      group: type-check-${{ github.ref }}
+      cancel-in-progress: true
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run TypeScript type-check
+        run: pnpm type-check
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
+
+  migrate:
+    if: github.event_name == 'push'
+    needs: [test, type-check]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    concurrency:
+      group: migrations-${{ github.ref_name }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up environment variables for dev
+        if: github.ref_name == 'dev'
+        run: echo "DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}" >> $GITHUB_ENV
+
+      - name: Set up environment variables for prod
+        if: github.ref_name == 'master'
+        run: echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
+
+      - name: Verify database url
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL is not set for branch ${{ github.ref_name }}"
+            exit 1
+          fi
+
+      - name: Run Migrations
+        run: pnpm run drizzle:migrate
+        env:
+          NODE_TLS_REJECT_UNAUTHORIZED: '0'

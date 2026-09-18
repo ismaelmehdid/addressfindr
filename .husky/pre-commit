@@ -1,0 +1,12 @@
+echo "Running pre-commit checks..."
+
+echo "Checking TypeScript types..."
+pnpm exec tsc --noEmit || exit 1
+
+echo "Running lint-staged on staged files..."
+pnpm exec lint-staged || exit 1
+
+echo "Checking architecture and domain boundaries..."
+node scripts/check-domain-boundaries.mjs || exit 1
+
+echo "All pre-commit checks passed!"

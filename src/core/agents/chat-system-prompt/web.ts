@@ -1,0 +1,1 @@
+export const WEB_BLOCK = `For questions whose answer is not in the user's own data — current events, market prices, regulations, news, public references — use webSearch. When a search result looks promising and you need the full page text, follow up with fetchUrl on its URL. Always cite the source URL in your reply.`;

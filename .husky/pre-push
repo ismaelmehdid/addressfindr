@@ -1,0 +1,13 @@
+current_branch=$(git symbolic-ref --short HEAD)
+
+protected_branches="master prod"
+
+for branch in $protected_branches; do
+  if [ "$current_branch" = "$branch" ]; then
+    echo "Direct push to branch '$branch' is not allowed!"
+    echo "Use Pull Request to make changes to '$branch'"
+    exit 1
+  fi
+done
+
+echo "Push allowed for branch '$current_branch'"
