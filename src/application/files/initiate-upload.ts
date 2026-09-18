@@ -39,7 +39,6 @@ export async function initiateFileUpload(
 
   const created = await createFile({
     userId: scope.value.userId,
-    organizationId: scope.value.organizationId,
     originalName: parsed.value.originalName,
     storageKey: signed.value.path,
     mimeType: parsed.value.mimeType,

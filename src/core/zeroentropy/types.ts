@@ -53,7 +53,7 @@ export type EntityIndexMetadataValue = string | number | boolean | string[];
 export type EntityIndexMetadata = {
   entityType: IndexableEntityType;
   entityId: string;
-  organizationId: string;
+  userId: string;
   updatedAt: string;
   docType: string;
   source: DataSource;
@@ -82,7 +82,7 @@ export type ZeroEntropyDocumentContent =
 export type EntityToIndex = {
   entityId: string;
   entityType: IndexableEntityType;
-  organizationId: string;
+  userId: string;
   docType: string;
   content: ZeroEntropyDocumentContent;
   metadata: EntityIndexMetadata;
@@ -93,7 +93,7 @@ export type EntityChangeEvent = {
   operation: SyncOperation;
   entityType: IndexableEntityType;
   entityId: string;
-  organizationId: string;
+  userId: string;
   source: DataSource;
   timestamp: Date;
 };
@@ -101,7 +101,7 @@ export type EntityChangeEvent = {
 export type CollectionInfo = {
   id: string;
   collectionName: string;
-  organizationId: string;
+  userId: string;
   status: CollectionStatus;
   documentCount: number;
   lastSyncAt: Date | null;

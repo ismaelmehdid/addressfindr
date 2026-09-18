@@ -3,7 +3,7 @@ import 'server-only';
 import { err, ok, type Result } from 'neverthrow';
 import { requireOrganizationScope } from '@/application/me/organization-scope';
 import type { AppError } from '@/core/errors';
-import { getFileForOrg } from '@/infra/data-access/file/file-repo';
+import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { log } from '@/shared/logger';
 import type { FileDto } from './dto';
 import { toFileDto } from './mappers';
@@ -14,9 +14,9 @@ export async function getFile(
   const scope = await requireOrganizationScope();
   if (scope.isErr()) return err(scope.error);
 
-  const file = await getFileForOrg({
+  const file = await getFileForUser({
     fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (file.isErr()) {
     log.warn('files.get.failed', { fileId, reason: file.error.code });

@@ -15,7 +15,7 @@ vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
   deleteFileRow: vi.fn(),
-  getFileForOrg: vi.fn(),
+  getFileForUser: vi.fn(),
 }));
 
 vi.mock('@/infra/external-apis/supabase-storage/storage-adapter', () => ({
@@ -31,14 +31,14 @@ import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrato
 import { notFound, unknown as unknownErr } from '@/core/errors';
 import {
   deleteFileRow,
-  getFileForOrg,
+  getFileForUser,
 } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { fakeFile } from './__test-helpers__';
 import { deleteFile } from './delete-file';
 
 const mockedScope = vi.mocked(requireOrganizationScope);
-const mockedGet = vi.mocked(getFileForOrg);
+const mockedGet = vi.mocked(getFileForUser);
 const mockedDispatch = vi.mocked(dispatchEvent);
 const mockedRemove = vi.mocked(supabaseStorageAdapter.remove);
 const mockedDelete = vi.mocked(deleteFileRow);
@@ -90,7 +90,7 @@ describe('deleteFile', () => {
     expect(mockedRemove).toHaveBeenCalledOnce();
     expect(mockedDelete).toHaveBeenCalledWith({
       fileId: 'file-1',
-      organizationId: 'org-1',
+      userId: 'user-1',
     });
   });
 });

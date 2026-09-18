@@ -288,7 +288,7 @@ function buildAddDocumentBody(args: {
 }
 
 function documentPath(d: EntityToIndex): string {
-  return `entities/${d.organizationId}/${d.entityType}/${d.entityId}/${d.docType}`;
+  return `entities/${d.userId}/${d.entityType}/${d.entityId}/${d.docType}`;
 }
 
 function mapDocumentInfo(doc: DocumentInfo): ZeroEntropyDocumentInfo {

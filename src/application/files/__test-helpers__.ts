@@ -5,7 +5,6 @@ export function fakeFile(overrides: Partial<FileEntity> = {}): FileEntity {
   return {
     id: 'file-1',
     userId: 'user-1',
-    organizationId: 'org-1',
     originalName: 'doc.pdf',
     storageKey: 'attachments/2024/file-1.pdf' as never,
     mimeType: 'application/pdf' as never,

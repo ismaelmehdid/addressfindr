@@ -8,15 +8,15 @@ import {
   timestamp,
   uniqueIndex,
 } from 'drizzle-orm/pg-core';
+import { user } from './auth-schema';
 import { timestamps } from './columns-helpers';
-import { organization } from './organization-schema';
 
 export const zeroentropyCollection = pgTable(
   'zeroentropy_collection',
   {
     id: text().default(sql`gen_random_uuid()`).primaryKey().notNull(),
-    organizationId: text()
-      .references(() => organization.id, { onDelete: 'cascade' })
+    userId: text()
+      .references(() => user.id, { onDelete: 'cascade' })
       .notNull(),
     collectionName: text().notNull(),
     status: text().notNull().default('pending'),
@@ -26,7 +26,7 @@ export const zeroentropyCollection = pgTable(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex('zeroentropy_collection_org_unique').on(table.organizationId),
+    uniqueIndex('zeroentropy_collection_user_unique').on(table.userId),
     uniqueIndex('zeroentropy_collection_name_unique').on(table.collectionName),
   ],
 ).enableRLS();
@@ -64,8 +64,8 @@ export const failedSyncOperation = pgTable(
   {
     id: text().default(sql`gen_random_uuid()`).primaryKey().notNull(),
     eventId: text().notNull(),
-    organizationId: text()
-      .references(() => organization.id, { onDelete: 'cascade' })
+    userId: text()
+      .references(() => user.id, { onDelete: 'cascade' })
       .notNull(),
     entityType: text().notNull(),
     entityId: text().notNull(),
@@ -81,12 +81,12 @@ export const failedSyncOperation = pgTable(
   },
   (table) => [
     uniqueIndex('failed_sync_operation_entity_unique').on(
-      table.organizationId,
+      table.userId,
       table.entityType,
       table.entityId,
     ),
     index('failed_sync_operation_event_idx').on(table.eventId),
-    index('failed_sync_operation_org_idx').on(table.organizationId),
+    index('failed_sync_operation_user_idx').on(table.userId),
     index('failed_sync_operation_next_retry_idx').on(table.nextRetryAt),
     index('failed_sync_operation_entity_idx').on(
       table.entityType,

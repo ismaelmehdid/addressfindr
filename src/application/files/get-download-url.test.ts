@@ -6,7 +6,7 @@ vi.mock('@/application/me/organization-scope', () => ({
 }));
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
-  getFileForOrg: vi.fn(),
+  getFileForUser: vi.fn(),
 }));
 
 vi.mock('@/infra/external-apis/supabase-storage/storage-adapter', () => ({
@@ -19,13 +19,13 @@ vi.mock('@/shared/env', () => ({
 
 import { requireOrganizationScope } from '@/application/me/organization-scope';
 import { notFound, unknown as unknownErr } from '@/core/errors';
-import { getFileForOrg } from '@/infra/data-access/file/file-repo';
+import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { fakeFile } from './__test-helpers__';
 import { getFileDownloadUrl } from './get-download-url';
 
 const mockedScope = vi.mocked(requireOrganizationScope);
-const mockedGet = vi.mocked(getFileForOrg);
+const mockedGet = vi.mocked(getFileForUser);
 const mockedSign = vi.mocked(supabaseStorageAdapter.createSignedDownloadUrl);
 
 beforeEach(() => {

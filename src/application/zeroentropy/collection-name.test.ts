@@ -2,34 +2,39 @@ import { describe, expect, it } from 'vitest';
 import { generateCollectionName } from './collection-name';
 
 describe('generateCollectionName', () => {
-  it('uses slugified organization name when present', () => {
+  it('derives a stable collection name from the user id', () => {
     const name = generateCollectionName({
-      organizationId: 'org-abc123def456',
-      organizationName: 'Café de la Gare',
+      userId: 'user-1234abcd',
+      userName: null,
     });
-    expect(name).toBe('cafe-de-la-gare-org-abc1');
+    expect(name).toMatch(/^app-entities-user-123-[0-9a-f]{8}$/);
+  });
+
+  it('prefers a slug of the user name when present', () => {
+    const name = generateCollectionName({
+      userId: 'user-1234abcd',
+      userName: 'Ismael Mehdid',
+    });
+    expect(name).toBe('ismael-mehdid-user-123');
   });
 
   it('keeps stable when called twice with same args', () => {
-    const args = {
-      organizationId: 'org-12345678',
-      organizationName: 'Test Org',
-    };
+    const args = { userId: 'user-12345678', userName: 'Test User' };
     expect(generateCollectionName(args)).toBe(generateCollectionName(args));
   });
 
   it('strips diacritics and lower-cases', () => {
     const name = generateCollectionName({
-      organizationId: 'orgabcdef',
-      organizationName: 'Étoile Spéciale',
+      userId: 'userabcdef',
+      userName: 'Étoile Spéciale',
     });
     expect(name.startsWith('etoile-speciale')).toBe(true);
   });
 
   it('truncates long names to 30 chars', () => {
     const name = generateCollectionName({
-      organizationId: 'orgabcdef',
-      organizationName: 'A'.repeat(100),
+      userId: 'userabcdef',
+      userName: 'A'.repeat(100),
     });
     const slugPart = name.split('-').slice(0, -1).join('-');
     expect(slugPart.length).toBeLessThanOrEqual(30);
@@ -37,12 +42,12 @@ describe('generateCollectionName', () => {
 
   it('falls back to deterministic hash when no name given', () => {
     const a = generateCollectionName({
-      organizationId: 'org-xyz12345',
-      organizationName: null,
+      userId: 'user-xyz12345',
+      userName: null,
     });
     const b = generateCollectionName({
-      organizationId: 'org-xyz12345',
-      organizationName: null,
+      userId: 'user-xyz12345',
+      userName: null,
     });
     expect(a).toBe(b);
     expect(a.startsWith('app-entities-')).toBe(true);
@@ -50,23 +55,17 @@ describe('generateCollectionName', () => {
 
   it('falls back to hash when name slugifies to empty', () => {
     const name = generateCollectionName({
-      organizationId: 'org-12345678',
-      organizationName: '   !!!   ',
+      userId: 'user-12345678',
+      userName: '   !!!   ',
     });
     expect(name.startsWith('app-entities-')).toBe(true);
   });
 
-  it('different orgs without names get different collection names', () => {
+  it('different users without names get different collection names', () => {
     expect(
-      generateCollectionName({
-        organizationId: 'org-aaa11111',
-        organizationName: null,
-      }),
+      generateCollectionName({ userId: 'user-aaa11111', userName: null }),
     ).not.toBe(
-      generateCollectionName({
-        organizationId: 'org-bbb22222',
-        organizationName: null,
-      }),
+      generateCollectionName({ userId: 'user-bbb22222', userName: null }),
     );
   });
 });

@@ -47,7 +47,7 @@ export async function dispatchEvent(
 ): Promise<Result<void, AppError>> {
   const queued = await enqueueOperation({
     eventId: event.eventId,
-    organizationId: event.organizationId,
+    userId: event.userId,
     entityType: event.entityType,
     entityId: event.entityId,
     operation: event.operation,
@@ -86,7 +86,7 @@ export async function retryDueOperations(args: {
         operation: op.operation,
         entityType: op.entityType,
         entityId: op.entityId,
-        organizationId: op.organizationId,
+        userId: op.userId,
         source: op.source,
         timestamp: op.nextRetryAt,
       };

@@ -3,7 +3,7 @@ import 'server-only';
 import { err, ok, type Result } from 'neverthrow';
 import Papa from 'papaparse';
 import { downloadFileBuffer } from '@/application/files/download-file-buffer';
-import { getFileEntityForOrg } from '@/application/files/get-file-entity';
+import { getFileEntityForUser } from '@/application/files/get-file-entity';
 import { type AppError, validation } from '@/core/errors';
 import {
   CSV_MAX_ROWS,
@@ -100,12 +100,12 @@ async function parseFileBuffer(args: {
 export async function fetchEntityData(args: {
   entityType: string;
   entityId: string;
-  organizationId: string;
+  userId: string;
 }): Promise<Result<FetchedEntity, AppError>> {
   if (args.entityType === IndexableEntityType.FILE) {
-    const fileResult = await getFileEntityForOrg({
+    const fileResult = await getFileEntityForUser({
       fileId: args.entityId,
-      organizationId: args.organizationId,
+      userId: args.userId,
     });
     if (fileResult.isErr()) return err(fileResult.error);
     const file = fileResult.value;

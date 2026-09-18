@@ -14,7 +14,7 @@ const DOC_TYPE = 'content';
 export const csvSerializer: IEntitySerializer<ParsedFile> = {
   entityType: IndexableEntityType.FILE,
   getEntityId: (entity) => entity.id,
-  toIndexable(entity, organizationId) {
+  toIndexable(entity, userId) {
     if (entity.parsed.kind !== 'csv-rows') return [];
     if (entity.parsed.rows.length === 0) return [];
 
@@ -40,7 +40,7 @@ export const csvSerializer: IEntitySerializer<ParsedFile> = {
       {
         entityId: entity.id,
         entityType: IndexableEntityType.FILE,
-        organizationId,
+        userId,
         docType: DOC_TYPE,
         content: {
           kind: ZeroEntropyContentKind.TEXT_PAGES_UNORDERED,

@@ -34,7 +34,7 @@ function sheetToPages(
 export const xlsxSerializer: IEntitySerializer<ParsedFile> = {
   entityType: IndexableEntityType.FILE,
   getEntityId: (entity) => entity.id,
-  toIndexable(entity, organizationId) {
+  toIndexable(entity, userId) {
     if (entity.parsed.kind !== 'spreadsheet-sheets') return [];
     if (entity.parsed.sheets.length === 0) return [];
     const pages = entity.parsed.sheets.flatMap((sheet) =>
@@ -45,7 +45,7 @@ export const xlsxSerializer: IEntitySerializer<ParsedFile> = {
       {
         entityId: entity.id,
         entityType: IndexableEntityType.FILE,
-        organizationId,
+        userId,
         docType: DOC_TYPE,
         content: {
           kind: ZeroEntropyContentKind.TEXT_PAGES_UNORDERED,

@@ -6,17 +6,17 @@ vi.mock('@/application/me/organization-scope', () => ({
 }));
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
-  listFilesForOrg: vi.fn(),
+  listFilesForUser: vi.fn(),
 }));
 
 import { requireOrganizationScope } from '@/application/me/organization-scope';
 import { notFound } from '@/core/errors';
-import { listFilesForOrg } from '@/infra/data-access/file/file-repo';
+import { listFilesForUser } from '@/infra/data-access/file/file-repo';
 import { fakeFile } from './__test-helpers__';
 import { listFiles } from './list-files';
 
 const mockedScope = vi.mocked(requireOrganizationScope);
-const mockedList = vi.mocked(listFilesForOrg);
+const mockedList = vi.mocked(listFilesForUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -56,7 +56,7 @@ describe('listFiles', () => {
   it('forwards page/perPage to repo', async () => {
     await listFiles({ page: 2, perPage: 50 });
     expect(mockedList).toHaveBeenCalledWith({
-      organizationId: 'org-1',
+      userId: 'user-1',
       page: 2,
       perPage: 50,
     });

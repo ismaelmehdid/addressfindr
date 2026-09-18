@@ -3,7 +3,7 @@ import 'server-only';
 import { err, ok, type Result } from 'neverthrow';
 import { requireOrganizationScope } from '@/application/me/organization-scope';
 import { type AppError, parseInput } from '@/core/errors';
-import { getFileForOrg } from '@/infra/data-access/file/file-repo';
+import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { env } from '@/shared/env';
 import {
@@ -33,9 +33,9 @@ export async function getBulkDownloadUrls(
 
   const results = await Promise.all(
     parsed.value.ids.map(async (fileId) => {
-      const file = await getFileForOrg({
+      const file = await getFileForUser({
         fileId,
-        organizationId: scope.value.organizationId,
+        userId: scope.value.userId,
       });
       if (file.isErr()) return { id: fileId, ok: false as const };
       const signed = await supabaseStorageAdapter.createSignedDownloadUrl({

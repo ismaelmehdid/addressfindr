@@ -14,17 +14,17 @@ function slugify(input: string, maxLength: number): string {
 }
 
 export function generateCollectionName(args: {
-  organizationId: string;
-  organizationName: string | null;
+  userId: string;
+  userName: string | null;
 }): string {
-  const orgIdShort = args.organizationId.slice(0, 8);
-  if (args.organizationName) {
-    const slug = slugify(args.organizationName, SLUG_MAX_LENGTH);
-    if (slug.length > 0) return `${slug}-${orgIdShort}`;
+  const userIdShort = args.userId.slice(0, 8);
+  if (args.userName) {
+    const slug = slugify(args.userName, SLUG_MAX_LENGTH);
+    if (slug.length > 0) return `${slug}-${userIdShort}`;
   }
   const hash = createHash('sha256')
-    .update(`${args.organizationId}-entities`)
+    .update(`${args.userId}-entities`)
     .digest('hex')
     .slice(0, 8);
-  return `app-entities-${orgIdShort}-${hash}`;
+  return `app-entities-${userIdShort}-${hash}`;
 }

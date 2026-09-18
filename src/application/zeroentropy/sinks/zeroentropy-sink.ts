@@ -16,13 +16,13 @@ async function handle(
     case SyncOperation.CREATE:
     case SyncOperation.UPDATE:
       return indexEntity({
-        organizationId: event.organizationId,
+        userId: event.userId,
         entityType: event.entityType,
         entityId: event.entityId,
       });
     case SyncOperation.DELETE:
       return removeEntity({
-        organizationId: event.organizationId,
+        userId: event.userId,
         entityType: event.entityType,
         entityId: event.entityId,
       });

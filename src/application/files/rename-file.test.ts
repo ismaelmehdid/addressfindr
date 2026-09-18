@@ -14,18 +14,18 @@ vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
 }));
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
-  renameFileForOrg: vi.fn(),
+  renameFileForUser: vi.fn(),
 }));
 
 import { requireOrganizationScope } from '@/application/me/organization-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { notFound, unknown as unknownErr } from '@/core/errors';
-import { renameFileForOrg } from '@/infra/data-access/file/file-repo';
+import { renameFileForUser } from '@/infra/data-access/file/file-repo';
 import { fakeFile } from './__test-helpers__';
 import { renameFile } from './rename-file';
 
 const mockedScope = vi.mocked(requireOrganizationScope);
-const mockedRename = vi.mocked(renameFileForOrg);
+const mockedRename = vi.mocked(renameFileForUser);
 const mockedDispatch = vi.mocked(dispatchEvent);
 
 beforeEach(() => {

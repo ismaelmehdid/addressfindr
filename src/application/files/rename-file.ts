@@ -10,7 +10,7 @@ import {
   IndexableEntityType,
   SyncOperation,
 } from '@/core/zeroentropy/types';
-import { renameFileForOrg } from '@/infra/data-access/file/file-repo';
+import { renameFileForUser } from '@/infra/data-access/file/file-repo';
 import { log } from '@/shared/logger';
 import {
   type FileDto,
@@ -32,9 +32,9 @@ export async function renameFile(
   const scope = await requireOrganizationScope();
   if (scope.isErr()) return err(scope.error);
 
-  const renamed = await renameFileForOrg({
+  const renamed = await renameFileForUser({
     fileId: parsed.value.fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
     originalName: parsed.value.originalName.trim(),
   });
   if (renamed.isErr()) return err(renamed.error);
@@ -44,7 +44,7 @@ export async function renameFile(
     operation: SyncOperation.UPDATE,
     entityType: IndexableEntityType.FILE,
     entityId: renamed.value.id,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
     source: DataSource.USER_EDIT,
     timestamp: new Date(),
   });

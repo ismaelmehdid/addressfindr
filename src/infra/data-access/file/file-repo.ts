@@ -26,7 +26,6 @@ type FileRowForEntity = Pick<
   FileRow,
   | 'id'
   | 'userId'
-  | 'organizationId'
   | 'originalName'
   | 'storageKey'
   | 'mimeType'
@@ -67,7 +66,6 @@ function rowToEntity(row: FileRowForEntity): Result<FileEntity, AppError> {
   return ok({
     id: row.id,
     userId: row.userId,
-    organizationId: row.organizationId,
     originalName: row.originalName,
     storageKey: storageKey.value,
     mimeType: mimeType(row.mimeType),
@@ -85,7 +83,6 @@ function rowToEntity(row: FileRowForEntity): Result<FileEntity, AppError> {
 const listColumns = {
   id: file.id,
   userId: file.userId,
-  organizationId: file.organizationId,
   originalName: file.originalName,
   storageKey: file.storageKey,
   mimeType: file.mimeType,
@@ -99,19 +96,14 @@ const listColumns = {
 
 export async function setFileVisionDescription(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
   visionDescription: string | null;
 }): Promise<Result<void, AppError>> {
   try {
     await db
       .update(file)
       .set({ visionDescription: args.visionDescription })
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      );
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)));
     return ok(undefined);
   } catch (e) {
     log.error('Failed to set file vision description', e, {
@@ -123,7 +115,6 @@ export async function setFileVisionDescription(args: {
 
 export async function createFile(args: {
   userId: string;
-  organizationId: string;
   originalName: string;
   storageKey: string;
   mimeType: string;
@@ -135,7 +126,6 @@ export async function createFile(args: {
       .insert(file)
       .values({
         userId: args.userId,
-        organizationId: args.organizationId,
         originalName: args.originalName,
         storageKey: args.storageKey,
         mimeType: args.mimeType,
@@ -153,20 +143,15 @@ export async function createFile(args: {
   }
 }
 
-export async function getFileForOrg(args: {
+export async function getFileForUser(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
 }): Promise<Result<FileEntity, AppError>> {
   try {
     const [row] = await db
       .select()
       .from(file)
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      )
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)))
       .limit(1);
     if (!row) return err(notFound('File not found', 'file'));
     return rowToEntity(row);
@@ -176,12 +161,16 @@ export async function getFileForOrg(args: {
   }
 }
 
-export async function getFilesByIds(
-  ids: string[],
-): Promise<Result<FileEntity[], AppError>> {
-  if (ids.length === 0) return ok([]);
+export async function getFilesByIds(args: {
+  ids: string[];
+  userId: string;
+}): Promise<Result<FileEntity[], AppError>> {
+  if (args.ids.length === 0) return ok([]);
   try {
-    const rows = await db.select().from(file).where(inArray(file.id, ids));
+    const rows = await db
+      .select()
+      .from(file)
+      .where(and(inArray(file.id, args.ids), eq(file.userId, args.userId)));
     const items: FileEntity[] = [];
     for (const row of rows) {
       const mapped = rowToEntity(row);
@@ -190,7 +179,7 @@ export async function getFilesByIds(
     }
     return ok(items);
   } catch (e) {
-    log.error('Failed to fetch files by ids', e, { count: ids.length });
+    log.error('Failed to fetch files by ids', e, { count: args.ids.length });
     return err(unknown('Failed to fetch files by ids'));
   }
 }
@@ -201,8 +190,8 @@ export type FilePage = {
   page: number;
 };
 
-export async function listFilesForOrg(args: {
-  organizationId: string;
+export async function listFilesForUser(args: {
+  userId: string;
   page: number;
   perPage: number;
 }): Promise<Result<FilePage, AppError>> {
@@ -211,10 +200,7 @@ export async function listFilesForOrg(args: {
       .select(listColumns)
       .from(file)
       .where(
-        and(
-          eq(file.organizationId, args.organizationId),
-          eq(file.status, FileStatus.UPLOADED),
-        ),
+        and(eq(file.userId, args.userId), eq(file.status, FileStatus.UPLOADED)),
       )
       .orderBy(desc(file.createdAt))
       .limit(args.perPage + 1)
@@ -228,27 +214,20 @@ export async function listFilesForOrg(args: {
     }
     return ok({ items, hasMore, page: args.page });
   } catch (e) {
-    log.error('Failed to list files', e, {
-      organizationId: args.organizationId,
-    });
+    log.error('Failed to list files', e, { userId: args.userId });
     return err(unknown('Failed to list files'));
   }
 }
 
 export async function markUploaded(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
 }): Promise<Result<FileEntity, AppError>> {
   try {
     const [row] = await db
       .update(file)
       .set({ status: FileStatus.UPLOADED })
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      )
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)))
       .returning();
     if (!row) return err(notFound('File not found', 'file'));
     return rowToEntity(row);
@@ -260,7 +239,7 @@ export async function markUploaded(args: {
 
 export async function markIndexStatus(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
   indexStatus: FileIndexStatus;
   indexError?: string | null;
 }): Promise<Result<void, AppError>> {
@@ -271,12 +250,7 @@ export async function markIndexStatus(args: {
         indexStatus: args.indexStatus,
         indexError: args.indexError ?? null,
       })
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      );
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)));
     return ok(undefined);
   } catch (e) {
     log.error('Failed to update file index status', e, args);
@@ -286,17 +260,12 @@ export async function markIndexStatus(args: {
 
 export async function deleteFileRow(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
 }): Promise<Result<void, AppError>> {
   try {
     await db
       .delete(file)
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      );
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)));
     return ok(undefined);
   } catch (e) {
     log.error('Failed to delete file row', e, { fileId: args.fileId });
@@ -304,21 +273,16 @@ export async function deleteFileRow(args: {
   }
 }
 
-export async function renameFileForOrg(args: {
+export async function renameFileForUser(args: {
   fileId: string;
-  organizationId: string;
+  userId: string;
   originalName: string;
 }): Promise<Result<FileEntity, AppError>> {
   try {
     const [row] = await db
       .update(file)
       .set({ originalName: args.originalName })
-      .where(
-        and(
-          eq(file.id, args.fileId),
-          eq(file.organizationId, args.organizationId),
-        ),
-      )
+      .where(and(eq(file.id, args.fileId), eq(file.userId, args.userId)))
       .returning();
     if (!row) return err(notFound('File not found', 'file'));
     return rowToEntity(row);
