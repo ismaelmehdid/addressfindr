@@ -210,8 +210,8 @@ export const DOMAINS = [
       'src/app/api/billing',
     ],
     schemas: [],
-    // Reads the active org id via the auth domain (openToAll); nothing else
-    // depends on it yet, so no ALLOWED_EDGES entry is required.
+    // Reads the current user id via the auth domain (openToAll); nothing
+    // else depends on it yet, so no ALLOWED_EDGES entry is required.
     public: ['src/application/billing/get-app-entitlement'],
   },
 ];

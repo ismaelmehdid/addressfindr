@@ -4,6 +4,7 @@ import {
   isPathOwnedBy,
   MAX_FILENAME_LENGTH,
   MAX_PATH_LENGTH,
+  ownerPrefix,
   parseFilePath,
 } from './file-path';
 
@@ -155,5 +156,24 @@ describe('isPathOwnedBy', () => {
         userId: '01HXYZOTHER000000000000000',
       }),
     ).toBe(false);
+  });
+});
+
+describe('ownerPrefix', () => {
+  it('returns a slash-terminated prefix for the user root', () => {
+    expect(ownerPrefix({ userId: USER })).toBe(`${USER}/`);
+  });
+
+  it('returns a slash-terminated prefix scoped to a category', () => {
+    expect(ownerPrefix({ userId: USER, category: 'attachments' })).toBe(
+      `${USER}/attachments/`,
+    );
+  });
+
+  it('does not let one userId prefix-match another', () => {
+    const similarOtherUser = `${USER}2`;
+    expect(similarOtherUser.startsWith(ownerPrefix({ userId: USER }))).toBe(
+      false,
+    );
   });
 });

@@ -171,7 +171,7 @@ export function ownerPrefix(input: {
   category?: FileCategory;
 }): string {
   if (input.category) {
-    return `${input.userId}/${input.category}`;
+    return `${input.userId}/${input.category}/`;
   }
-  return input.userId;
+  return `${input.userId}/`;
 }
