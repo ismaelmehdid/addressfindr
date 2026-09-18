@@ -11,6 +11,7 @@ import { PosthogExporter } from '@mastra/posthog';
 import { CHAT_AGENT, type ChatAgentId } from '@/core/agents/agent-ids';
 import { WorkingMemoryJsonSchema } from '@/core/agents/working-memory';
 import { env } from '@/shared/env';
+import { log } from '@/shared/logger';
 import { agentDefinitions } from './agent-definitions';
 import { stripNonImageFilePartsProcessor } from './strip-non-image-files-processor';
 
@@ -35,26 +36,45 @@ function buildMastraSingletons(): MastraSingletons {
     max: MASTRA_PG_POOL_MAX,
     idleTimeoutMillis: MASTRA_PG_IDLE_TIMEOUT_MS,
   });
+  // Embedding and title generation need OpenAI. Constructing them without a key
+  // throws at module load, which would take down every page that merely reads
+  // conversations — so the key-less build keeps storage and working memory and
+  // drops only what actually calls the model.
+  const openaiConfigured = Boolean(e.OPENAI_API_KEY);
+  if (!openaiConfigured) {
+    log.warn('mastra.memory.degraded', {
+      reason: 'OPENAI_API_KEY not set',
+      disabled: ['semanticRecall', 'generateTitle', 'embedder'],
+    });
+  }
   const memoryInstance = new Memory({
     storage,
-    vector: new PgVector({
-      id: 'app-vector',
-      connectionString: e.DATABASE_URL,
-      max: MASTRA_PG_POOL_MAX,
-      idleTimeoutMillis: MASTRA_PG_IDLE_TIMEOUT_MS,
-    }),
-    embedder: new ModelRouterEmbeddingModel(`openai/text-embedding-3-small`),
+    ...(openaiConfigured
+      ? {
+          vector: new PgVector({
+            id: 'app-vector',
+            connectionString: e.DATABASE_URL,
+            max: MASTRA_PG_POOL_MAX,
+            idleTimeoutMillis: MASTRA_PG_IDLE_TIMEOUT_MS,
+          }),
+          embedder: new ModelRouterEmbeddingModel(
+            `openai/text-embedding-3-small`,
+          ),
+        }
+      : {}),
     options: {
       lastMessages: 20,
       workingMemory: {
         enabled: true,
         schema: WorkingMemoryJsonSchema,
       },
-      semanticRecall: {
-        topK: 5,
-        messageRange: 2,
-      },
-      generateTitle: true,
+      semanticRecall: openaiConfigured
+        ? {
+            topK: 5,
+            messageRange: 2,
+          }
+        : false,
+      generateTitle: openaiConfigured,
     },
   });
   return { storage, memory: memoryInstance };

@@ -153,9 +153,21 @@ function assertBillingConfigured(parsed: Env): void {
   }
 }
 
+// `.env` ships every optional key with an empty value, and dotenv loads those
+// as '' rather than undefined — which would defeat v.optional() and fail the
+// minLength/url/email checks. An empty value means "not set".
+function definedEntries(source: NodeJS.ProcessEnv): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(source).filter(
+      (entry): entry is [string, string] =>
+        typeof entry[1] === 'string' && entry[1].trim() !== '',
+    ),
+  );
+}
+
 export function env(): Env {
   if (cached) return cached;
-  const result = v.safeParse(EnvSchema, process.env);
+  const result = v.safeParse(EnvSchema, definedEntries(process.env));
   if (!result.success) {
     const issues = result.issues
       .map(
