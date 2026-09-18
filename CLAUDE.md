@@ -197,6 +197,10 @@ Rules the checker enforces:
 ### Infra constraints
 
 - **No new infra / SaaS subscriptions.** Stick to the existing stack: OpenAI, ZeroEntropy, Supabase, Upstash, Vercel, PostHog. If you think you need something else, raise it explicitly first.
+  - **Approved additions (raised and accepted 2026-09-17), scoped to the `listing` domain:**
+    - **Firecrawl** — scraping des annonces immobilières. Retenu après mesure : il passe DataDome sur leboncoin là où un `fetch` direct ne passe pas. Appelé en REST via `fetch`, aucun paquet npm ajouté.
+    - **Groq** — hébergeur d'inférence pour l'extraction de champs depuis le markdown d'annonce. Le modèle reste un modèle OpenAI (`openai/gpt-oss-120b`), donc la règle « OpenAI-only » tient sur le fond ; seul l'hôte d'inférence change. API compatible OpenAI, donc `@ai-sdk/openai` avec un `baseURL` — aucun paquet npm ajouté, et le repli vers OpenAI est un changement de config.
+    - Rationale et mesures : `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md` §3 et §4.1.
 - **Cron is only for retry / stuck-state cleanup.** Primary work runs in-request (or via `waitUntil`).
 
 ---

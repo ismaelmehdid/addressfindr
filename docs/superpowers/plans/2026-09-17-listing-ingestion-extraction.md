@@ -2839,8 +2839,18 @@ describe('looksBlocked', () => {
     ).toBe(true);
   });
 
-  it('does NOT flag a full listing page that merely loads an anti-bot script', () => {
+  it('does NOT flag a short page just because an anti-bot vendor is named', () => {
+    // ~1.4k chars: sous le seuil, donc la liste de marqueurs EST consultée.
+    // "datadome" n'en fait pas partie — c'est le garde-fou contre le faux
+    // positif observé pendant la recherche (le script est sur toutes les pages).
     const markdown = `${'Duplex 4 pièces 102 m² '.repeat(60)} datadome`;
+    expect(markdown.length).toBeLessThan(1500);
+    expect(looksBlocked({ markdown, statusCode: 200 })).toBe(false);
+  });
+
+  it('does NOT flag a long page that happens to contain a challenge string', () => {
+    const markdown = `${'Appartement 4 pièces 80 m² '.repeat(100)} geo.captcha-delivery.com`;
+    expect(markdown.length).toBeGreaterThan(1500);
     expect(looksBlocked({ markdown, statusCode: 200 })).toBe(false);
   });
 
@@ -2918,7 +2928,7 @@ export function isUnsupportedCategory(text: string): boolean {
 - [ ] **Step 4: Lancer le test, vérifier le succès**
 
 Run: `pnpm vitest run src/core/listing/page-guards.test.ts`
-Expected: PASS (10 tests)
+Expected: PASS (11 tests)
 
 - [ ] **Step 5: Brancher `looksBlocked` dans l'adaptateur Firecrawl**
 
