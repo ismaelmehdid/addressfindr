@@ -312,6 +312,7 @@ git commit -m "refactor(auth): replace organization scope with user scope"
 - Modify: `src/app/(app)/layout.tsx`, `src/app/(app)/dashboard/layout.tsx`, `src/app/(public)/sign-in/page.tsx`, `src/app/(public)/page.tsx`
 - Modify: `src/application/me/get-current-user.ts`
 - Modify: `src/infra/data-access/early-access/early-access-repo.ts`
+- Modify: `src/shared/api-route.ts`
 - Modify: `src/application/early-access/redeem.ts`
 
 - [ ] **Step 1: Delete the two route directories**
@@ -362,6 +363,8 @@ hasRedeemedAccess: redeemed.value,
 Then in `(app)/layout.tsx`, `(app)/dashboard/layout.tsx` and `(public)/sign-in/page.tsx`, replace `!currentUser.value.organizationId` with `!currentUser.value.hasRedeemedAccess`.
 
 Remove the organization link from `dashboard-sidebar.tsx`. The sidebar stays collapsed to its icon rail — do not expand it.
+
+`src/shared/api-route.ts` is the second gate and must move in the same commit. It rejects any user without an organization (`forbidden('Organization required')`) and builds its rate-limit identifier as `` `${organizationId}:${id}` ``. Drop the organization check — `requireUserScope` already dropped its equivalent, and leaving this one in place would keep every `/api/files/*` and `/api/transcribe` route closed. The rate-limit identifier becomes the user id alone, which changes bucketing from per-organization-per-user to per-user: correct for a B2C product, and the only sane reading once organizations are gone.
 
 - [ ] **Step 4: Simplify the redeem use case in the same commit**
 
