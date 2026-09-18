@@ -9,37 +9,13 @@ export const DOMAINS = [
       'src/app/(public)/sign-in',
       'src/app/(app)/dashboard/settings',
     ],
-    schemas: [
-      'src/infra/database/schema/auth-schema',
-      // co-owner: the better-auth organization plugin writes org tables
-      'src/infra/database/schema/organization-schema',
-    ],
+    schemas: ['src/infra/database/schema/auth-schema'],
     public: [
       'src/infra/auth/auth',
-      'src/infra/auth/active-organization',
       'src/application/me/get-current-user',
       'src/application/me/user-scope',
     ],
     openToAll: true,
-  },
-  {
-    name: 'organization',
-    dirs: [
-      'src/application/organization',
-      'src/application/invitations',
-      'src/infra/data-access/organization',
-      'src/app/(public)/accept-invitation',
-    ],
-    schemas: ['src/infra/database/schema/organization-schema'],
-    public: [
-      'src/application/organization/dto',
-      'src/application/organization/list-members',
-      'src/application/organization/list-invitations',
-      'src/application/organization/get-membership',
-      'src/application/organization/get-organization-name',
-      'src/application/organization/create-organization-with-owner',
-      'src/application/invitations/find-pending-for-current-user',
-    ],
   },
   {
     name: 'early-access',
@@ -196,10 +172,7 @@ export const DOMAINS = [
       'src/infra/external-apis/smtp',
     ],
     schemas: [],
-    public: [
-      'src/infra/email/email-sender',
-      'src/infra/email/send-organization-invitation',
-    ],
+    public: ['src/infra/email/email-sender'],
     openToAll: true,
   },
   {
@@ -220,11 +193,8 @@ export const DOMAINS = [
 ];
 
 export const ALLOWED_EDGES = [
-  ['early-access', 'organization'],
-  ['auth', 'organization'],
   ['auth', 'early-access'],
   ['indexing', 'files'],
-  ['indexing', 'organization'],
   ['files', 'indexing'],
 ];
 

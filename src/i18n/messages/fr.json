@@ -7,14 +7,11 @@
   "SignIn": {
     "title": "Connexion",
     "google": "Continuer avec Google",
-    "microsoft": "Continuer avec Microsoft",
-    "signInToAcceptInvitation": "Connectez-vous pour accepter votre invitation.",
-    "emailMismatchToast": "Cette invitation concerne une autre adresse e-mail. Connectez-vous avec ce compte."
+    "microsoft": "Continuer avec Microsoft"
   },
   "Onboarding": {
     "title": "Saisissez votre code d'accès",
     "subtitle": "Utilisez le code d'accès anticipé que vous avez reçu pour continuer.",
-    "orgName": "Nom de l'organisation",
     "code": "Code d'accès anticipé",
     "submit": "Continuer",
     "invalidCode": "Code invalide ou déjà utilisé.",
@@ -32,55 +29,10 @@
     "signOut": "Se déconnecter",
     "language": "Langue"
   },
-  "Members": {
-    "title": "Organisation",
-    "subtitle": "Gérez les membres et les invitations.",
-    "pageHelp": "Gérez les membres de votre organisation et les invitations en attente. Tous les fichiers et documents partagés ici sont accessibles à l'équipe.",
-    "membersSection": "Membres",
-    "pendingSection": "Invitations en attente",
-    "inviteButton": "Inviter",
-    "inviteDialogTitle": "Inviter un membre",
-    "inviteDialogDescription": "Il recevra un e-mail avec un lien pour rejoindre.",
-    "inviteEmailLabel": "E-mail",
-    "inviteEmailPlaceholder": "nom@entreprise.com",
-    "inviteRoleLabel": "Rôle",
-    "roleMember": "Membre",
-    "roleAdmin": "Administrateur",
-    "roleOwner": "Propriétaire",
-    "sendInvitation": "Envoyer l'invitation",
-    "cancel": "Annuler",
-    "cancelInvitation": "Annuler l'invitation",
-    "remove": "Retirer",
-    "you": "Vous",
-    "joinedOn": "A rejoint le {date}",
-    "expiresOn": "Expire le {date}",
-    "inviteSuccess": "Invitation envoyée",
-    "inviteAlreadyMember": "Cette personne est déjà membre",
-    "cancelSuccess": "Invitation annulée",
-    "removeSuccess": "Membre retiré",
-    "emptyMembers": "Aucun membre pour l'instant.",
-    "emptyInvitations": "Aucune invitation en attente."
-  },
-  "AcceptInvitation": {
-    "title": "Vous avez été invité",
-    "subtitle": "Rejoindre {orgName} en tant que {role}.",
-    "accept": "Accepter",
-    "reject": "Refuser",
-    "acceptSuccess": "Bienvenue !",
-    "rejectSuccess": "Invitation refusée",
-    "expired": "Cette invitation a expiré.",
-    "notFound": "Invitation introuvable.",
-    "alreadyMember": "Vous êtes déjà membre de cette organisation.",
-    "wrongAccount": "Cette invitation est pour {email}. Vous êtes connecté en tant que {currentEmail}.",
-    "switchAccount": "Se déconnecter et changer de compte",
-    "emailMismatchToast": "Cette invitation concerne une autre adresse e-mail. Connectez-vous avec ce compte.",
-    "alreadyInOrgToast": "Vous êtes déjà membre d'une organisation — vous ne pouvez en rejoindre qu'une seule à la fois."
-  },
   "Meta": {
     "signIn": "Connexion",
     "onboarding": "Bienvenue",
     "dashboard": "Tableau de bord",
-    "acceptInvitation": "Accepter l'invitation",
     "settings": "Paramètres"
   },
   "Home": {

@@ -1,16 +1,12 @@
 'use client';
 
 import Image from 'next/image';
-import { useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useEffect } from 'react';
-import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authClient } from '@/shared/auth-client';
 
-const DEFAULT_CALLBACK_URL = '/onboarding';
-const INVITATION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+const CALLBACK_URL = '/onboarding';
 
 type Props = {
   microsoftEnabled: boolean;
@@ -18,29 +14,6 @@ type Props = {
 
 export function SignInForm({ microsoftEnabled }: Props) {
   const t = useTranslations('SignIn');
-  const searchParams = useSearchParams();
-  const invitationParam = searchParams.get('invitation') ?? '';
-  const hasValidInvitation = INVITATION_ID_PATTERN.test(invitationParam);
-  const callbackURL = hasValidInvitation
-    ? `/accept-invitation/${invitationParam}`
-    : DEFAULT_CALLBACK_URL;
-
-  const errorParam = searchParams.get('error');
-
-  useEffect(() => {
-    if (errorParam === 'invitation-email-mismatch') {
-      const id = window.setTimeout(() => {
-        toast.error(t('emailMismatchToast'));
-      }, 0);
-      return () => window.clearTimeout(id);
-    }
-    if (hasValidInvitation) {
-      const id = window.setTimeout(() => {
-        toast.info(t('signInToAcceptInvitation'));
-      }, 0);
-      return () => window.clearTimeout(id);
-    }
-  }, [errorParam, hasValidInvitation, t]);
 
   return (
     <main className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background">
@@ -67,7 +40,7 @@ export function SignInForm({ microsoftEnabled }: Props) {
               onClick={() =>
                 authClient.signIn.social({
                   provider: 'google',
-                  callbackURL,
+                  callbackURL: CALLBACK_URL,
                 })
               }
             >
@@ -87,7 +60,7 @@ export function SignInForm({ microsoftEnabled }: Props) {
                 onClick={() =>
                   authClient.signIn.social({
                     provider: 'microsoft',
-                    callbackURL,
+                    callbackURL: CALLBACK_URL,
                   })
                 }
               >

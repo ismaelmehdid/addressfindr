@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { Suspense } from 'react';
 import { getAppEntitlement } from '@/application/billing/get-app-entitlement';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { DashboardMainShell } from './components/dashboard-main-shell';
 import { DashboardWrapper } from './components/dashboard-wrapper';
-import { ToastFromSearchParams } from './components/toast-from-search-params';
 
 export default async function DashboardLayout({
   children,
@@ -23,9 +21,6 @@ export default async function DashboardLayout({
 
   return (
     <DashboardWrapper user={currentUser.value}>
-      <Suspense fallback={null}>
-        <ToastFromSearchParams />
-      </Suspense>
       <DashboardMainShell header={header}>{children}</DashboardMainShell>
     </DashboardWrapper>
   );

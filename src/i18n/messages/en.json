@@ -7,14 +7,11 @@
   "SignIn": {
     "title": "Sign in",
     "google": "Continue with Google",
-    "microsoft": "Continue with Microsoft",
-    "signInToAcceptInvitation": "Sign in to accept your invitation.",
-    "emailMismatchToast": "This invitation is for a different email. Sign in with that account."
+    "microsoft": "Continue with Microsoft"
   },
   "Onboarding": {
     "title": "Enter your access code",
     "subtitle": "Use the early-access code you received to continue.",
-    "orgName": "Organization name",
     "code": "Early-access code",
     "submit": "Continue",
     "invalidCode": "Invalid or already-used code.",
@@ -32,55 +29,10 @@
     "signOut": "Sign out",
     "language": "Language"
   },
-  "Members": {
-    "title": "Organization",
-    "subtitle": "Manage members and invitations.",
-    "pageHelp": "Manage your organization's members and pending invitations. All files and documents shared here are accessible to the whole team.",
-    "membersSection": "Members",
-    "pendingSection": "Pending invitations",
-    "inviteButton": "Invite",
-    "inviteDialogTitle": "Invite a member",
-    "inviteDialogDescription": "They will receive an email with a link to join.",
-    "inviteEmailLabel": "Email",
-    "inviteEmailPlaceholder": "name@company.com",
-    "inviteRoleLabel": "Role",
-    "roleMember": "Member",
-    "roleAdmin": "Admin",
-    "roleOwner": "Owner",
-    "sendInvitation": "Send invitation",
-    "cancel": "Cancel",
-    "cancelInvitation": "Cancel invitation",
-    "remove": "Remove",
-    "you": "You",
-    "joinedOn": "Joined {date}",
-    "expiresOn": "Expires {date}",
-    "inviteSuccess": "Invitation sent",
-    "inviteAlreadyMember": "This person is already a member",
-    "cancelSuccess": "Invitation cancelled",
-    "removeSuccess": "Member removed",
-    "emptyMembers": "No members yet.",
-    "emptyInvitations": "No pending invitations."
-  },
-  "AcceptInvitation": {
-    "title": "You've been invited",
-    "subtitle": "Join {orgName} as {role}.",
-    "accept": "Accept",
-    "reject": "Decline",
-    "acceptSuccess": "Welcome aboard!",
-    "rejectSuccess": "Invitation declined",
-    "expired": "This invitation has expired.",
-    "notFound": "Invitation not found.",
-    "alreadyMember": "You're already a member of this organization.",
-    "wrongAccount": "This invitation is for {email}. You're signed in as {currentEmail}.",
-    "switchAccount": "Sign out and switch account",
-    "emailMismatchToast": "This invitation is for a different email. Sign in with that account.",
-    "alreadyInOrgToast": "You're already a member of an organization — you can only belong to one at a time."
-  },
   "Meta": {
     "signIn": "Sign in",
     "onboarding": "Welcome",
     "dashboard": "Dashboard",
-    "acceptInvitation": "Accept invitation",
     "settings": "Settings"
   },
   "Home": {
