@@ -97,18 +97,29 @@ describe('resolveQuotedFields', () => {
     expect(resolveQuotedFields({ source: SOURCE, quotes: {} })).toEqual({});
   });
 
+  // why: ces espaces sont invisibles et un echappement \uXXXX ecrit dans un
+  // litteral a deja ete aplati en espace ordinaire trois fois dans ce plan. On
+  // les construit par code point, et on verifie leur presence AVANT de s'en
+  // servir — sinon le test passerait en ne testant rien.
   it('matches across a unicode space divergence on either side', () => {
+    const nbsp = String.fromCharCode(0x00a0);
+    const narrowNbsp = String.fromCharCode(0x202f);
+
+    const sourceWithNbsp = `Surface habitable : 80,5${nbsp}m²`;
+    expect(sourceWithNbsp).toContain(nbsp);
     expect(
       resolveQuotedFields({
-        source: 'Surface habitable : 80,5 m²',
+        source: sourceWithNbsp,
         quotes: { surfaceM2: 'Surface habitable : 80,5 m²' },
       }).surfaceM2,
     ).toBe(80.5);
 
+    const quoteWithNarrowNbsp = `Surface habitable : 80,5${narrowNbsp}m²`;
+    expect(quoteWithNarrowNbsp).toContain(narrowNbsp);
     expect(
       resolveQuotedFields({
         source: 'Surface habitable : 80,5 m²',
-        quotes: { surfaceM2: 'Surface habitable : 80,5 m²' },
+        quotes: { surfaceM2: quoteWithNarrowNbsp },
       }).surfaceM2,
     ).toBe(80.5);
   });
