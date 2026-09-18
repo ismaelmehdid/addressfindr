@@ -5,8 +5,8 @@ vi.mock('@/shared/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
@@ -26,7 +26,7 @@ vi.mock('@/shared/env', () => ({
   env: () => ({ SUPABASE_STORAGE_BUCKET: 'files' }),
 }));
 
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { notFound, unknown as unknownErr } from '@/core/errors';
 import {
@@ -37,7 +37,7 @@ import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/s
 import { fakeFile } from './__test-helpers__';
 import { deleteFile } from './delete-file';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
+const mockedScope = vi.mocked(requireUserScope);
 const mockedGet = vi.mocked(getFileForUser);
 const mockedDispatch = vi.mocked(dispatchEvent);
 const mockedRemove = vi.mocked(supabaseStorageAdapter.remove);
@@ -45,9 +45,7 @@ const mockedDelete = vi.mocked(deleteFileRow);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-1', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-1' }));
   mockedGet.mockResolvedValue(ok(fakeFile()));
   mockedDispatch.mockResolvedValue(ok(undefined));
   mockedRemove.mockResolvedValue(ok(undefined));

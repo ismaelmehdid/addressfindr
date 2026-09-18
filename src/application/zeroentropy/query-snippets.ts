@@ -6,7 +6,7 @@ import {
   getFileEntitiesByIds,
   getFileEntityForUser,
 } from '@/application/files/get-file-entity';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { multiQuerySearch } from '@/application/retrieval/multi-query-search';
 import { type AppError, parseInput } from '@/core/errors';
 import { ZEROENTROPY_CONFIG } from '@/core/zeroentropy/config';
@@ -88,7 +88,7 @@ async function searchUserFilesImpl(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const collection = await ensureCollection(scope.value.userId);
@@ -191,7 +191,7 @@ async function searchFileTextImpl(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const file = await getFileEntityForUser({

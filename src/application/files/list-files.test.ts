@@ -1,28 +1,26 @@
 import { err, ok } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
   listFilesForUser: vi.fn(),
 }));
 
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { notFound } from '@/core/errors';
 import { listFilesForUser } from '@/infra/data-access/file/file-repo';
 import { fakeFile } from './__test-helpers__';
 import { listFiles } from './list-files';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
+const mockedScope = vi.mocked(requireUserScope);
 const mockedList = vi.mocked(listFilesForUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-1', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-1' }));
   mockedList.mockResolvedValue(
     ok({
       items: [fakeFile({ id: 'a' }), fakeFile({ id: 'b' })],

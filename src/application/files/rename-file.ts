@@ -2,7 +2,7 @@ import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
 import { v7 as uuidv7 } from 'uuid';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { type AppError, parseInput } from '@/core/errors';
 import {
@@ -29,7 +29,7 @@ export async function renameFile(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const renamed = await renameFileForUser({

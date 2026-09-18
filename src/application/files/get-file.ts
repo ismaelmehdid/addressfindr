@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import type { AppError } from '@/core/errors';
 import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { log } from '@/shared/logger';
@@ -11,7 +11,7 @@ import { toFileDto } from './mappers';
 export async function getFile(
   fileId: string,
 ): Promise<Result<FileDto, AppError>> {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const file = await getFileForUser({

@@ -18,7 +18,7 @@ export const DOMAINS = [
       'src/infra/auth/auth',
       'src/infra/auth/active-organization',
       'src/application/me/get-current-user',
-      'src/application/me/organization-scope',
+      'src/application/me/user-scope',
     ],
     openToAll: true,
   },

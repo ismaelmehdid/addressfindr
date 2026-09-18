@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { type AppError, parseInput } from '@/core/errors';
 import { buildFilePath } from '@/core/storage/services/file-path';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
@@ -22,11 +22,10 @@ export async function createSignedUploadUrl(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const path = buildFilePath({
-    organizationId: scope.value.organizationId,
     userId: scope.value.userId,
     category: parsed.value.category,
     filename: parsed.value.filename,

@@ -5,8 +5,8 @@ vi.mock('@/shared/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/application/files/get-file-entity', () => ({
@@ -23,21 +23,19 @@ vi.mock('./collection-service', () => ({
 }));
 
 import { getFileEntitiesByIds } from '@/application/files/get-file-entity';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { multiQuerySearch } from '@/application/retrieval/multi-query-search';
 import { ensureCollection } from './collection-service';
 import { searchUserFiles } from './query-snippets';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
+const mockedScope = vi.mocked(requireUserScope);
 const mockedEnsureCollection = vi.mocked(ensureCollection);
 const mockedSearch = vi.mocked(multiQuerySearch);
 const mockedGetFiles = vi.mocked(getFileEntitiesByIds);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-a', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-a' }));
   mockedEnsureCollection.mockResolvedValue(
     ok({
       id: 'coll-a',

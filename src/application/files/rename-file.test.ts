@@ -5,8 +5,8 @@ vi.mock('@/shared/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
@@ -17,22 +17,20 @@ vi.mock('@/infra/data-access/file/file-repo', () => ({
   renameFileForUser: vi.fn(),
 }));
 
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { notFound, unknown as unknownErr } from '@/core/errors';
 import { renameFileForUser } from '@/infra/data-access/file/file-repo';
 import { fakeFile } from './__test-helpers__';
 import { renameFile } from './rename-file';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
+const mockedScope = vi.mocked(requireUserScope);
 const mockedRename = vi.mocked(renameFileForUser);
 const mockedDispatch = vi.mocked(dispatchEvent);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-1', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-1' }));
   mockedRename.mockResolvedValue(ok(fakeFile({ originalName: 'new.pdf' })));
   mockedDispatch.mockResolvedValue(ok(undefined));
 });

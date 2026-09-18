@@ -42,7 +42,7 @@ describe('createSignedUploadUrl', () => {
     ).mockResolvedValue(
       ok({
         bucket: 'files',
-        path: 'org1/user1/attachments/01-doc.pdf' as never,
+        path: 'user1/attachments/01-doc.pdf' as never,
         signedUrl: 'https://signed',
         token: 'tok',
         resumableEndpoint:
@@ -65,7 +65,7 @@ describe('createSignedUploadUrl', () => {
     expect(result.value.expiresAt).toBe('2030-01-01T02:00:00.000Z');
     const call = vi.mocked(supabaseStorageAdapter.createSignedUploadCredentials)
       .mock.calls[0]?.[0];
-    expect(call?.path.startsWith('org1/user1/attachments/')).toBe(true);
+    expect(call?.path.startsWith('user1/attachments/')).toBe(true);
     expect(call?.upsert).toBe(false);
   });
 

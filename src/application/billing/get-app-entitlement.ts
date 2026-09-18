@@ -2,7 +2,7 @@ import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
 import { cookies } from 'next/headers';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { isDevPaywallSkipEnabled } from '@/core/billing/services/dev-paywall-skip';
 import {
   DEV_PAYWALL_SKIP_COOKIE,
@@ -17,7 +17,7 @@ import { env } from '@/shared/env';
 export async function getAppEntitlement(): Promise<
   Result<Entitlement, AppError>
 > {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const cookieStore = await cookies();

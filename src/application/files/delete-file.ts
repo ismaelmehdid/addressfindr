@@ -2,7 +2,7 @@ import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
 import { v7 as uuidv7 } from 'uuid';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import type { AppError } from '@/core/errors';
 import {
@@ -21,7 +21,7 @@ import { log } from '@/shared/logger';
 export async function deleteFile(
   fileId: string,
 ): Promise<Result<void, AppError>> {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const file = await getFileForUser({

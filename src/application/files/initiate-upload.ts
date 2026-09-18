@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { createSignedUploadUrl } from '@/application/storage/create-signed-upload-url';
 import { type AppError, parseInput, validation } from '@/core/errors';
 import { mimeToFileType } from '@/core/file/mime-mapping';
@@ -27,7 +27,7 @@ export async function initiateFileUpload(
     return err(validation('Unsupported mime type', 'mimeType'));
   }
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const signed = await createSignedUploadUrl({

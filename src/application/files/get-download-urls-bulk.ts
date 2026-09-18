@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { type AppError, parseInput } from '@/core/errors';
 import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
@@ -24,7 +24,7 @@ export async function getBulkDownloadUrls(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   const bucket = env().SUPABASE_STORAGE_BUCKET;
