@@ -12,7 +12,6 @@ import type { AppError } from '@/core/errors';
 import { autumnBillingAdapter } from '@/infra/external-apis/autumn/autumn-billing-adapter';
 import { env } from '@/shared/env';
 
-// Whole-app entitlement for the current user's active organization.
 // Order matters: the dev skip short-circuits before any Autumn call so local
 // development works without a billing account.
 export async function getAppEntitlement(): Promise<
@@ -29,6 +28,6 @@ export async function getAppEntitlement(): Promise<
   if (skipEnabled) return ok({ allowed: true, reason: 'dev_skip' });
 
   return autumnBillingAdapter.checkAppAccess({
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
 }
