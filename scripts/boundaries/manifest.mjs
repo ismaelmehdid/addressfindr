@@ -160,6 +160,22 @@ export const DOMAINS = [
     public: ['src/application/url-fetch/fetch-url', 'src/core/url-fetch/types'],
   },
   {
+    name: 'listing',
+    dirs: [
+      'src/core/listing',
+      'src/application/listing',
+      'src/infra/external-apis/firecrawl',
+      'src/infra/external-apis/groq',
+      'src/app/api/listings',
+    ],
+    schemas: [],
+    public: [
+      'src/application/listing/extract-listing',
+      'src/application/listing/dto',
+      'src/core/listing/types',
+    ],
+  },
+  {
     name: 'web-search',
     dirs: [
       'src/core/web-search',
