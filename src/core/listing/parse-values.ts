@@ -5,7 +5,7 @@ import {
   type TransactionType,
 } from './types';
 
-const SPACE_VARIANTS = /[ {4}]/g;
+const SPACE_VARIANTS = /[     ]/g;
 
 export function parseFrenchNumber(raw: string): number | null {
   let s = raw.replace(SPACE_VARIANTS, ' ');
@@ -69,8 +69,11 @@ export function parsePostalCode(raw: string): string | null {
   return match && match[1] ? match[1] : null;
 }
 
+// why: un code INSEE fait exactement 5 caracteres — soit 5 chiffres,
+// soit le format corse 2A/2B (ex. 2A004). Les deux alternatives sont
+// necessaires : \d{5} seul rejette la Corse, [0-9AB]\d{4} aussi.
 export function parseInseeCode(raw: string): string | null {
-  const match = /(?<![0-9A-Za-z])([0-9][A-B]?\d{3,4})(?![0-9A-Za-z])/.exec(raw);
+  const match = /(?<![0-9A-Za-z])(\d[AB]\d{3}|\d{5})(?![0-9A-Za-z])/.exec(raw);
   return match && match[1] ? match[1].toUpperCase() : null;
 }
 

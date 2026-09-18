@@ -23,7 +23,7 @@ describe('parseFrenchNumber', () => {
   });
 
   it('handles a non-breaking space as thousands separator', () => {
-    expect(parseFrenchNumber('365 000')).toBe(365000);
+    expect(parseFrenchNumber('365 000')).toBe(365000);
   });
 
   it('handles several thousands groups', () => {
@@ -125,6 +125,10 @@ describe('parsePriceEur', () => {
   it('reads a price with spaces and a currency sign', () => {
     expect(parsePriceEur('249 900 €')).toBe(249900);
   });
+
+  it('handles narrow no-break space in prices', () => {
+    expect(parsePriceEur('249 900 €')).toBe(249900);
+  });
 });
 
 describe('parsePostalCode and parseInseeCode', () => {
@@ -138,6 +142,19 @@ describe('parsePostalCode and parseInseeCode', () => {
 
   it('reads a corsican insee code', () => {
     expect(parseInseeCode('2A004')).toBe('2A004');
+    expect(parseInseeCode('2B033')).toBe('2B033');
+  });
+
+  it('reads a mainland insee code', () => {
+    expect(parseInseeCode('commune 78250')).toBe('78250');
+  });
+
+  it('refuses a four character code', () => {
+    expect(parseInseeCode('7825')).toBeNull();
+  });
+
+  it('refuses a letter that is not A or B', () => {
+    expect(parseInseeCode('2C004')).toBeNull();
   });
 });
 
