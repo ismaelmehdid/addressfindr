@@ -16,17 +16,31 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+const RELATED_LISTING_KEYS = new Set([
+  'similar',
+  'similar_ads',
+  'related',
+  'recommendations',
+]);
+
+// why: le noeud annonce se reconnait a son tableau `attributes`, mais un bloc
+// "annonces similaires" porte la meme forme. Un parcours en profondeur peut
+// donc rendre le DPE du voisin. En largeur, le plus proche de la racine gagne,
+// et on ne descend pas du tout dans les conteneurs d'annonces liees.
 function findAdNode(payload: unknown): Record<string, unknown> | null {
-  const stack: unknown[] = [payload];
-  while (stack.length > 0) {
-    const current = stack.pop();
+  const queue: unknown[] = [payload];
+  while (queue.length > 0) {
+    const current = queue.shift();
     if (Array.isArray(current)) {
-      stack.push(...current);
+      queue.push(...current);
       continue;
     }
     if (!isRecord(current)) continue;
     if (Array.isArray(current.attributes)) return current;
-    stack.push(...Object.values(current));
+    for (const [key, value] of Object.entries(current)) {
+      if (RELATED_LISTING_KEYS.has(key)) continue;
+      queue.push(value);
+    }
   }
   return null;
 }

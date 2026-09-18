@@ -80,4 +80,49 @@ describe('mapHydrationToValues — leboncoin', () => {
   it('returns an empty object for a null payload', () => {
     expect(mapHydrationToValues('leboncoin', null)).toEqual({});
   });
+
+  it('never reads a neighbouring listing nested under the ad', () => {
+    const payload = {
+      props: {
+        pageProps: {
+          ad: {
+            list_id: 111,
+            attributes: [
+              { key: 'square', value: '102' },
+              { key: 'energy_rate', value: 'b', value_label: 'B' },
+            ],
+            similar: [
+              {
+                list_id: 222,
+                attributes: [
+                  { key: 'square', value: '42' },
+                  { key: 'energy_rate', value: 'g', value_label: 'G' },
+                ],
+              },
+            ],
+          },
+        },
+      },
+    };
+    const values = mapHydrationToValues('leboncoin', payload);
+    expect(values.listingId).toBe('111');
+    expect(values.surfaceM2).toBe(102);
+    expect(values.dpeClass).toBe('B');
+  });
+
+  it('prefers the shallowest ad node when a sibling block also has attributes', () => {
+    const payload = {
+      props: {
+        pageProps: {
+          ad: { list_id: 111, attributes: [{ key: 'square', value: '102' }] },
+          carousel: {
+            items: [
+              { list_id: 333, attributes: [{ key: 'square', value: '42' }] },
+            ],
+          },
+        },
+      },
+    };
+    expect(mapHydrationToValues('leboncoin', payload).surfaceM2).toBe(102);
+  });
 });
