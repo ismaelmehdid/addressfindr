@@ -50,7 +50,10 @@ export const DOMAINS = [
       'src/app/api/early-access',
     ],
     schemas: ['src/infra/database/schema/early-access-schema'],
-    public: ['src/application/early-access/redeem'],
+    public: [
+      'src/application/early-access/redeem',
+      'src/application/early-access/has-redeemed-code',
+    ],
   },
   {
     name: 'files',
@@ -219,6 +222,7 @@ export const DOMAINS = [
 export const ALLOWED_EDGES = [
   ['early-access', 'organization'],
   ['auth', 'organization'],
+  ['auth', 'early-access'],
   ['indexing', 'files'],
   ['indexing', 'organization'],
   ['files', 'indexing'],

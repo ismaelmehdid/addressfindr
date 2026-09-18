@@ -33,7 +33,6 @@ export async function GET(req: Request): Promise<Response> {
   const { page } = parsedQuery.output;
 
   log.info('api.files.list.request', {
-    organizationId: auth.ctx.organizationId,
     userId: auth.ctx.userId,
     page,
   });
@@ -43,12 +42,12 @@ export async function GET(req: Request): Promise<Response> {
     log.warn('api.files.list.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
     });
     return jsonError(result.error);
   }
   log.info('api.files.list.success', {
-    organizationId: auth.ctx.organizationId,
+    userId: auth.ctx.userId,
     count: result.value.items.length,
     page: result.value.page,
   });

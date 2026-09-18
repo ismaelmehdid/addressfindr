@@ -12,8 +12,8 @@
     "emailMismatchToast": "This invitation is for a different email. Sign in with that account."
   },
   "Onboarding": {
-    "title": "Create your organization",
-    "subtitle": "Enter your organization name and the early-access code you received.",
+    "title": "Enter your access code",
+    "subtitle": "Enter the early-access code you received to continue.",
     "orgName": "Organization name",
     "code": "Early-access code",
     "submit": "Continue",

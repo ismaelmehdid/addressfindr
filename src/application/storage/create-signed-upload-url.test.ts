@@ -27,7 +27,7 @@ const authedUser = ok({
   image: null,
   locale: 'en',
   sessionId: 's1',
-  organizationId: 'org1',
+  hasRedeemedAccess: true,
 });
 
 describe('createSignedUploadUrl', () => {

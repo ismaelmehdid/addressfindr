@@ -28,3 +28,19 @@ export async function claimCode(args: {
     return err(unknown('Failed to claim early-access code'));
   }
 }
+
+export async function hasRedeemedCode(args: {
+  userId: string;
+}): Promise<Result<boolean, AppError>> {
+  try {
+    const [row] = await db
+      .select({ id: earlyAccessCode.id })
+      .from(earlyAccessCode)
+      .where(eq(earlyAccessCode.usedBy, args.userId))
+      .limit(1);
+    return ok(Boolean(row));
+  } catch (e) {
+    log.error('early_access.has_redeemed.failed', e, { userId: args.userId });
+    return err(unknown('Failed to read early-access status'));
+  }
+}

@@ -21,7 +21,6 @@ import { Label } from '@/components/ui/label';
 // failures (rate limit, malformed body) answer with a different shape.
 async function redeemEarlyAccess(input: {
   code: string;
-  organizationName: string;
 }): Promise<RedeemResult> {
   try {
     const res = await fetch('/api/early-access/redeem', {
@@ -49,14 +48,11 @@ export function OnboardingForm() {
     setError(null);
     startTransition(async () => {
       const result = await redeemEarlyAccess({
-        organizationName: String(formData.get('orgName') ?? ''),
         code: String(formData.get('code') ?? ''),
       });
 
       if (result.success) {
-        posthog.capture('onboarding_completed', {
-          org_name: String(formData.get('orgName') ?? ''),
-        });
+        posthog.capture('onboarding_completed');
         router.replace('/dashboard');
         return;
       }
@@ -68,9 +64,6 @@ export function OnboardingForm() {
           break;
         case 'unauthenticated':
           router.replace('/sign-in');
-          break;
-        case 'already_in_org':
-          router.replace('/dashboard');
           break;
         default:
           setError(t('unknownError'));
@@ -98,15 +91,6 @@ export function OnboardingForm() {
         </CardHeader>
         <CardContent>
           <form action={onSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="orgName">{t('orgName')}</Label>
-              <Input
-                id="orgName"
-                name="orgName"
-                required
-                autoComplete="organization"
-              />
-            </div>
             <div className="flex flex-col gap-2">
               <Label htmlFor="code">{t('code')}</Label>
               <Input

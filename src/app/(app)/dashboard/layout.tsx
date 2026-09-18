@@ -16,7 +16,7 @@ export default async function DashboardLayout({
 }): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
   if (currentUser.isErr()) redirect('/sign-in');
-  if (!currentUser.value.organizationId) redirect('/onboarding');
+  if (!currentUser.value.hasRedeemedAccess) redirect('/onboarding');
 
   const entitlement = await getAppEntitlement();
   if (entitlement.isErr() || !entitlement.value.allowed) redirect('/paywall');

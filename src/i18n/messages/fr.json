@@ -12,8 +12,8 @@
     "emailMismatchToast": "Cette invitation concerne une autre adresse e-mail. Connectez-vous avec ce compte."
   },
   "Onboarding": {
-    "title": "Créez votre organisation",
-    "subtitle": "Saisissez le nom de votre organisation et le code d'accès anticipé reçu.",
+    "title": "Saisissez votre code d'accès",
+    "subtitle": "Saisissez le code d'accès anticipé que vous avez reçu pour continuer.",
     "orgName": "Nom de l'organisation",
     "code": "Code d'accès anticipé",
     "submit": "Continuer",

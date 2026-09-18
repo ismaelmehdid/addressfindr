@@ -7,6 +7,7 @@ import { type AppError, forbidden, unknown } from '@/core/errors';
 import { auth } from '@/infra/auth/auth';
 import { log } from '@/shared/logger';
 import type { OrganizationInvitationDto, OrganizationRole } from './dto';
+import { getMembership } from './get-membership';
 
 function normalizeRole(role: string): OrganizationRole {
   if (role === 'owner' || role === 'admin') return role;
@@ -18,12 +19,14 @@ export async function listOrganizationInvitations(): Promise<
 > {
   const me = await getCurrentUser();
   if (me.isErr()) return err(me.error);
-  if (!me.value.organizationId) {
+  const membership = await getMembership(me.value.id);
+  if (membership.isErr()) return err(membership.error);
+  if (!membership.value) {
     return err(forbidden('No active organization'));
   }
   try {
     const items = await auth.api.listInvitations({
-      query: { organizationId: me.value.organizationId },
+      query: { organizationId: membership.value.organizationId },
       headers: await headers(),
     });
     const pending = (items ?? []).filter((inv) => inv.status === 'pending');

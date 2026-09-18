@@ -13,6 +13,10 @@ vi.mock('@/application/me/get-current-user', () => ({
   getCurrentUser: vi.fn(),
 }));
 
+vi.mock('./get-membership', () => ({
+  getMembership: vi.fn(),
+}));
+
 vi.mock('@/infra/auth/auth', () => ({
   auth: { api: { listMembers: vi.fn() } },
 }));
@@ -20,15 +24,18 @@ vi.mock('@/infra/auth/auth', () => ({
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { unauthorized } from '@/core/errors';
 import { auth } from '@/infra/auth/auth';
+import { getMembership } from './get-membership';
 import { listOrganizationMembers } from './list-members';
 
 const mockedUser = vi.mocked(getCurrentUser);
+const mockedMembership = vi.mocked(getMembership);
 const mockedList = vi.mocked(auth.api.listMembers);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedUser.mockResolvedValue(
-    ok({ id: 'u', organizationId: 'org-1' } as never),
+  mockedUser.mockResolvedValue(ok({ id: 'u' } as never));
+  mockedMembership.mockResolvedValue(
+    ok({ organizationId: 'org-1', role: 'owner' }),
   );
 });
 
@@ -40,9 +47,7 @@ describe('listOrganizationMembers', () => {
   });
 
   it('returns forbidden when user has no org', async () => {
-    mockedUser.mockResolvedValue(
-      ok({ id: 'u', organizationId: null } as never),
-    );
+    mockedMembership.mockResolvedValue(ok(null));
     const r = await listOrganizationMembers();
     expect(r.isErr()).toBe(true);
     if (r.isErr()) expect(r.error.code).toBe('forbidden');

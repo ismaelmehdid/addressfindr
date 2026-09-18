@@ -16,7 +16,6 @@ export async function POST(req: Request): Promise<Response> {
   if (!body.ok) return body.response;
 
   log.info('api.files.download_urls.request', {
-    organizationId: auth.ctx.organizationId,
     userId: auth.ctx.userId,
     count: body.value.ids.length,
   });
@@ -26,12 +25,12 @@ export async function POST(req: Request): Promise<Response> {
     log.warn('api.files.download_urls.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
     });
     return jsonError(result.error);
   }
   log.info('api.files.download_urls.success', {
-    organizationId: auth.ctx.organizationId,
+    userId: auth.ctx.userId,
     count: Object.keys(result.value.urls).length,
   });
   return NextResponse.json(result.value);
