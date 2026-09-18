@@ -402,6 +402,17 @@ In `auth.ts`, delete the whole `organization({ … })` entry from `plugins`, inc
 
 In `auth-schema.ts`, remove `activeOrganizationId` from the `session` table. Delete `src/infra/auth/active-organization.ts`.
 
+- [ ] **Step 2b: Remove what still links to the deleted invitation route**
+
+Two places still build links to `/accept-invitation/<id>`, which Task 5 deleted:
+
+- `src/infra/auth/auth.ts:116` builds `acceptUrl` server-side. It goes with the plugin in Step 1.
+- `src/app/(public)/sign-in/components/sign-in-form.tsx:22-26` builds `callbackURL = /accept-invitation/${invitationParam}` from a query param. Remove that branch.
+
+Also drop the dead `invitation-already-in-org` case in `src/app/(app)/dashboard/components/toast-from-search-params.tsx:14` — its only producer was deleted in Task 5.
+
+This matters because the Better Auth organization plugin stays mounted at `src/app/auth/[...all]/route.ts` until Step 1 runs, so `organization.inviteMember` remains reachable and can still send emails pointing at a route that no longer exists.
+
 - [ ] **Step 3: Delete the invitation email**
 
 ```bash
