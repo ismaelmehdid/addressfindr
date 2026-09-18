@@ -67,4 +67,18 @@ describe('mapJsonLdToValues', () => {
   it('returns an empty object when no listing node exists', () => {
     expect(mapJsonLdToValues([])).toEqual({});
   });
+
+  it('never lets a five-digit price in the title beat the structured postal code', () => {
+    const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente maison 5 pièces 120 m² 89000 € Lyon (69001)","offers":{"@type":"Offer","price":"89000"},"address":{"@type":"PostalAddress","addressLocality":"Lyon 1er","postalCode":"69001"}}</script>`;
+    const values = mapJsonLdToValues(extractJsonLdNodes(html));
+    expect(values.postalCode).toBe('69001');
+    expect(values.priceEur).toBe(89000);
+  });
+
+  it('still falls back to the title when no structured address exists', () => {
+    const html = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Apartment","name":"Appartement 2 pièces Hardricourt (78250)"}</script>`;
+    const values = mapJsonLdToValues(extractJsonLdNodes(html));
+    expect(values.postalCode).toBe('78250');
+    expect(values.propertyType).toBe('apartment');
+  });
 });

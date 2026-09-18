@@ -114,6 +114,7 @@ export function mapJsonLdToValues(
   nodes: Record<string, unknown>[],
 ): Partial<ExtractedValues> {
   const values: Partial<ExtractedValues> = {};
+  const titles: string[] = [];
 
   for (const node of nodes) {
     const type = typeOf(node);
@@ -142,13 +143,18 @@ export function mapJsonLdToValues(
     if (posted) values.publishedAt ??= posted;
 
     const name = asString(node.name);
-    if (name) {
-      values.propertyType ??= parsePropertyType(name);
-      values.postalCode ??= parsePostalCode(name);
-    }
+    if (name) titles.push(name);
 
     readAddress(node, values);
     readAdditionalProperties(node, values);
+  }
+
+  // why: le titre est une heuristique et doit passer APRES tous les champs
+  // structures, sinon un prix a 5 chiffres ("89000 € Lyon (69001)") est capte
+  // comme code postal et ??= empeche l'adresse structuree de le corriger
+  for (const title of titles) {
+    values.propertyType ??= parsePropertyType(title);
+    values.postalCode ??= parsePostalCode(title);
   }
 
   for (const key of Object.keys(values) as (keyof ExtractedValues)[]) {
