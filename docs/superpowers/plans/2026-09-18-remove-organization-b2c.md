@@ -247,7 +247,7 @@ it('returns the user id for a signed-in user', async () => {
 it('returns unauthorized when there is no session', async () => {
   const result = await requireUserScope();
   expect(result.isErr()).toBe(true);
-  expect(result._unsafeUnwrapErr().code).toBe('UNAUTHORIZED');
+  expect(result._unsafeUnwrapErr().code).toBe('unauthorized');
 });
 ```
 
@@ -312,6 +312,7 @@ git commit -m "refactor(auth): replace organization scope with user scope"
 - Modify: `src/app/(app)/layout.tsx`, `src/app/(app)/dashboard/layout.tsx`, `src/app/(public)/sign-in/page.tsx`, `src/app/(public)/page.tsx`
 - Modify: `src/application/me/get-current-user.ts`
 - Modify: `src/infra/data-access/early-access/early-access-repo.ts`
+- Modify: `src/application/early-access/redeem.ts`
 
 - [ ] **Step 1: Delete the two route directories**
 
@@ -362,16 +363,22 @@ Then in `(app)/layout.tsx`, `(app)/dashboard/layout.tsx` and `(public)/sign-in/p
 
 Remove the organization link from `dashboard-sidebar.tsx`. The sidebar stays collapsed to its icon rail — do not expand it.
 
-- [ ] **Step 4: Verify**
+- [ ] **Step 4: Simplify the redeem use case in the same commit**
+
+The form stops sending `organizationName`, so the endpoint it posts to must stop requiring it in the same commit — otherwise onboarding posts an empty string into a `minLength(2)` check and breaks at runtime, where `tsc` cannot see it.
+
+In `src/application/early-access/redeem.ts`: remove `organizationName` from the valibot input schema, delete the `slugify` helper, the `createOrganizationWithOwner` call, the `setActiveOrganizationOnSession` call and the `already_in_org` branch. `RedeemResult` becomes `{ success: true } | { success: false; error: … }`. Keep the code-hash lookup and the `usedBy` / `usedAt` write — that is the gate.
+
+- [ ] **Step 5: Verify**
 
 Run: `pnpm type-check`
 Expected: errors now point only at `application/organization/*` and `infra/auth/auth.ts`, which Tasks 6 and 7 remove.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add -A "src/app"
-git commit -m "refactor(ui): remove organization screens and onboarding org field"
+git add -A "src/app" src/application/me src/application/early-access src/infra/data-access/early-access
+git commit -m "refactor(ui): remove organization screens and gate on early access"
 ```
 
 ---
@@ -383,7 +390,6 @@ git commit -m "refactor(ui): remove organization screens and onboarding org fiel
 - Delete: `src/infra/auth/active-organization.ts`
 - Delete: `src/infra/email/send-organization-invitation.tsx`, `src/infra/email/templates/organization-invitation-email.tsx`
 - Modify: `src/infra/database/schema/auth-schema.ts`
-- Modify: `src/application/early-access/redeem.ts`
 
 - [ ] **Step 1: Remove the plugin**
 
@@ -393,11 +399,7 @@ In `auth.ts`, delete the whole `organization({ … })` entry from `plugins`, inc
 
 In `auth-schema.ts`, remove `activeOrganizationId` from the `session` table. Delete `src/infra/auth/active-organization.ts`.
 
-- [ ] **Step 3: Simplify the redeem use case**
-
-In `redeem.ts`, remove `organizationName` from the valibot input schema, delete the `slugify` helper, the `createOrganizationWithOwner` call, the `setActiveOrganizationOnSession` call and the `already_in_org` branch. `RedeemResult` becomes `{ success: true } | { success: false; error: … }`. Keep the code-hash lookup and the `usedBy` / `usedAt` write — that is the gate.
-
-- [ ] **Step 4: Delete the invitation email**
+- [ ] **Step 3: Delete the invitation email**
 
 ```bash
 rm src/infra/email/send-organization-invitation.tsx src/infra/email/templates/organization-invitation-email.tsx
@@ -405,15 +407,15 @@ rm src/infra/email/send-organization-invitation.tsx src/infra/email/templates/or
 
 `emailSender()` and the no-op adapter stay: they will serve B2C transactional mail.
 
-- [ ] **Step 5: Verify**
+- [ ] **Step 4: Verify**
 
 Run: `pnpm type-check`
 Expected: remaining errors point only at `application/organization/*`.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add -A src/infra src/application/early-access
+git add -A src/infra
 git commit -m "refactor(auth): drop the Better Auth organization plugin"
 ```
 
