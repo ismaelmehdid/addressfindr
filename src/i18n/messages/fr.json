@@ -28,8 +28,6 @@
   },
   "Nav": {
     "dashboard": "Tableau de bord",
-    "storage": "Stockage",
-    "organization": "Organisation",
     "settings": "Paramètres",
     "signOut": "Se déconnecter",
     "language": "Langue"
@@ -82,22 +80,8 @@
     "signIn": "Connexion",
     "onboarding": "Bienvenue",
     "dashboard": "Tableau de bord",
-    "storage": "Stockage",
-    "organization": "Organisation",
     "acceptInvitation": "Accepter l'invitation",
     "settings": "Paramètres"
-  },
-  "ChatTools": {
-    "calling": "Appel de {tool}…",
-    "completed": "{tool}",
-    "failed": "Échec de {tool}",
-    "approvalNeeded": "{tool} nécessite une approbation",
-    "denied": "{tool} refusé",
-    "searchUserFiles": "Rechercher dans les fichiers",
-    "searchFileText": "Lire le fichier",
-    "listFiles": "Lister les fichiers",
-    "fetchUrl": "Charger l'URL",
-    "webSearch": "Recherche web"
   },
   "Home": {
     "welcomeTitle": "Comment puis-je vous aider aujourd'hui ?",
@@ -123,35 +107,6 @@
     "rename": "Renommer",
     "deleteConfirmTitle": "Supprimer la conversation ?",
     "deleteConfirmDescription": "Cela supprimera définitivement la conversation et ses messages. Cette action est irréversible."
-  },
-  "Storage": {
-    "title": "Stockage",
-    "pageHelp": "Documents importés de votre organisation. Le chat peut les rechercher, lire leur contenu et y faire référence dans ses réponses.",
-    "uploadButton": "Téléverser",
-    "empty": "Aucun fichier",
-    "emptyDescription": "Glissez un fichier ici ou cliquez sur Téléverser pour commencer.",
-    "rowActions": "Actions du fichier",
-    "open": "Ouvrir",
-    "download": "Télécharger",
-    "preparingDownload": "Préparation du téléchargement…",
-    "rename": "Renommer",
-    "dropToUpload": "Déposez pour téléverser",
-    "previewUnavailable": "Aperçu indisponible",
-    "previewLoading": "Chargement de l'aperçu…",
-    "renameDialogTitle": "Renommer le fichier",
-    "renamePlaceholder": "Nouveau nom de fichier",
-    "errorFileTooLarge": "Le fichier dépasse la limite de 10 Mo.",
-    "errorMimeNotSupported": "Ce type de fichier n'est pas pris en charge.",
-    "errorMimeMismatch": "Le contenu du fichier ne correspond pas au type déclaré.",
-    "deleteConfirmTitle": "Supprimer le fichier ?",
-    "deleteConfirmDescription": "Supprimer définitivement {name}. Le fichier sera retiré du stockage et de la recherche. Cette action est irréversible.",
-    "deleteConfirmDescriptionGeneric": "Supprimer définitivement ce fichier. Il sera retiré du stockage et de la recherche. Cette action est irréversible.",
-    "indexStatus": {
-      "pending": "En attente",
-      "indexing": "Indexation",
-      "indexed": "Indexé",
-      "error": "Erreur"
-    }
   },
   "Settings": {
     "title": "Paramètres",
@@ -194,16 +149,13 @@
     "backDashboard": "Retour au tableau de bord",
     "backHome": "Retour à l'accueil"
   },
-  "Chat": {
-    "activeContext": "Fichier actif visible par le chat",
-    "toggle": "Discussion",
-    "send": "Envoyer",
-    "stop": "Arrêter",
-    "mic": "Enregistrer un message vocal",
-    "stopRecording": "Arrêter l'enregistrement",
-    "transcribing": "Transcription…",
-    "resizePanel": "Redimensionner le panneau",
-    "stepLimitReached": "J'ai atteint le nombre maximal d'étapes autorisées pour une seule requête, je me suis donc arrêté avant de répondre complètement. Veuillez préciser la question ou demandez-moi de continuer.",
-    "responseLengthLimitReached": "Ma réponse a atteint la longueur maximale pour un tour et a été tronquée. Demandez-moi de continuer et je reprendrai où je me suis arrêté."
+  "Listing": {
+    "heading": "Collez le lien d'une annonce immobilière",
+    "placeholder": "https://www.seloger.com/annonces/...",
+    "submit": "Analyser",
+    "errorEmpty": "Collez l'adresse d'une annonce pour continuer.",
+    "errorMalformed": "Ce lien n'est pas valide. Vérifiez qu'il commence par https://",
+    "errorUnsupportedPortal": "Ce site n'est pas encore pris en charge. Essayez une annonce SeLoger, Leboncoin, PAP ou Bien'ici.",
+    "notAvailable": "Lien reconnu. L'analyse des annonces n'est pas encore disponible."
   }
 }

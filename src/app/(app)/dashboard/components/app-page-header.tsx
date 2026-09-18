@@ -1,16 +1,10 @@
 'use client';
 
-import { ChevronRight, CircleHelp, type LucideIcon } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import { ChatToggleButton } from './chat-toggle-button';
 
 type BreadcrumbItem = {
   label: string;
@@ -21,7 +15,6 @@ type PrimaryActionConfig = {
   label: string;
   onClick: () => void;
   icon?: LucideIcon;
-  dataHelpId?: string;
 };
 
 type Props = {
@@ -30,7 +23,6 @@ type Props = {
   count?: number;
   primaryAction?: PrimaryActionConfig;
   rightContent?: ReactNode;
-  helpTooltip?: string;
 };
 
 export function AppPageHeader({
@@ -39,7 +31,6 @@ export function AppPageHeader({
   count,
   primaryAction,
   rightContent,
-  helpTooltip,
 }: Props) {
   return (
     <div className="z-50 grid h-10 shrink-0 items-center border-b border-stone/70 bg-linen px-3">
@@ -59,51 +50,20 @@ export function AppPageHeader({
               )}
             </div>
           )}
-          {helpTooltip && <HelpHint text={helpTooltip} />}
         </div>
         <div className="flex flex-shrink-0 items-center gap-2">
           {rightContent}
           {primaryAction && (
-            <Button
-              size="sm"
-              onClick={primaryAction.onClick}
-              data-help-id={primaryAction.dataHelpId}
-            >
+            <Button size="sm" onClick={primaryAction.onClick}>
               {primaryAction.icon && (
                 <primaryAction.icon className="size-3.5" />
               )}
               {primaryAction.label}
             </Button>
           )}
-          <ChatToggleButton />
         </div>
       </div>
     </div>
-  );
-}
-
-function HelpHint({ text }: { text: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger
-        render={
-          <button
-            type="button"
-            aria-label={text}
-            className="inline-flex shrink-0 items-center justify-center rounded-full p-0.5 text-pebble transition-colors hover:text-slate-neutral focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-pebble"
-          >
-            <CircleHelp className="size-3.5" strokeWidth={1.5} />
-          </button>
-        }
-      />
-      <TooltipContent
-        side="bottom"
-        align="start"
-        className="max-w-xs whitespace-normal text-left leading-snug text-balance"
-      >
-        {text}
-      </TooltipContent>
-    </Tooltip>
   );
 }
 

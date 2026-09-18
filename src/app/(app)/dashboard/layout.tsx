@@ -10,11 +10,9 @@ import { ToastFromSearchParams } from './components/toast-from-search-params';
 export default async function DashboardLayout({
   children,
   header,
-  chat,
 }: {
   children: ReactNode;
   header: ReactNode;
-  chat: ReactNode;
 }): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
   if (currentUser.isErr()) redirect('/sign-in');
@@ -24,7 +22,7 @@ export default async function DashboardLayout({
   if (entitlement.isErr() || !entitlement.value.allowed) redirect('/paywall');
 
   return (
-    <DashboardWrapper user={currentUser.value} chat={chat}>
+    <DashboardWrapper user={currentUser.value}>
       <Suspense fallback={null}>
         <ToastFromSearchParams />
       </Suspense>

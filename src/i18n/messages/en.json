@@ -28,8 +28,6 @@
   },
   "Nav": {
     "dashboard": "Dashboard",
-    "storage": "Storage",
-    "organization": "Organization",
     "settings": "Settings",
     "signOut": "Sign out",
     "language": "Language"
@@ -82,22 +80,8 @@
     "signIn": "Sign in",
     "onboarding": "Welcome",
     "dashboard": "Dashboard",
-    "storage": "Storage",
-    "organization": "Organization",
     "acceptInvitation": "Accept invitation",
     "settings": "Settings"
-  },
-  "ChatTools": {
-    "calling": "Calling {tool}…",
-    "completed": "Used {tool}",
-    "failed": "{tool} failed",
-    "approvalNeeded": "{tool} needs approval",
-    "denied": "{tool} denied",
-    "searchUserFiles": "Search files",
-    "searchFileText": "Read file",
-    "listFiles": "List files",
-    "fetchUrl": "Fetch URL",
-    "webSearch": "Web search"
   },
   "Home": {
     "welcomeTitle": "How can I help you today?",
@@ -123,35 +107,6 @@
     "rename": "Rename",
     "deleteConfirmTitle": "Delete conversation?",
     "deleteConfirmDescription": "This will permanently remove the conversation and its messages. This action cannot be undone."
-  },
-  "Storage": {
-    "title": "Storage",
-    "pageHelp": "Files uploaded by your organization. The chat can search them, read their content, and reference them in its answers.",
-    "uploadButton": "Upload",
-    "empty": "No files yet",
-    "emptyDescription": "Drop a file here or click Upload to get started.",
-    "rowActions": "File actions",
-    "open": "Open",
-    "download": "Download",
-    "preparingDownload": "Preparing download…",
-    "rename": "Rename",
-    "dropToUpload": "Drop to upload",
-    "previewUnavailable": "Preview unavailable",
-    "previewLoading": "Loading preview…",
-    "renameDialogTitle": "Rename file",
-    "renamePlaceholder": "New file name",
-    "errorFileTooLarge": "File exceeds the 10 MB limit.",
-    "errorMimeNotSupported": "This file type is not supported.",
-    "errorMimeMismatch": "File content does not match the declared type.",
-    "deleteConfirmTitle": "Delete file?",
-    "deleteConfirmDescription": "Permanently delete {name}. This removes the file from storage and search. This cannot be undone.",
-    "deleteConfirmDescriptionGeneric": "Permanently delete this file. This removes it from storage and search. This cannot be undone.",
-    "indexStatus": {
-      "pending": "Pending",
-      "indexing": "Indexing",
-      "indexed": "Indexed",
-      "error": "Error"
-    }
   },
   "Settings": {
     "title": "Settings",
@@ -194,16 +149,13 @@
     "backDashboard": "Back to dashboard",
     "backHome": "Back to home"
   },
-  "Chat": {
-    "activeContext": "Active file the chat can see",
-    "toggle": "Chat",
-    "send": "Send",
-    "stop": "Stop",
-    "mic": "Record voice message",
-    "stopRecording": "Stop recording",
-    "transcribing": "Transcribing…",
-    "resizePanel": "Resize chat panel",
-    "stepLimitReached": "I reached the maximum number of steps allowed for a single request, so I stopped before fully answering. Please narrow the question or ask me to continue.",
-    "responseLengthLimitReached": "My answer reached the maximum length for one turn and was cut off. Ask me to continue and I'll pick up where I left off."
+  "Listing": {
+    "heading": "Paste a property listing link",
+    "placeholder": "https://www.seloger.com/annonces/...",
+    "submit": "Analyze",
+    "errorEmpty": "Paste a listing address to continue.",
+    "errorMalformed": "That link isn't valid. Make sure it starts with https://",
+    "errorUnsupportedPortal": "That site isn't supported yet. Try a listing from SeLoger, Leboncoin, PAP or Bien'ici.",
+    "notAvailable": "Link recognized. Listing analysis isn't available yet."
   }
 }

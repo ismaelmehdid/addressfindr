@@ -1,6 +1,6 @@
 'use client';
 
-import { Building2, FolderOpen, Home } from 'lucide-react';
+import { Home } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -25,24 +25,6 @@ const MAIN_ITEMS = [
     labelKey: 'dashboard',
     icon: Home,
     exact: true,
-    helpId: 'sidebar.dashboard',
-  },
-] as const;
-
-const SECONDARY_ITEMS = [
-  {
-    href: '/dashboard/storage',
-    labelKey: 'storage',
-    icon: FolderOpen,
-    exact: false,
-    helpId: 'sidebar.storage',
-  },
-  {
-    href: '/dashboard/organization',
-    labelKey: 'organization',
-    icon: Building2,
-    exact: false,
-    helpId: 'sidebar.organization',
   },
 ] as const;
 
@@ -76,11 +58,7 @@ export function DashboardSidebar({ user }: { user: AuthenticatedUser }) {
             const label = t(item.labelKey);
             const active = isActive(pathname, item.href, item.exact);
             return (
-              <SidebarMenuItem
-                key={item.href}
-                className="pb-0.5"
-                data-help-id={item.helpId}
-              >
+              <SidebarMenuItem key={item.href} className="pb-0.5">
                 <SidebarMenuButton
                   render={<Link href={item.href} />}
                   isActive={active}
@@ -95,29 +73,6 @@ export function DashboardSidebar({ user }: { user: AuthenticatedUser }) {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter className="p-1 pb-3">
-        <SidebarMenu className="items-center">
-          {SECONDARY_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const label = t(item.labelKey);
-            const active = isActive(pathname, item.href, item.exact);
-            return (
-              <SidebarMenuItem
-                key={item.href}
-                className="pb-0.5"
-                data-help-id={item.helpId}
-              >
-                <SidebarMenuButton
-                  render={<Link href={item.href} />}
-                  isActive={active}
-                  tooltip={label}
-                >
-                  <Icon className={cn(active && 'text-sidebar-primary')} />
-                  <span>{label}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            );
-          })}
-        </SidebarMenu>
         <div className="flex flex-col items-center gap-1.5">
           <LanguageSwitcher />
           <UserMenu
