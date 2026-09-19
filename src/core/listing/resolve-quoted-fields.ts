@@ -1,5 +1,6 @@
 import { withinBounds } from './field-bounds';
 import {
+  parseBedroomCount,
   parseCity,
   parseCount,
   parseEnergyClass,
@@ -7,6 +8,7 @@ import {
   parsePostalCode,
   parsePriceEur,
   parsePropertyType,
+  parseRoomCount,
   parseStreetAddress,
   parseSurfaceM2,
   parseTransactionType,
@@ -32,13 +34,13 @@ type FieldParser = (raw: string) => string | number | null;
 
 const PARSERS: Partial<Record<ExtractedFieldName, FieldParser>> = {
   surfaceM2: parseSurfaceM2,
-  rooms: parseCount,
-  bedrooms: parseCount,
+  rooms: parseRoomCount,
+  bedrooms: parseBedroomCount,
   floor: parseCount,
   buildingFloors: parseCount,
   yearBuilt: parseYear,
-  dpeClass: parseEnergyClass,
-  gesClass: parseEnergyClass,
+  dpeClass: (quote) => parseEnergyClass(quote, 'dpe'),
+  gesClass: (quote) => parseEnergyClass(quote, 'ges'),
   city: parseCity,
   postalCode: parsePostalCode,
   inseeCode: parseInseeCode,

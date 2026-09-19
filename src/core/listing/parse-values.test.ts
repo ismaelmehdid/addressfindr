@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseBedroomCount,
   parseCity,
   parseCount,
   parseEnergyClass,
@@ -8,6 +9,7 @@ import {
   parsePostalCode,
   parsePriceEur,
   parsePropertyType,
+  parseRoomCount,
   parseSurfaceM2,
   parseTransactionType,
   parseYear,
@@ -63,33 +65,50 @@ describe('parseSurfaceM2', () => {
 
 describe('parseEnergyClass', () => {
   it('reads a labelled DPE letter', () => {
-    expect(parseEnergyClass('DPE : D')).toBe('D');
+    expect(parseEnergyClass('DPE : D', 'dpe')).toBe('D');
   });
 
   it('reads a letter after a long label', () => {
     expect(
-      parseEnergyClass('Diagnostic de performance énergétique (DPE) C'),
+      parseEnergyClass('Diagnostic de performance énergétique (DPE) C', 'dpe'),
     ).toBe('C');
   });
 
   it('reads a GES letter', () => {
-    expect(parseEnergyClass('Émissions GES A')).toBe('A');
+    expect(parseEnergyClass('Émissions GES A', 'ges')).toBe('A');
   });
 
   it('refuses a full scale as ambiguous', () => {
-    expect(parseEnergyClass('DPE A B C D E F G')).toBeNull();
+    expect(parseEnergyClass('DPE A B C D E F G', 'dpe')).toBeNull();
   });
 
   it('refuses a letter with no energy context', () => {
-    expect(parseEnergyClass('Bâtiment C')).toBeNull();
+    expect(parseEnergyClass('Bâtiment C', 'dpe')).toBeNull();
   });
 
   it('refuses marketing prose with no letter', () => {
-    expect(parseEnergyClass('Bonne isolation (DPE conforme)')).toBeNull();
+    expect(
+      parseEnergyClass('Bonne isolation (DPE conforme)', 'dpe'),
+    ).toBeNull();
   });
 
   it('refuses a letter outside A-G', () => {
-    expect(parseEnergyClass('DPE H')).toBeNull();
+    expect(parseEnergyClass('DPE H', 'dpe')).toBeNull();
+  });
+
+  // why: regression — un quote GES ne doit jamais satisfaire dpeClass, et
+  // inversement, meme quand la lettre elle-meme est valide.
+  it('refuses a GES-only quote for the dpe metric', () => {
+    expect(parseEnergyClass('Emissions GES B', 'dpe')).toBeNull();
+  });
+
+  it('refuses a DPE-only quote for the ges metric', () => {
+    expect(parseEnergyClass('DPE B', 'ges')).toBeNull();
+  });
+
+  it('refuses a quote naming both metrics even for the correct one', () => {
+    expect(parseEnergyClass('DPE C · GES C', 'dpe')).toBeNull();
+    expect(parseEnergyClass('DPE C · GES C', 'ges')).toBeNull();
   });
 });
 
@@ -108,6 +127,24 @@ describe('parseCount', () => {
 
   it('returns null with no digit', () => {
     expect(parseCount('studio')).toBeNull();
+  });
+});
+
+describe('parseRoomCount and parseBedroomCount', () => {
+  it('refuses a bedrooms quote for rooms', () => {
+    expect(parseRoomCount('3 chambres')).toBeNull();
+  });
+
+  it('reads a rooms quote', () => {
+    expect(parseRoomCount('4 pièces')).toBe(4);
+  });
+
+  it('reads a bedrooms quote', () => {
+    expect(parseBedroomCount('2 chambres')).toBe(2);
+  });
+
+  it('refuses a rooms quote for bedrooms', () => {
+    expect(parseBedroomCount('4 pièces')).toBeNull();
   });
 });
 

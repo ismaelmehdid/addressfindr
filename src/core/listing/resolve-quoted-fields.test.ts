@@ -93,6 +93,26 @@ describe('resolveQuotedFields', () => {
     expect(values.dpeClass).toBe('C');
   });
 
+  // why: regression pour la confusion DPE/GES — un quote GES seul ne doit
+  // jamais satisfaire dpeClass, meme s'il parse et respecte les bornes.
+  it('refuses a GES-only quote for dpeClass', () => {
+    const source = 'Emissions GES B pour ce bien';
+    const values = resolveQuotedFields({
+      source,
+      quotes: { dpeClass: 'Emissions GES B' },
+    });
+    expect(values.dpeClass).toBeUndefined();
+  });
+
+  it('refuses a DPE-only quote for gesClass', () => {
+    const source = 'DPE B pour ce bien';
+    const values = resolveQuotedFields({
+      source,
+      quotes: { gesClass: 'DPE B' },
+    });
+    expect(values.gesClass).toBeUndefined();
+  });
+
   it('ignores a field with no quote', () => {
     expect(resolveQuotedFields({ source: SOURCE, quotes: {} })).toEqual({});
   });
