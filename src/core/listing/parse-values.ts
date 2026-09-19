@@ -29,11 +29,17 @@ export function parseSurfaceM2(raw: string): number | null {
   return parseFrenchNumber(match[1]);
 }
 
-const ENERGY_CONTEXT = /dpe|ges|[ée]nerg|effet de serre|consommation/i;
+const DPE_CONTEXT = /\bdpe\b|consommation|[ée]nerg/i;
+const GES_CONTEXT = /\bges\b|effet de serre|[ée]mission/i;
 const STANDALONE_LETTER = /(?<![\p{L}])([A-Ga-g])(?![\p{L}])/gu;
 
-export function parseEnergyClass(raw: string): EnergyClass | null {
-  if (!ENERGY_CONTEXT.test(raw)) return null;
+export function parseEnergyClass(
+  raw: string,
+  metric: 'dpe' | 'ges',
+): EnergyClass | null {
+  const wanted = metric === 'dpe' ? DPE_CONTEXT : GES_CONTEXT;
+  const other = metric === 'dpe' ? GES_CONTEXT : DPE_CONTEXT;
+  if (!wanted.test(raw) || other.test(raw)) return null;
   const found = raw.match(STANDALONE_LETTER);
   if (!found || found.length === 0) return null;
   const unique = [...new Set(found.map((l) => l.toUpperCase()))];
@@ -50,6 +56,19 @@ export function parseCount(raw: string): number | null {
   const value = parseFrenchNumber(raw);
   if (value === null) return null;
   return Number.isInteger(value) ? value : null;
+}
+
+const ROOMS_SUBJECT = /pi[èe]ces?|\bT[1-9]\b|\bF[1-9]\b/i;
+const BEDROOMS_SUBJECT = /chambres?/i;
+
+export function parseRoomCount(raw: string): number | null {
+  if (!ROOMS_SUBJECT.test(raw) || BEDROOMS_SUBJECT.test(raw)) return null;
+  return parseCount(raw);
+}
+
+export function parseBedroomCount(raw: string): number | null {
+  if (!BEDROOMS_SUBJECT.test(raw)) return null;
+  return parseCount(raw);
 }
 
 export function parseYear(raw: string): number | null {

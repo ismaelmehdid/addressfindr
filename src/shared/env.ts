@@ -3,6 +3,7 @@ import {
   CHEAP_CHAT_MODELS,
   VISION_CAPABLE_CHAT_MODELS,
 } from '@/core/chat/types';
+import { LISTING_EXTRACTION_MODELS } from '@/core/listing/types';
 import { BUCKETS } from '@/core/storage/types/bucket';
 
 const NodeEnv = v.picklist(['development', 'test', 'production']);
@@ -69,6 +70,24 @@ const EnvSchema = v.object({
     v.optional(v.string(), 'true'),
     v.transform((s) => s === 'true' || s === '1'),
     v.boolean(),
+  ),
+
+  FIRECRAWL_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
+  FIRECRAWL_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '60000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(5000),
+  ),
+
+  GROQ_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
+  GROQ_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://api.groq.com/openai/v1',
+  ),
+  LISTING_EXTRACTION_MODEL: v.optional(
+    v.picklist(LISTING_EXTRACTION_MODELS),
+    'openai/gpt-oss-120b',
   ),
 
   BRAVE_SEARCH_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),

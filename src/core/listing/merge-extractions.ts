@@ -50,3 +50,7 @@ export function missingRequiredFields(
 ): ExtractedFieldName[] {
   return REQUIRED_FIELDS.filter((field) => values[field] === null);
 }
+
+export function unfilledFields(values: ExtractedValues): ExtractedFieldName[] {
+  return EXTRACTED_FIELD_NAMES.filter((field) => values[field] === null);
+}

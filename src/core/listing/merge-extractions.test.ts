@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mergeExtractions, missingRequiredFields } from './merge-extractions';
+import {
+  mergeExtractions,
+  missingRequiredFields,
+  unfilledFields,
+} from './merge-extractions';
 
 describe('mergeExtractions', () => {
   it('prefers hydration over json-ld for the same field', () => {
@@ -76,5 +80,37 @@ describe('missingRequiredFields', () => {
       },
     ]);
     expect(missingRequiredFields(merged.values)).toEqual([]);
+  });
+});
+
+describe('unfilledFields', () => {
+  it('lists every null field, not only the required ones', () => {
+    const merged = mergeExtractions([
+      {
+        source: 'hydration',
+        values: {
+          surfaceM2: 80,
+          rooms: 4,
+          dpeClass: 'C',
+          city: 'Lyon',
+          propertyType: 'apartment',
+        },
+      },
+    ]);
+    expect(missingRequiredFields(merged.values)).toEqual([]);
+    expect(unfilledFields(merged.values)).toContain('gesClass');
+    expect(unfilledFields(merged.values)).toContain('priceEur');
+    expect(unfilledFields(merged.values)).toContain('transactionType');
+    expect(unfilledFields(merged.values)).toContain('inseeCode');
+  });
+
+  it('returns an empty list once every field has a value', () => {
+    const merged = mergeExtractions([]);
+    for (const field of unfilledFields(merged.values)) {
+      expect(merged.values[field]).toBeNull();
+    }
+    expect(unfilledFields(merged.values).length).toBe(
+      Object.keys(merged.sources).length,
+    );
   });
 });
