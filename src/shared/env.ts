@@ -71,6 +71,14 @@ const EnvSchema = v.object({
     v.boolean(),
   ),
 
+  FIRECRAWL_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
+  FIRECRAWL_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '60000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(5000),
+  ),
+
   BRAVE_SEARCH_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
 
   SUPABASE_URL: v.pipe(v.string(), v.url()),
