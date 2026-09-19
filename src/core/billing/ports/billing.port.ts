@@ -3,7 +3,7 @@ import type { AppError } from '@/core/errors';
 import type { Entitlement } from '../types/entitlement';
 
 export type CheckAppAccessInput = {
-  organizationId: string;
+  userId: string;
 };
 
 export type BillingPort = {

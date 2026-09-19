@@ -59,12 +59,7 @@ export function UserMenu({ firstName, lastName, email, image }: Props) {
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button
-              variant="ghost"
-              size="icon"
-              data-help-id="sidebar.user-menu"
-              aria-label={displayName}
-            />
+            <Button variant="ghost" size="icon" aria-label={displayName} />
           }
         >
           <Avatar className="size-6">

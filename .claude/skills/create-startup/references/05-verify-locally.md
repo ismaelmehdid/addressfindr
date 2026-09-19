@@ -33,8 +33,8 @@ Follow the script's output. Skip only if the user confirms the gate is disabled 
 2. Open `http://localhost:3000`.
 3. Sign in with **Google** (email/password is disabled — Google is the only provider unless
    Microsoft was configured).
-4. Exercise the core surface: create/confirm an organization, upload a file (Supabase Storage +
-   ZeroEntropy indexing), and send a chat message (OpenAI). Watch the dev logs for errors.
+4. Exercise the core surface: redeem an early-access code at onboarding, then upload a file
+   (Supabase Storage + ZeroEntropy indexing). Watch the dev logs for errors.
 5. If PostHog was configured, confirm events land in the PostHog project.
 6. If Autumn is wired, open the pricing/paywall surface and confirm the `useCustomer` state loads
    (a checkout can be tested in Step 6 against Stripe test mode).

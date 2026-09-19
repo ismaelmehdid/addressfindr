@@ -3,7 +3,7 @@ import 'server-only';
 import { waitUntil } from '@vercel/functions';
 import { err, ok, type Result } from 'neverthrow';
 import { v7 as uuidv7 } from 'uuid';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { recordLlmCost } from '@/application/rate-limit/llm-cost-limiter';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { type AppError, notFound, parseInput, validation } from '@/core/errors';
@@ -18,7 +18,7 @@ import {
 } from '@/core/zeroentropy/types';
 import {
   deleteFileRow,
-  getFileForOrg,
+  getFileForUser,
   markIndexStatus,
   markUploaded,
   setFileVisionDescription,
@@ -53,12 +53,12 @@ export async function finalizeFileUpload(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const file = await getFileForOrg({
+  const file = await getFileForUser({
     fileId: parsed.value.fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (file.isErr()) return err(file.error);
 
@@ -88,7 +88,7 @@ export async function finalizeFileUpload(
   if (stat.isErr()) {
     const removed = await deleteFileRow({
       fileId: file.value.id,
-      organizationId: scope.value.organizationId,
+      userId: scope.value.userId,
     });
     if (removed.isErr()) {
       log.warn('files.finalize.orphan_cleanup_failed', {
@@ -133,7 +133,7 @@ export async function finalizeFileUpload(
 
   const updated = await markUploaded({
     fileId: file.value.id,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (updated.isErr()) return err(updated.error);
 
@@ -142,7 +142,6 @@ export async function finalizeFileUpload(
       file: updated.value,
       bytes,
       userId: scope.value.userId,
-      organizationId: scope.value.organizationId,
     }),
   );
 
@@ -165,9 +164,8 @@ async function describeAndIndexFile(args: {
   file: FileEntity;
   bytes: Uint8Array;
   userId: string;
-  organizationId: string;
 }): Promise<void> {
-  const { file, bytes, userId, organizationId } = args;
+  const { file, bytes, userId } = args;
 
   if (IMAGE_FILE_TYPES.has(file.fileType)) {
     const base64 = Buffer.from(bytes).toString('base64');
@@ -192,7 +190,7 @@ async function describeAndIndexFile(args: {
     }
     const persisted = await setFileVisionDescription({
       fileId: file.id,
-      organizationId,
+      userId,
       visionDescription:
         visionDescription.length > 0 ? visionDescription : null,
     });
@@ -209,7 +207,7 @@ async function describeAndIndexFile(args: {
     operation: SyncOperation.CREATE,
     entityType: IndexableEntityType.FILE,
     entityId: file.id,
-    organizationId,
+    userId,
     source: DataSource.USER_UPLOAD,
     timestamp: new Date(),
   });
@@ -217,7 +215,7 @@ async function describeAndIndexFile(args: {
   if (indexEvent.isErr()) {
     await markIndexStatus({
       fileId: file.id,
-      organizationId,
+      userId,
       indexStatus: 'error',
       indexError: indexEvent.error.message,
     });
@@ -228,7 +226,7 @@ async function describeAndIndexFile(args: {
   } else {
     await markIndexStatus({
       fileId: file.id,
-      organizationId,
+      userId,
       indexStatus: 'indexed',
       indexError: null,
     });

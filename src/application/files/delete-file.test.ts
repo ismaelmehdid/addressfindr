@@ -5,8 +5,8 @@ vi.mock('@/shared/logger', () => ({
   log: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
@@ -15,7 +15,7 @@ vi.mock('@/application/zeroentropy/entity-sync-orchestrator', () => ({
 
 vi.mock('@/infra/data-access/file/file-repo', () => ({
   deleteFileRow: vi.fn(),
-  getFileForOrg: vi.fn(),
+  getFileForUser: vi.fn(),
 }));
 
 vi.mock('@/infra/external-apis/supabase-storage/storage-adapter', () => ({
@@ -26,28 +26,26 @@ vi.mock('@/shared/env', () => ({
   env: () => ({ SUPABASE_STORAGE_BUCKET: 'files' }),
 }));
 
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { notFound, unknown as unknownErr } from '@/core/errors';
 import {
   deleteFileRow,
-  getFileForOrg,
+  getFileForUser,
 } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { fakeFile } from './__test-helpers__';
 import { deleteFile } from './delete-file';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
-const mockedGet = vi.mocked(getFileForOrg);
+const mockedScope = vi.mocked(requireUserScope);
+const mockedGet = vi.mocked(getFileForUser);
 const mockedDispatch = vi.mocked(dispatchEvent);
 const mockedRemove = vi.mocked(supabaseStorageAdapter.remove);
 const mockedDelete = vi.mocked(deleteFileRow);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-1', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-1' }));
   mockedGet.mockResolvedValue(ok(fakeFile()));
   mockedDispatch.mockResolvedValue(ok(undefined));
   mockedRemove.mockResolvedValue(ok(undefined));
@@ -56,7 +54,7 @@ beforeEach(() => {
 
 describe('deleteFile', () => {
   it('returns scope error', async () => {
-    mockedScope.mockResolvedValue(err(notFound('no scope', 'organization')));
+    mockedScope.mockResolvedValue(err(notFound('no scope', 'user')));
     const r = await deleteFile('file-1');
     expect(r.isErr()).toBe(true);
   });
@@ -90,7 +88,7 @@ describe('deleteFile', () => {
     expect(mockedRemove).toHaveBeenCalledOnce();
     expect(mockedDelete).toHaveBeenCalledWith({
       fileId: 'file-1',
-      organizationId: 'org-1',
+      userId: 'user-1',
     });
   });
 });

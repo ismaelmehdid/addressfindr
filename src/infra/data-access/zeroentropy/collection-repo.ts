@@ -18,7 +18,7 @@ function rowToInfo(row: CollectionRow): CollectionInfo {
   return {
     id: row.id,
     collectionName: row.collectionName,
-    organizationId: row.organizationId,
+    userId: row.userId,
     status: row.status as CollectionStatusType,
     documentCount: row.documentCount,
     lastSyncAt: row.lastSyncAt ?? null,
@@ -26,24 +26,24 @@ function rowToInfo(row: CollectionRow): CollectionInfo {
   };
 }
 
-export async function getCollectionByOrg(
-  organizationId: string,
+export async function getCollectionByUser(
+  userId: string,
 ): Promise<Result<CollectionInfo | null, AppError>> {
   try {
     const [row] = await db
       .select()
       .from(zeroentropyCollection)
-      .where(eq(zeroentropyCollection.organizationId, organizationId))
+      .where(eq(zeroentropyCollection.userId, userId))
       .limit(1);
     return ok(row ? rowToInfo(row) : null);
   } catch (e) {
-    log.error('Failed to fetch collection', e, { organizationId });
+    log.error('Failed to fetch collection', e, { userId });
     return err(unknown('Failed to fetch collection'));
   }
 }
 
 export async function insertCollection(args: {
-  organizationId: string;
+  userId: string;
   collectionName: string;
   status: CollectionStatusType;
 }): Promise<Result<CollectionInfo, AppError>> {
@@ -51,12 +51,12 @@ export async function insertCollection(args: {
     const [row] = await db
       .insert(zeroentropyCollection)
       .values({
-        organizationId: args.organizationId,
+        userId: args.userId,
         collectionName: args.collectionName,
         status: args.status,
       })
       .onConflictDoUpdate({
-        target: zeroentropyCollection.organizationId,
+        target: zeroentropyCollection.userId,
         set: { collectionName: args.collectionName, status: args.status },
       })
       .returning();
@@ -148,18 +148,18 @@ export async function getCollectionById(
 }
 
 export async function claimCollectionCreation(args: {
-  organizationId: string;
+  userId: string;
   collectionName: string;
 }): Promise<Result<CollectionInfo | null, AppError>> {
   try {
     const existingActive = await db.transaction(async (tx) => {
-      const lockKey = `ze:collection:${args.organizationId}`;
+      const lockKey = `ze:collection:${args.userId}`;
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
       const rows = await tx
         .select()
         .from(zeroentropyCollection)
-        .where(eq(zeroentropyCollection.organizationId, args.organizationId))
+        .where(eq(zeroentropyCollection.userId, args.userId))
         .limit(1);
       const existing = rows[0];
       if (existing && existing.status === CollectionStatus.ACTIVE) {
@@ -170,7 +170,7 @@ export async function claimCollectionCreation(args: {
         const inserted = await tx
           .insert(zeroentropyCollection)
           .values({
-            organizationId: args.organizationId,
+            userId: args.userId,
             collectionName: args.collectionName,
             status: CollectionStatus.CREATING,
           })
@@ -192,7 +192,7 @@ export async function claimCollectionCreation(args: {
     return ok(existingActive);
   } catch (e) {
     log.error('claimCollectionCreation transaction failed', e, {
-      organizationId: args.organizationId,
+      userId: args.userId,
     });
     return err(unknown('Failed to acquire collection lock'));
   }

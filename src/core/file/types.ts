@@ -55,7 +55,6 @@ export const FILE_INDEX_STATUSES = [
 export type FileEntity = {
   id: string;
   userId: string;
-  organizationId: string;
   originalName: string;
   storageKey: FilePath;
   mimeType: MimeType;

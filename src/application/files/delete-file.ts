@@ -2,7 +2,7 @@ import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
 import { v7 as uuidv7 } from 'uuid';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import type { AppError } from '@/core/errors';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/core/zeroentropy/types';
 import {
   deleteFileRow,
-  getFileForOrg,
+  getFileForUser,
 } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { env } from '@/shared/env';
@@ -21,12 +21,12 @@ import { log } from '@/shared/logger';
 export async function deleteFile(
   fileId: string,
 ): Promise<Result<void, AppError>> {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const file = await getFileForOrg({
+  const file = await getFileForUser({
     fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (file.isErr()) return err(file.error);
 
@@ -35,7 +35,7 @@ export async function deleteFile(
     operation: SyncOperation.DELETE,
     entityType: IndexableEntityType.FILE,
     entityId: fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
     source: DataSource.USER_UPLOAD,
     timestamp: new Date(),
   });
@@ -64,7 +64,7 @@ export async function deleteFile(
 
   const dbDelete = await deleteFileRow({
     fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (dbDelete.isErr()) {
     log.error(

@@ -11,7 +11,7 @@ export const appAccess = feature({
 });
 
 // Baseline auto-enabled plan. It does NOT include app_access, so a brand-new
-// organization is signed up but still behind the paywall until it upgrades.
+// user is signed up but still behind the paywall until they upgrade.
 export const free = plan({
   id: 'free',
   name: 'Free',

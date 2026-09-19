@@ -2,7 +2,7 @@ import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
 import { v7 as uuidv7 } from 'uuid';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { dispatchEvent } from '@/application/zeroentropy/entity-sync-orchestrator';
 import { type AppError, parseInput } from '@/core/errors';
 import {
@@ -10,7 +10,7 @@ import {
   IndexableEntityType,
   SyncOperation,
 } from '@/core/zeroentropy/types';
-import { renameFileForOrg } from '@/infra/data-access/file/file-repo';
+import { renameFileForUser } from '@/infra/data-access/file/file-repo';
 import { log } from '@/shared/logger';
 import {
   type FileDto,
@@ -29,12 +29,12 @@ export async function renameFile(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const renamed = await renameFileForOrg({
+  const renamed = await renameFileForUser({
     fileId: parsed.value.fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
     originalName: parsed.value.originalName.trim(),
   });
   if (renamed.isErr()) return err(renamed.error);
@@ -44,7 +44,7 @@ export async function renameFile(
     operation: SyncOperation.UPDATE,
     entityType: IndexableEntityType.FILE,
     entityId: renamed.value.id,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
     source: DataSource.USER_EDIT,
     timestamp: new Date(),
   });

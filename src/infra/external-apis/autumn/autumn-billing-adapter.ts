@@ -26,17 +26,17 @@ async function checkAppAccess(
     // No key configured (allowed locally). Callers treat this as "not entitled";
     // the dev paywall-skip is what lets developers through without billing.
     log.warn('billing.check_app_access.unconfigured', {
-      organizationId: input.organizationId,
+      userId: input.userId,
     });
     return ok({ allowed: false, reason: 'billing_unconfigured' });
   }
 
   log.info('billing.check_app_access.start', {
-    organizationId: input.organizationId,
+    userId: input.userId,
   });
   try {
     const response = await autumnClient(secretKey).check({
-      customerId: input.organizationId,
+      customerId: input.userId,
       featureId: APP_ACCESS_FEATURE_ID,
     });
 
@@ -46,7 +46,7 @@ async function checkAppAccess(
     }
 
     log.info('billing.check_app_access.success', {
-      organizationId: input.organizationId,
+      userId: input.userId,
       allowed: parsed.output.allowed,
     });
     return ok({
@@ -55,7 +55,7 @@ async function checkAppAccess(
     });
   } catch (e) {
     log.error('billing.check_app_access.exception', e, {
-      organizationId: input.organizationId,
+      userId: input.userId,
     });
     return err(externalApi(PROVIDER, 'Billing check failed'));
   }

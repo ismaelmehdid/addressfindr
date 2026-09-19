@@ -23,7 +23,6 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   log.info('api.files.download_url.request', {
-    organizationId: auth.ctx.organizationId,
     userId: auth.ctx.userId,
     fileId: id,
   });
@@ -33,13 +32,13 @@ export async function GET(
     log.warn('api.files.download_url.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
       fileId: id,
     });
     return jsonError(result.error);
   }
   log.info('api.files.download_url.success', {
-    organizationId: auth.ctx.organizationId,
+    userId: auth.ctx.userId,
     fileId: id,
   });
   return NextResponse.json(result.value);
@@ -70,7 +69,6 @@ export async function PATCH(
   }
 
   log.info('api.files.rename.request', {
-    organizationId: auth.ctx.organizationId,
     userId: auth.ctx.userId,
     fileId: id,
   });
@@ -80,14 +78,14 @@ export async function PATCH(
     log.warn('api.files.rename.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
       fileId: id,
     });
     return jsonError(result.error);
   }
   log.info('api.files.rename.success', {
     fileId: result.value.id,
-    organizationId: auth.ctx.organizationId,
+    userId: auth.ctx.userId,
   });
   return NextResponse.json(result.value);
 }
@@ -104,7 +102,6 @@ export async function DELETE(
   if (!auth.ok) return auth.response;
 
   log.info('api.files.delete.request', {
-    organizationId: auth.ctx.organizationId,
     userId: auth.ctx.userId,
     fileId: id,
   });
@@ -114,14 +111,14 @@ export async function DELETE(
     log.warn('api.files.delete.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
       fileId: id,
     });
     return jsonError(result.error);
   }
   log.info('api.files.delete.success', {
     fileId: id,
-    organizationId: auth.ctx.organizationId,
+    userId: auth.ctx.userId,
   });
   return new Response(null, { status: 204 });
 }

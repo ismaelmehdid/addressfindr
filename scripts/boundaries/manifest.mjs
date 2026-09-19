@@ -9,38 +9,13 @@ export const DOMAINS = [
       'src/app/(public)/sign-in',
       'src/app/(app)/dashboard/settings',
     ],
-    schemas: [
-      'src/infra/database/schema/auth-schema',
-      // co-owner: the better-auth organization plugin writes org tables
-      'src/infra/database/schema/organization-schema',
-    ],
+    schemas: ['src/infra/database/schema/auth-schema'],
     public: [
       'src/infra/auth/auth',
-      'src/infra/auth/active-organization',
       'src/application/me/get-current-user',
-      'src/application/me/organization-scope',
+      'src/application/me/user-scope',
     ],
     openToAll: true,
-  },
-  {
-    name: 'organization',
-    dirs: [
-      'src/application/organization',
-      'src/application/invitations',
-      'src/infra/data-access/organization',
-      'src/app/(app)/dashboard/organization',
-      'src/app/(public)/accept-invitation',
-    ],
-    schemas: ['src/infra/database/schema/organization-schema'],
-    public: [
-      'src/application/organization/dto',
-      'src/application/organization/list-members',
-      'src/application/organization/list-invitations',
-      'src/application/organization/get-membership',
-      'src/application/organization/get-organization-name',
-      'src/application/organization/create-organization-with-owner',
-      'src/application/invitations/find-pending-for-current-user',
-    ],
   },
   {
     name: 'early-access',
@@ -51,7 +26,10 @@ export const DOMAINS = [
       'src/app/api/early-access',
     ],
     schemas: ['src/infra/database/schema/early-access-schema'],
-    public: ['src/application/early-access/redeem'],
+    public: [
+      'src/application/early-access/redeem',
+      'src/application/early-access/has-redeemed-code',
+    ],
   },
   {
     name: 'files',
@@ -62,7 +40,6 @@ export const DOMAINS = [
       'src/application/storage',
       'src/infra/data-access/file',
       'src/infra/external-apis/supabase-storage',
-      'src/app/(app)/dashboard/storage',
       'src/app/api/files',
     ],
     schemas: ['src/infra/database/schema/file-schema'],
@@ -88,8 +65,6 @@ export const DOMAINS = [
       'src/core/storage/types/file',
       'src/core/storage/types/signed-url',
       'src/core/storage/types/image-transform',
-      'src/app/(app)/dashboard/storage/components/files-drop-zone',
-      'src/app/(app)/dashboard/storage/components/validate-magic-bytes',
     ],
   },
   {
@@ -114,27 +89,9 @@ export const DOMAINS = [
   },
   {
     name: 'chat',
-    dirs: [
-      'src/core/chat',
-      'src/core/agents',
-      'src/core/conversation',
-      'src/core/help',
-      'src/application/chat',
-      'src/application/conversation',
-      'src/infra/data-access/conversation',
-      'src/infra/external-apis/mastra',
-      'src/app/api/chat',
-      'src/app/api/conversations',
-      'src/app/(app)/dashboard/components/chat',
-      'src/app/(app)/dashboard/@chat',
-    ],
+    dirs: ['src/core/chat'],
     schemas: [],
-    public: [
-      'src/core/chat/types',
-      'src/core/conversation/cookies',
-      'src/app/(app)/dashboard/components/chat/chat-context',
-      'src/app/(app)/dashboard/components/chat/dashboard-chat-panel-context',
-    ],
+    public: ['src/core/chat/types'],
   },
   {
     name: 'transcription',
@@ -164,6 +121,7 @@ export const DOMAINS = [
     dirs: [
       'src/core/listing',
       'src/application/listing',
+      'src/app/(app)/dashboard/components/listing',
       'src/infra/external-apis/firecrawl',
       'src/infra/external-apis/groq',
       'src/app/api/listings',
@@ -173,6 +131,7 @@ export const DOMAINS = [
       'src/application/listing/extract-listing',
       'src/application/listing/dto',
       'src/core/listing/types',
+      'src/app/(app)/dashboard/components/listing/listing-url-form',
     ],
   },
   {
@@ -213,10 +172,7 @@ export const DOMAINS = [
       'src/infra/external-apis/smtp',
     ],
     schemas: [],
-    public: [
-      'src/infra/email/email-sender',
-      'src/infra/email/send-organization-invitation',
-    ],
+    public: ['src/infra/email/email-sender'],
     openToAll: true,
   },
   {
@@ -230,22 +186,15 @@ export const DOMAINS = [
       'src/app/api/billing',
     ],
     schemas: [],
-    // Reads the active org id via the auth domain (openToAll); nothing else
-    // depends on it yet, so no ALLOWED_EDGES entry is required.
+    // Reads the current user id via the auth domain (openToAll); nothing
+    // else depends on it yet, so no ALLOWED_EDGES entry is required.
     public: ['src/application/billing/get-app-entitlement'],
   },
 ];
 
 export const ALLOWED_EDGES = [
-  ['early-access', 'organization'],
-  ['auth', 'organization'],
-  ['chat', 'files'],
-  ['chat', 'indexing'],
-  ['chat', 'transcription'],
-  ['chat', 'url-fetch'],
-  ['chat', 'web-search'],
+  ['auth', 'early-access'],
   ['indexing', 'files'],
-  ['indexing', 'organization'],
   ['files', 'indexing'],
 ];
 

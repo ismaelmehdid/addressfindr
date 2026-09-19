@@ -26,7 +26,6 @@ export const session = pgTable(
     userId: text()
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
-    activeOrganizationId: text(),
     ...timestamps,
   },
   (table) => [

@@ -102,14 +102,10 @@ function validateSegment(
 }
 
 export function buildFilePath(input: {
-  organizationId: string;
   userId: string;
   category: FileCategory;
   filename: string;
 }): Result<FilePath, AppError> {
-  const org = validateSegment(input.organizationId.trim(), 'organizationId');
-  if (org.isErr()) return err(org.error);
-
   const user = validateSegment(input.userId.trim(), 'userId');
   if (user.isErr()) return err(user.error);
 
@@ -128,7 +124,7 @@ export function buildFilePath(input: {
 
   const id = uuidv7();
   const tail = truncateFilename(`${id}-${slug}`, MAX_FILENAME_LENGTH);
-  const path = `${org.value}/${user.value}/${input.category}/${tail}`;
+  const path = `${user.value}/${input.category}/${tail}`;
 
   if (path.length > MAX_PATH_LENGTH) {
     return err(validation('path exceeds maximum length', 'path'));
@@ -164,20 +160,18 @@ export function parseFilePath(raw: string): Result<FilePath, AppError> {
 
 export function isPathOwnedBy(input: {
   path: FilePath;
-  organizationId: string;
   userId: string;
 }): boolean {
-  const prefix = `${input.organizationId}/${input.userId}/`;
+  const prefix = `${input.userId}/`;
   return input.path.startsWith(prefix);
 }
 
 export function ownerPrefix(input: {
-  organizationId: string;
   userId: string;
   category?: FileCategory;
 }): string {
   if (input.category) {
-    return `${input.organizationId}/${input.userId}/${input.category}`;
+    return `${input.userId}/${input.category}/`;
   }
-  return `${input.organizationId}/${input.userId}`;
+  return `${input.userId}/`;
 }

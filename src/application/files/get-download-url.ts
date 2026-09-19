@@ -1,9 +1,9 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import type { AppError } from '@/core/errors';
-import { getFileForOrg } from '@/infra/data-access/file/file-repo';
+import { getFileForUser } from '@/infra/data-access/file/file-repo';
 import { supabaseStorageAdapter } from '@/infra/external-apis/supabase-storage/storage-adapter';
 import { env } from '@/shared/env';
 
@@ -17,12 +17,12 @@ export type DownloadUrlDto = {
 export async function getFileDownloadUrl(
   fileId: string,
 ): Promise<Result<DownloadUrlDto, AppError>> {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const file = await getFileForOrg({
+  const file = await getFileForUser({
     fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (file.isErr()) return err(file.error);
 

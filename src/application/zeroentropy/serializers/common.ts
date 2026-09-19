@@ -15,7 +15,7 @@ export function buildFileMetadata(args: {
   return {
     entityType: IndexableEntityType.FILE,
     entityId: args.file.id,
-    organizationId: args.file.organizationId,
+    userId: args.file.userId,
     updatedAt: args.file.updatedAt.toISOString(),
     docType: args.docType,
     source: DataSource.USER_UPLOAD,

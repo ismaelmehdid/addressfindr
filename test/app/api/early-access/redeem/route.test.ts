@@ -35,14 +35,13 @@ function request(body: unknown): Request {
   });
 }
 
-const VALID_BODY = { code: 'CODE-1', organizationName: 'Acme' };
+const VALID_BODY = { code: 'CODE-1' };
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedUser.mockResolvedValue(
     ok({
       id: 'user-1',
-      organizationId: null,
       sessionId: 'session-1',
     }) as unknown as Awaited<ReturnType<typeof getCurrentUser>>,
   );
@@ -50,18 +49,15 @@ beforeEach(() => {
     success: true,
     reset: 0,
   } as unknown as Awaited<ReturnType<typeof applyRateLimit>>);
-  mockedRedeem.mockResolvedValue({ success: true, organizationId: 'org-1' });
+  mockedRedeem.mockResolvedValue({ success: true });
 });
 
 describe('POST /api/early-access/redeem', () => {
-  it('returns 200 and the organization id on success', async () => {
+  it('returns 200 on success', async () => {
     const res = await POST(request(VALID_BODY));
 
     expect(res.status).toBe(200);
-    await expect(res.json()).resolves.toEqual({
-      success: true,
-      organizationId: 'org-1',
-    });
+    await expect(res.json()).resolves.toEqual({ success: true });
   });
 
   it('returns 401 without calling redeem when unauthenticated', async () => {
@@ -95,7 +91,6 @@ describe('POST /api/early-access/redeem', () => {
   it.each([
     ['invalid_code', 400],
     ['invalid_input', 400],
-    ['already_in_org', 409],
     ['unauthenticated', 401],
     ['unknown', 500],
   ] as const)('maps the %s outcome to HTTP %i', async (reason, status) => {

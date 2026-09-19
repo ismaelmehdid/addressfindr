@@ -48,6 +48,7 @@
   "files": {
     "includes": [
       "**",
+      "!.claude",
       "!drizzle",
       "!.next",
       "!node_modules",

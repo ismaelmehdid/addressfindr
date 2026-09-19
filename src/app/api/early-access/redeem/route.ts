@@ -10,7 +10,6 @@ import { log } from '@/shared/logger';
 
 const BodySchema = v.object({
   code: v.string(),
-  organizationName: v.string(),
 });
 
 const ERROR_STATUS: Record<
@@ -18,15 +17,13 @@ const ERROR_STATUS: Record<
   number
 > = {
   unauthenticated: 401,
-  already_in_org: 409,
   invalid_input: 400,
   invalid_code: 400,
   unknown: 500,
 };
 
 export async function POST(req: Request): Promise<Response> {
-  // Redemption runs before the user has an organization, so the standard
-  // authed-route guard (which requires one) cannot be used here.
+  // Own rate-limit namespace, distinct from the shared 'default' bucket other routes use.
   const me = await getCurrentUser();
   if (me.isErr()) return jsonError(unauthorized(me.error.message));
 
@@ -59,9 +56,6 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json(result, { status: ERROR_STATUS[result.error] });
   }
 
-  log.info('api.early_access.redeem.success', {
-    userId: me.value.id,
-    organizationId: result.organizationId,
-  });
+  log.info('api.early_access.redeem.success', { userId: me.value.id });
   return NextResponse.json(result);
 }

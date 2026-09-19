@@ -7,14 +7,11 @@
   "SignIn": {
     "title": "Sign in",
     "google": "Continue with Google",
-    "microsoft": "Continue with Microsoft",
-    "signInToAcceptInvitation": "Sign in to accept your invitation.",
-    "emailMismatchToast": "This invitation is for a different email. Sign in with that account."
+    "microsoft": "Continue with Microsoft"
   },
   "Onboarding": {
-    "title": "Create your organization",
-    "subtitle": "Enter your organization name and the early-access code you received.",
-    "orgName": "Organization name",
+    "title": "Enter your access code",
+    "subtitle": "Use the early-access code you received to continue.",
     "code": "Early-access code",
     "submit": "Continue",
     "invalidCode": "Invalid or already-used code.",
@@ -28,76 +25,15 @@
   },
   "Nav": {
     "dashboard": "Dashboard",
-    "storage": "Storage",
-    "organization": "Organization",
     "settings": "Settings",
     "signOut": "Sign out",
     "language": "Language"
-  },
-  "Members": {
-    "title": "Organization",
-    "subtitle": "Manage members and invitations.",
-    "pageHelp": "Manage your organization's members and pending invitations. All files and documents shared here are accessible to the whole team.",
-    "membersSection": "Members",
-    "pendingSection": "Pending invitations",
-    "inviteButton": "Invite",
-    "inviteDialogTitle": "Invite a member",
-    "inviteDialogDescription": "They will receive an email with a link to join.",
-    "inviteEmailLabel": "Email",
-    "inviteEmailPlaceholder": "name@company.com",
-    "inviteRoleLabel": "Role",
-    "roleMember": "Member",
-    "roleAdmin": "Admin",
-    "roleOwner": "Owner",
-    "sendInvitation": "Send invitation",
-    "cancel": "Cancel",
-    "cancelInvitation": "Cancel invitation",
-    "remove": "Remove",
-    "you": "You",
-    "joinedOn": "Joined {date}",
-    "expiresOn": "Expires {date}",
-    "inviteSuccess": "Invitation sent",
-    "inviteAlreadyMember": "This person is already a member",
-    "cancelSuccess": "Invitation cancelled",
-    "removeSuccess": "Member removed",
-    "emptyMembers": "No members yet.",
-    "emptyInvitations": "No pending invitations."
-  },
-  "AcceptInvitation": {
-    "title": "You've been invited",
-    "subtitle": "Join {orgName} as {role}.",
-    "accept": "Accept",
-    "reject": "Decline",
-    "acceptSuccess": "Welcome aboard!",
-    "rejectSuccess": "Invitation declined",
-    "expired": "This invitation has expired.",
-    "notFound": "Invitation not found.",
-    "alreadyMember": "You're already a member of this organization.",
-    "wrongAccount": "This invitation is for {email}. You're signed in as {currentEmail}.",
-    "switchAccount": "Sign out and switch account",
-    "emailMismatchToast": "This invitation is for a different email. Sign in with that account.",
-    "alreadyInOrgToast": "You're already a member of an organization — you can only belong to one at a time."
   },
   "Meta": {
     "signIn": "Sign in",
     "onboarding": "Welcome",
     "dashboard": "Dashboard",
-    "storage": "Storage",
-    "organization": "Organization",
-    "acceptInvitation": "Accept invitation",
     "settings": "Settings"
-  },
-  "ChatTools": {
-    "calling": "Calling {tool}…",
-    "completed": "Used {tool}",
-    "failed": "{tool} failed",
-    "approvalNeeded": "{tool} needs approval",
-    "denied": "{tool} denied",
-    "searchUserFiles": "Search files",
-    "searchFileText": "Read file",
-    "listFiles": "List files",
-    "fetchUrl": "Fetch URL",
-    "webSearch": "Web search"
   },
   "Home": {
     "welcomeTitle": "How can I help you today?",
@@ -123,35 +59,6 @@
     "rename": "Rename",
     "deleteConfirmTitle": "Delete conversation?",
     "deleteConfirmDescription": "This will permanently remove the conversation and its messages. This action cannot be undone."
-  },
-  "Storage": {
-    "title": "Storage",
-    "pageHelp": "Files uploaded by your organization. The chat can search them, read their content, and reference them in its answers.",
-    "uploadButton": "Upload",
-    "empty": "No files yet",
-    "emptyDescription": "Drop a file here or click Upload to get started.",
-    "rowActions": "File actions",
-    "open": "Open",
-    "download": "Download",
-    "preparingDownload": "Preparing download…",
-    "rename": "Rename",
-    "dropToUpload": "Drop to upload",
-    "previewUnavailable": "Preview unavailable",
-    "previewLoading": "Loading preview…",
-    "renameDialogTitle": "Rename file",
-    "renamePlaceholder": "New file name",
-    "errorFileTooLarge": "File exceeds the 10 MB limit.",
-    "errorMimeNotSupported": "This file type is not supported.",
-    "errorMimeMismatch": "File content does not match the declared type.",
-    "deleteConfirmTitle": "Delete file?",
-    "deleteConfirmDescription": "Permanently delete {name}. This removes the file from storage and search. This cannot be undone.",
-    "deleteConfirmDescriptionGeneric": "Permanently delete this file. This removes it from storage and search. This cannot be undone.",
-    "indexStatus": {
-      "pending": "Pending",
-      "indexing": "Indexing",
-      "indexed": "Indexed",
-      "error": "Error"
-    }
   },
   "Settings": {
     "title": "Settings",
@@ -194,16 +101,13 @@
     "backDashboard": "Back to dashboard",
     "backHome": "Back to home"
   },
-  "Chat": {
-    "activeContext": "Active file the chat can see",
-    "toggle": "Chat",
-    "send": "Send",
-    "stop": "Stop",
-    "mic": "Record voice message",
-    "stopRecording": "Stop recording",
-    "transcribing": "Transcribing…",
-    "resizePanel": "Resize chat panel",
-    "stepLimitReached": "I reached the maximum number of steps allowed for a single request, so I stopped before fully answering. Please narrow the question or ask me to continue.",
-    "responseLengthLimitReached": "My answer reached the maximum length for one turn and was cut off. Ask me to continue and I'll pick up where I left off."
+  "Listing": {
+    "heading": "Paste a property listing link",
+    "placeholder": "https://www.seloger.com/annonces/...",
+    "submit": "Analyze",
+    "errorEmpty": "Paste a listing address to continue.",
+    "errorMalformed": "That link isn't valid. Make sure it starts with https://",
+    "errorUnsupportedPortal": "That site isn't supported yet. Try a listing from SeLoger, Leboncoin, PAP or Bien'ici.",
+    "notAvailable": "Link recognized. Listing analysis isn't available yet."
   }
 }

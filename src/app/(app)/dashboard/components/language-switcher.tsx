@@ -48,7 +48,6 @@ export function LanguageSwitcher() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  data-help-id="sidebar.language-switcher"
                   aria-label={t('language')}
                   loading={isPending}
                 />

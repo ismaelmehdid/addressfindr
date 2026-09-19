@@ -3,7 +3,7 @@ import { fakeFile } from './__test-helpers__';
 import { toFileDto } from './mappers';
 
 describe('toFileDto', () => {
-  it('exposes the public DTO with ISO dates and no userId/orgId/storageKey', () => {
+  it('exposes the public DTO with ISO dates and no userId/storageKey', () => {
     const dto = toFileDto(fakeFile());
     expect(dto).toEqual({
       id: 'file-1',
@@ -17,7 +17,6 @@ describe('toFileDto', () => {
       updatedAt: '2024-01-02T00:00:00.000Z',
     });
     expect(dto).not.toHaveProperty('userId');
-    expect(dto).not.toHaveProperty('organizationId');
     expect(dto).not.toHaveProperty('storageKey');
   });
 });

@@ -12,7 +12,6 @@ import { log } from '@/shared/logger';
 
 export type AuthedRouteContext = {
   userId: string;
-  organizationId: string;
 };
 
 export async function requireAuthedRoute(args: {
@@ -25,17 +24,16 @@ export async function requireAuthedRoute(args: {
   if (me.isErr()) {
     return { ok: false, response: jsonError(unauthorized(me.error.message)) };
   }
-  if (!me.value.organizationId) {
+  if (!me.value.hasRedeemedAccess) {
     return {
       ok: false,
-      response: jsonError(forbidden('Organization required')),
+      response: jsonError(forbidden('Early access required')),
     };
   }
-  const identifier = `${me.value.organizationId}:${me.value.id}`;
+  const identifier = me.value.id;
   const rl = await applyRateLimit({ identifier, limit: args.rateLimit });
   if (!rl.success) {
     log.warn(`${args.event}.rate_limited`, {
-      organizationId: me.value.organizationId,
       userId: me.value.id,
       reset: rl.reset,
     });
@@ -49,7 +47,7 @@ export async function requireAuthedRoute(args: {
   }
   return {
     ok: true,
-    ctx: { userId: me.value.id, organizationId: me.value.organizationId },
+    ctx: { userId: me.value.id },
   };
 }
 

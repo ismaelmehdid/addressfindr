@@ -1,8 +1,8 @@
 import { err, ok } from 'neverthrow';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@/application/me/organization-scope', () => ({
-  requireOrganizationScope: vi.fn(),
+vi.mock('@/application/me/user-scope', () => ({
+  requireUserScope: vi.fn(),
 }));
 
 vi.mock('@/application/storage/create-signed-upload-url', () => ({
@@ -13,22 +13,20 @@ vi.mock('@/infra/data-access/file/file-repo', () => ({
   createFile: vi.fn(),
 }));
 
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { createSignedUploadUrl } from '@/application/storage/create-signed-upload-url';
 import { notFound } from '@/core/errors';
 import { createFile } from '@/infra/data-access/file/file-repo';
 import { fakeFile } from './__test-helpers__';
 import { initiateFileUpload } from './initiate-upload';
 
-const mockedScope = vi.mocked(requireOrganizationScope);
+const mockedScope = vi.mocked(requireUserScope);
 const mockedSign = vi.mocked(createSignedUploadUrl);
 const mockedCreate = vi.mocked(createFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedScope.mockResolvedValue(
-    ok({ userId: 'user-1', organizationId: 'org-1' }),
-  );
+  mockedScope.mockResolvedValue(ok({ userId: 'user-1' }));
   mockedSign.mockResolvedValue(
     ok({
       bucket: 'files',
@@ -57,7 +55,7 @@ describe('initiateFileUpload', () => {
   });
 
   it('returns scope error', async () => {
-    mockedScope.mockResolvedValue(err(notFound('no scope', 'organization')));
+    mockedScope.mockResolvedValue(err(notFound('no scope', 'user')));
     const r = await initiateFileUpload({
       originalName: 'a.pdf',
       mimeType: 'application/pdf',

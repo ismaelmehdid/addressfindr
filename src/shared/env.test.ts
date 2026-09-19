@@ -49,3 +49,33 @@ describe('env email provider', () => {
     expect(() => env()).toThrow(/EMAIL_PROVIDER=resend requires/);
   });
 });
+
+describe('env empty values', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('treats an empty optional value as unset rather than invalid', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      OPENAI_API_KEY: '',
+      ZEROENTROPY_API_KEY: '',
+      NEXT_PUBLIC_POSTHOG_KEY: '',
+      SUPABASE_STORAGE_HOST: '',
+      RESEND_FROM_EMAIL: '',
+    });
+    expect(() => env()).not.toThrow();
+    expect(env().OPENAI_API_KEY).toBeUndefined();
+    expect(env().SUPABASE_STORAGE_HOST).toBeUndefined();
+  });
+
+  it('falls back to the default when an optional value is empty', async () => {
+    const env = await loadEnv({ EMAIL_PROVIDER: 'none', CHAT_MODEL: '' });
+    expect(env().CHAT_MODEL).toBe('gpt-5.4-mini');
+  });
+
+  it('still rejects an empty required value', async () => {
+    const env = await loadEnv({ EMAIL_PROVIDER: 'none', DATABASE_URL: '' });
+    expect(() => env()).toThrow(/DATABASE_URL/);
+  });
+});

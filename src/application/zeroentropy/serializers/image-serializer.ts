@@ -15,13 +15,13 @@ const VISION_DOC_TYPE = 'vision-description';
 export const imageSerializer: IEntitySerializer<ParsedFile> = {
   entityType: IndexableEntityType.FILE,
   getEntityId: (entity) => entity.id,
-  toIndexable(entity, organizationId) {
+  toIndexable(entity, userId) {
     if (entity.parsed.kind !== 'image') return [];
     const out: EntityToIndex[] = [
       {
         entityId: entity.id,
         entityType: IndexableEntityType.FILE,
-        organizationId,
+        userId,
         docType: BINARY_DOC_TYPE,
         content: {
           kind: ZeroEntropyContentKind.AUTO,
@@ -38,7 +38,7 @@ export const imageSerializer: IEntitySerializer<ParsedFile> = {
       out.push({
         entityId: entity.id,
         entityType: IndexableEntityType.FILE,
-        organizationId,
+        userId,
         docType: VISION_DOC_TYPE,
         content: {
           kind: ZeroEntropyContentKind.TEXT,

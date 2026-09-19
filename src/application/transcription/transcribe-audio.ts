@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { type AppError, validation } from '@/core/errors';
 import {
   MAX_AUDIO_BYTES,
@@ -39,7 +39,7 @@ export async function transcribeAudioForUser(args: {
   filename: string;
   languageHint?: string;
 }): Promise<Result<TranscribeAudioResult, AppError>> {
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
   if (args.audio.byteLength === 0) {
@@ -63,7 +63,6 @@ export async function transcribeAudioForUser(args: {
   }
 
   log.info('transcription.start', {
-    organizationId: scope.value.organizationId,
     userId: scope.value.userId,
     mimeType: args.mimeType,
     bytes: args.audio.byteLength,
@@ -82,7 +81,6 @@ export async function transcribeAudioForUser(args: {
     result.value.durationInSeconds > MAX_RECORDING_SECONDS
   ) {
     log.warn('transcription.duration_exceeded', {
-      organizationId: scope.value.organizationId,
       userId: scope.value.userId,
       durationSeconds: result.value.durationInSeconds,
       limitSeconds: MAX_RECORDING_SECONDS,
@@ -96,7 +94,6 @@ export async function transcribeAudioForUser(args: {
   }
 
   log.info('transcription.success', {
-    organizationId: scope.value.organizationId,
     userId: scope.value.userId,
     textChars: result.value.text.length,
     durationSeconds: result.value.durationInSeconds,

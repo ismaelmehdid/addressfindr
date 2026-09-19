@@ -58,7 +58,7 @@ export async function POST(req: Request): Promise<Response> {
     log.warn('api.transcribe.failure', {
       code: result.error.code,
       message: result.error.message,
-      organizationId: auth.ctx.organizationId,
+      userId: auth.ctx.userId,
     });
     return jsonError(result.error);
   }

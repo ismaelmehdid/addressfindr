@@ -15,7 +15,7 @@ import { log } from '@/shared/logger';
 export type FailedSyncOperationRecord = {
   id: string;
   eventId: string;
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
   operation: SyncOperation;
@@ -30,7 +30,7 @@ export type FailedSyncOperationRecord = {
 
 export async function enqueueOperation(args: {
   eventId: string;
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
   operation: SyncOperation;
@@ -42,7 +42,7 @@ export async function enqueueOperation(args: {
       .insert(failedSyncOperation)
       .values({
         eventId: args.eventId,
-        organizationId: args.organizationId,
+        userId: args.userId,
         entityType: args.entityType,
         entityId: args.entityId,
         operation: args.operation,
@@ -53,7 +53,7 @@ export async function enqueueOperation(args: {
       })
       .onConflictDoUpdate({
         target: [
-          failedSyncOperation.organizationId,
+          failedSyncOperation.userId,
           failedSyncOperation.entityType,
           failedSyncOperation.entityId,
         ],
@@ -181,8 +181,7 @@ function parseRawFailedSyncRow(
   const r = raw as Record<string, unknown>;
   const id = typeof r.id === 'string' ? r.id : null;
   const eventId = typeof r.event_id === 'string' ? r.event_id : null;
-  const organizationId =
-    typeof r.organization_id === 'string' ? r.organization_id : null;
+  const userId = typeof r.user_id === 'string' ? r.user_id : null;
   const entityType = typeof r.entity_type === 'string' ? r.entity_type : null;
   const entityId = typeof r.entity_id === 'string' ? r.entity_id : null;
   const operation = typeof r.operation === 'string' ? r.operation : null;
@@ -202,7 +201,7 @@ function parseRawFailedSyncRow(
   if (
     !id ||
     !eventId ||
-    !organizationId ||
+    !userId ||
     !entityType ||
     !entityId ||
     !operation ||
@@ -229,7 +228,7 @@ function parseRawFailedSyncRow(
   return ok({
     id,
     eventId,
-    organizationId,
+    userId,
     entityType: entityType as IndexableEntityType,
     entityId,
     operation: operation as SyncOperation,

@@ -4,9 +4,9 @@ import { err, ok, type Result } from 'neverthrow';
 import * as v from 'valibot';
 import {
   getFileEntitiesByIds,
-  getFileEntityForOrg,
+  getFileEntityForUser,
 } from '@/application/files/get-file-entity';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { multiQuerySearch } from '@/application/retrieval/multi-query-search';
 import { type AppError, parseInput } from '@/core/errors';
 import { ZEROENTROPY_CONFIG } from '@/core/zeroentropy/config';
@@ -88,10 +88,10 @@ async function searchUserFilesImpl(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const collection = await ensureCollection(scope.value.organizationId);
+  const collection = await ensureCollection(scope.value.userId);
   if (collection.isErr()) return err(collection.error);
 
   const snippets = await multiQuerySearch({
@@ -138,7 +138,10 @@ async function searchUserFilesImpl(
     ),
   );
 
-  const files = await getFileEntitiesByIds(uniqueIds);
+  const files = await getFileEntitiesByIds({
+    ids: uniqueIds,
+    userId: scope.value.userId,
+  });
   if (files.isErr()) return err(files.error);
 
   const fileNameById = new Map<string, string>();
@@ -149,6 +152,7 @@ async function searchUserFilesImpl(
   const enriched: FileSnippet[] = [];
   for (const { snippet, parsedPath } of parsedSnippets) {
     if (!parsedPath) continue;
+    if (!fileNameById.has(parsedPath.entityId)) continue;
     enriched.push({
       content: snippet.content,
       score: snippet.score,
@@ -187,16 +191,16 @@ async function searchFileTextImpl(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const file = await getFileEntityForOrg({
+  const file = await getFileEntityForUser({
     fileId: parsed.value.fileId,
-    organizationId: scope.value.organizationId,
+    userId: scope.value.userId,
   });
   if (file.isErr()) return err(file.error);
 
-  const collection = await ensureCollection(scope.value.organizationId);
+  const collection = await ensureCollection(scope.value.userId);
   if (collection.isErr()) return err(collection.error);
 
   const snippets = await multiQuerySearch({

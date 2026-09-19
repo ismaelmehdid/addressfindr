@@ -7,7 +7,6 @@ function file(): FileEntity {
   return {
     id: 'file-1',
     userId: 'user-1',
-    organizationId: 'org-1',
     originalName: 'report.pdf',
     storageKey: { bucket: 'files', objectPath: 'p' } as never,
     mimeType: 'application/pdf' as never,
@@ -26,7 +25,7 @@ describe('buildFileMetadata', () => {
     const meta = buildFileMetadata({ file: file(), docType: 'extracted' });
     expect(meta.entityType).toBe('file');
     expect(meta.entityId).toBe('file-1');
-    expect(meta.organizationId).toBe('org-1');
+    expect(meta.userId).toBe('user-1');
     expect(meta.updatedAt).toBe('2024-01-02T03:04:05.000Z');
     expect(meta.docType).toBe('extracted');
     expect(meta.source).toBe('user_upload');

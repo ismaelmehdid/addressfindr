@@ -2,7 +2,6 @@ import 'server-only';
 
 import { betterAuth, type LogLevel } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { organization } from 'better-auth/plugins';
 import { db } from '@/infra/database/connection';
 import {
   account,
@@ -10,12 +9,6 @@ import {
   user,
   verification,
 } from '@/infra/database/schema/auth-schema';
-import {
-  invitation,
-  member,
-  organization as organizationTable,
-} from '@/infra/database/schema/organization-schema';
-import { sendOrganizationInvitationEmail } from '@/infra/email/send-organization-invitation';
 import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
 
@@ -50,9 +43,6 @@ export const auth = betterAuth({
       session,
       account,
       verification,
-      organization: organizationTable,
-      member,
-      invitation,
     },
   }),
   user: {
@@ -108,45 +98,6 @@ export const auth = betterAuth({
         }
       : {}),
   },
-  plugins: [
-    organization({
-      invitationExpiresIn: 60 * 60 * 24 * 7,
-      cancelPendingInvitationsOnReInvite: true,
-      async sendInvitationEmail(data) {
-        const acceptUrl = `${e.BETTER_AUTH_URL}/accept-invitation/${data.id}`;
-        const orgLocale =
-          (
-            data.organization as unknown as {
-              locale?: string;
-            }
-          ).locale === 'en'
-            ? 'en'
-            : 'fr';
-        const role = data.role === 'admin' ? 'admin' : 'member';
-        const result = await sendOrganizationInvitationEmail({
-          recipientEmail: data.email,
-          organizationName: data.organization.name,
-          inviterName: data.inviter.user.name,
-          inviterEmail: data.inviter.user.email,
-          role,
-          acceptUrl,
-          expiresAt: new Date(Date.now() + 60 * 60 * 24 * 7 * 1000),
-          locale: orgLocale,
-        });
-        if (result.isErr()) {
-          log.error(
-            'auth.organization.invitation_email_failed',
-            new Error(result.error.message),
-            {
-              email: data.email,
-              organizationId: data.organization.id,
-              code: result.error.code,
-            },
-          );
-        }
-      },
-    }),
-  ],
   advanced: {
     useSecureCookies: isSecure,
     defaultCookieAttributes: {

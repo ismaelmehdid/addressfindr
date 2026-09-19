@@ -10,23 +10,12 @@ export async function generateMetadata(): Promise<Metadata> {
   return { title: t('signIn') };
 }
 
-const INVITATION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
-
-export default async function SignInPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ invitation?: string }>;
-}): Promise<React.ReactElement> {
-  const params = await searchParams;
-  const invitation = params.invitation ?? '';
-  const hasInvitation = INVITATION_ID_PATTERN.test(invitation);
-
+export default async function SignInPage(): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
   if (currentUser.isOk()) {
-    if (hasInvitation) {
-      redirect(`/accept-invitation/${invitation}`);
-    }
-    redirect(currentUser.value.organizationId ? '/dashboard' : '/onboarding');
+    redirect(
+      currentUser.value.hasRedeemedAccess ? '/dashboard' : '/onboarding',
+    );
   }
   return <SignInForm microsoftEnabled={isMicrosoftAuthEnabled} />;
 }

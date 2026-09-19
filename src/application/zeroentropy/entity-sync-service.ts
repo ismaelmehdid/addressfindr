@@ -10,7 +10,7 @@ import {
   type IndexableEntityType,
   ZeroEntropyContentKind,
 } from '@/core/zeroentropy/types';
-import { getCollectionByOrg } from '@/infra/data-access/zeroentropy/collection-repo';
+import { getCollectionByUser } from '@/infra/data-access/zeroentropy/collection-repo';
 import {
   deleteIndexedEntityDocs,
   getIndexedEntity,
@@ -53,27 +53,27 @@ function computeCompositeHash(docs: EntityToIndex[]): string {
 }
 
 function documentPath(d: EntityToIndex): string {
-  return `entities/${d.organizationId}/${d.entityType}/${d.entityId}/${d.docType}`;
+  return `entities/${d.userId}/${d.entityType}/${d.entityId}/${d.docType}`;
 }
 
 function serializeFetched(
   fetched: FetchedEntity,
-  organizationId: string,
+  userId: string,
 ): EntityToIndex[] {
-  return fetched.serializer.toIndexable(fetched.entity, organizationId);
+  return fetched.serializer.toIndexable(fetched.entity, userId);
 }
 
 function pathForDocType(args: {
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
   docType: string;
 }): string {
-  return `entities/${args.organizationId}/${args.entityType}/${args.entityId}/${args.docType}`;
+  return `entities/${args.userId}/${args.entityType}/${args.entityId}/${args.docType}`;
 }
 
 export async function indexEntity(args: {
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
 }): Promise<Result<void, AppError>> {
@@ -93,21 +93,21 @@ export async function indexEntity(args: {
 }
 
 async function indexEntityLocked(args: {
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
 }): Promise<Result<void, AppError>> {
-  const collection = await ensureCollection(args.organizationId);
+  const collection = await ensureCollection(args.userId);
   if (collection.isErr()) return err(collection.error);
 
   const fetched = await fetchEntityData({
     entityType: args.entityType,
     entityId: args.entityId,
-    organizationId: args.organizationId,
+    userId: args.userId,
   });
   if (fetched.isErr()) return err(fetched.error);
 
-  const documents = serializeFetched(fetched.value, args.organizationId);
+  const documents = serializeFetched(fetched.value, args.userId);
   if (documents.length === 0) {
     // The entity has no indexable content anymore (e.g. a file whose
     // content was emptied). Returning early would leave the previously
@@ -134,7 +134,7 @@ async function indexEntityLocked(args: {
       'indexing.doc_count': documents.length,
     });
     log.info('Entity unchanged, skipping', {
-      organizationId: args.organizationId,
+      userId: args.userId,
       entityType: args.entityType,
       entityId: args.entityId,
     });
@@ -178,7 +178,7 @@ async function indexEntityLocked(args: {
     });
     if (persistedErr.isErr()) return err(persistedErr.error);
     log.warn('Entity partially indexed, marked ERROR', {
-      organizationId: args.organizationId,
+      userId: args.userId,
       entityType: args.entityType,
       entityId: args.entityId,
       failedCount: failed.length,
@@ -203,7 +203,7 @@ async function indexEntityLocked(args: {
         orphanDocTypes.map((docType) =>
           orphanLimit(async () => {
             const path = pathForDocType({
-              organizationId: args.organizationId,
+              userId: args.userId,
               entityType: args.entityType,
               entityId: args.entityId,
               docType,
@@ -214,7 +214,7 @@ async function indexEntityLocked(args: {
             });
             if (removed.isErr()) {
               log.warn('Failed to delete orphan ZE doc', {
-                organizationId: args.organizationId,
+                userId: args.userId,
                 entityType: args.entityType,
                 entityId: args.entityId,
                 docType,
@@ -244,7 +244,7 @@ async function indexEntityLocked(args: {
   if (persisted.isErr()) return err(persisted.error);
 
   log.info('Entity indexed', {
-    organizationId: args.organizationId,
+    userId: args.userId,
     entityType: args.entityType,
     entityId: args.entityId,
     docCount: documents.length,
@@ -253,7 +253,7 @@ async function indexEntityLocked(args: {
 }
 
 export async function removeEntity(args: {
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
 }): Promise<Result<void, AppError>> {
@@ -265,11 +265,11 @@ export async function removeEntity(args: {
 }
 
 async function removeEntityLocked(args: {
-  organizationId: string;
+  userId: string;
   entityType: IndexableEntityType;
   entityId: string;
 }): Promise<Result<void, AppError>> {
-  const collection = await getCollectionByOrg(args.organizationId);
+  const collection = await getCollectionByUser(args.userId);
   if (collection.isErr()) return err(collection.error);
   if (!collection.value) {
     return ok(undefined);
@@ -292,7 +292,7 @@ async function removeEntityLocked(args: {
     existing.value.docTypes.map((docType) =>
       removeLimit(async () => {
         const path = pathForDocType({
-          organizationId: args.organizationId,
+          userId: args.userId,
           entityType: args.entityType,
           entityId: args.entityId,
           docType,
@@ -304,7 +304,7 @@ async function removeEntityLocked(args: {
         if (removed.isErr()) {
           anyDeleteFailed = true;
           log.warn('Failed to delete ZE document', {
-            organizationId: args.organizationId,
+            userId: args.userId,
             entityType: args.entityType,
             entityId: args.entityId,
             docType,
@@ -331,7 +331,7 @@ async function removeEntityLocked(args: {
   if (purge.isErr()) return err(purge.error);
 
   log.info('Entity removed from ZE', {
-    organizationId: args.organizationId,
+    userId: args.userId,
     entityType: args.entityType,
     entityId: args.entityId,
     docCount: existing.value.docTypes.length,

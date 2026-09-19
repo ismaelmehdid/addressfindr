@@ -7,14 +7,11 @@
   "SignIn": {
     "title": "Connexion",
     "google": "Continuer avec Google",
-    "microsoft": "Continuer avec Microsoft",
-    "signInToAcceptInvitation": "Connectez-vous pour accepter votre invitation.",
-    "emailMismatchToast": "Cette invitation concerne une autre adresse e-mail. Connectez-vous avec ce compte."
+    "microsoft": "Continuer avec Microsoft"
   },
   "Onboarding": {
-    "title": "Créez votre organisation",
-    "subtitle": "Saisissez le nom de votre organisation et le code d'accès anticipé reçu.",
-    "orgName": "Nom de l'organisation",
+    "title": "Saisissez votre code d'accès",
+    "subtitle": "Utilisez le code d'accès anticipé que vous avez reçu pour continuer.",
     "code": "Code d'accès anticipé",
     "submit": "Continuer",
     "invalidCode": "Code invalide ou déjà utilisé.",
@@ -28,76 +25,15 @@
   },
   "Nav": {
     "dashboard": "Tableau de bord",
-    "storage": "Stockage",
-    "organization": "Organisation",
     "settings": "Paramètres",
     "signOut": "Se déconnecter",
     "language": "Langue"
-  },
-  "Members": {
-    "title": "Organisation",
-    "subtitle": "Gérez les membres et les invitations.",
-    "pageHelp": "Gérez les membres de votre organisation et les invitations en attente. Tous les fichiers et documents partagés ici sont accessibles à l'équipe.",
-    "membersSection": "Membres",
-    "pendingSection": "Invitations en attente",
-    "inviteButton": "Inviter",
-    "inviteDialogTitle": "Inviter un membre",
-    "inviteDialogDescription": "Il recevra un e-mail avec un lien pour rejoindre.",
-    "inviteEmailLabel": "E-mail",
-    "inviteEmailPlaceholder": "nom@entreprise.com",
-    "inviteRoleLabel": "Rôle",
-    "roleMember": "Membre",
-    "roleAdmin": "Administrateur",
-    "roleOwner": "Propriétaire",
-    "sendInvitation": "Envoyer l'invitation",
-    "cancel": "Annuler",
-    "cancelInvitation": "Annuler l'invitation",
-    "remove": "Retirer",
-    "you": "Vous",
-    "joinedOn": "A rejoint le {date}",
-    "expiresOn": "Expire le {date}",
-    "inviteSuccess": "Invitation envoyée",
-    "inviteAlreadyMember": "Cette personne est déjà membre",
-    "cancelSuccess": "Invitation annulée",
-    "removeSuccess": "Membre retiré",
-    "emptyMembers": "Aucun membre pour l'instant.",
-    "emptyInvitations": "Aucune invitation en attente."
-  },
-  "AcceptInvitation": {
-    "title": "Vous avez été invité",
-    "subtitle": "Rejoindre {orgName} en tant que {role}.",
-    "accept": "Accepter",
-    "reject": "Refuser",
-    "acceptSuccess": "Bienvenue !",
-    "rejectSuccess": "Invitation refusée",
-    "expired": "Cette invitation a expiré.",
-    "notFound": "Invitation introuvable.",
-    "alreadyMember": "Vous êtes déjà membre de cette organisation.",
-    "wrongAccount": "Cette invitation est pour {email}. Vous êtes connecté en tant que {currentEmail}.",
-    "switchAccount": "Se déconnecter et changer de compte",
-    "emailMismatchToast": "Cette invitation concerne une autre adresse e-mail. Connectez-vous avec ce compte.",
-    "alreadyInOrgToast": "Vous êtes déjà membre d'une organisation — vous ne pouvez en rejoindre qu'une seule à la fois."
   },
   "Meta": {
     "signIn": "Connexion",
     "onboarding": "Bienvenue",
     "dashboard": "Tableau de bord",
-    "storage": "Stockage",
-    "organization": "Organisation",
-    "acceptInvitation": "Accepter l'invitation",
     "settings": "Paramètres"
-  },
-  "ChatTools": {
-    "calling": "Appel de {tool}…",
-    "completed": "{tool}",
-    "failed": "Échec de {tool}",
-    "approvalNeeded": "{tool} nécessite une approbation",
-    "denied": "{tool} refusé",
-    "searchUserFiles": "Rechercher dans les fichiers",
-    "searchFileText": "Lire le fichier",
-    "listFiles": "Lister les fichiers",
-    "fetchUrl": "Charger l'URL",
-    "webSearch": "Recherche web"
   },
   "Home": {
     "welcomeTitle": "Comment puis-je vous aider aujourd'hui ?",
@@ -123,35 +59,6 @@
     "rename": "Renommer",
     "deleteConfirmTitle": "Supprimer la conversation ?",
     "deleteConfirmDescription": "Cela supprimera définitivement la conversation et ses messages. Cette action est irréversible."
-  },
-  "Storage": {
-    "title": "Stockage",
-    "pageHelp": "Documents importés de votre organisation. Le chat peut les rechercher, lire leur contenu et y faire référence dans ses réponses.",
-    "uploadButton": "Téléverser",
-    "empty": "Aucun fichier",
-    "emptyDescription": "Glissez un fichier ici ou cliquez sur Téléverser pour commencer.",
-    "rowActions": "Actions du fichier",
-    "open": "Ouvrir",
-    "download": "Télécharger",
-    "preparingDownload": "Préparation du téléchargement…",
-    "rename": "Renommer",
-    "dropToUpload": "Déposez pour téléverser",
-    "previewUnavailable": "Aperçu indisponible",
-    "previewLoading": "Chargement de l'aperçu…",
-    "renameDialogTitle": "Renommer le fichier",
-    "renamePlaceholder": "Nouveau nom de fichier",
-    "errorFileTooLarge": "Le fichier dépasse la limite de 10 Mo.",
-    "errorMimeNotSupported": "Ce type de fichier n'est pas pris en charge.",
-    "errorMimeMismatch": "Le contenu du fichier ne correspond pas au type déclaré.",
-    "deleteConfirmTitle": "Supprimer le fichier ?",
-    "deleteConfirmDescription": "Supprimer définitivement {name}. Le fichier sera retiré du stockage et de la recherche. Cette action est irréversible.",
-    "deleteConfirmDescriptionGeneric": "Supprimer définitivement ce fichier. Il sera retiré du stockage et de la recherche. Cette action est irréversible.",
-    "indexStatus": {
-      "pending": "En attente",
-      "indexing": "Indexation",
-      "indexed": "Indexé",
-      "error": "Erreur"
-    }
   },
   "Settings": {
     "title": "Paramètres",
@@ -194,16 +101,13 @@
     "backDashboard": "Retour au tableau de bord",
     "backHome": "Retour à l'accueil"
   },
-  "Chat": {
-    "activeContext": "Fichier actif visible par le chat",
-    "toggle": "Discussion",
-    "send": "Envoyer",
-    "stop": "Arrêter",
-    "mic": "Enregistrer un message vocal",
-    "stopRecording": "Arrêter l'enregistrement",
-    "transcribing": "Transcription…",
-    "resizePanel": "Redimensionner le panneau",
-    "stepLimitReached": "J'ai atteint le nombre maximal d'étapes autorisées pour une seule requête, je me suis donc arrêté avant de répondre complètement. Veuillez préciser la question ou demandez-moi de continuer.",
-    "responseLengthLimitReached": "Ma réponse a atteint la longueur maximale pour un tour et a été tronquée. Demandez-moi de continuer et je reprendrai où je me suis arrêté."
+  "Listing": {
+    "heading": "Collez le lien d'une annonce immobilière",
+    "placeholder": "https://www.seloger.com/annonces/...",
+    "submit": "Analyser",
+    "errorEmpty": "Collez l'adresse d'une annonce pour continuer.",
+    "errorMalformed": "Ce lien n'est pas valide. Vérifiez qu'il commence par https://",
+    "errorUnsupportedPortal": "Ce site n'est pas encore pris en charge. Essayez une annonce SeLoger, Leboncoin, PAP ou Bien'ici.",
+    "notAvailable": "Lien reconnu. L'analyse des annonces n'est pas encore disponible."
   }
 }

@@ -13,13 +13,13 @@ const DOC_TYPE = 'content';
 export const jsonSerializer: IEntitySerializer<ParsedFile> = {
   entityType: IndexableEntityType.FILE,
   getEntityId: (entity) => entity.id,
-  toIndexable(entity, organizationId) {
+  toIndexable(entity, userId) {
     if (entity.parsed.kind !== 'text') return [];
     return [
       {
         entityId: entity.id,
         entityType: IndexableEntityType.FILE,
-        organizationId,
+        userId,
         docType: DOC_TYPE,
         content: {
           kind: ZeroEntropyContentKind.TEXT,

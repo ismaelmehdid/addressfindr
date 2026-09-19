@@ -1,9 +1,9 @@
 import 'server-only';
 
 import { err, ok, type Result } from 'neverthrow';
-import { requireOrganizationScope } from '@/application/me/organization-scope';
+import { requireUserScope } from '@/application/me/user-scope';
 import { type AppError, parseInput } from '@/core/errors';
-import { listFilesForOrg } from '@/infra/data-access/file/file-repo';
+import { listFilesForUser } from '@/infra/data-access/file/file-repo';
 import { type FileDto, ListFilesInputSchema } from './dto';
 import { toFileDto } from './mappers';
 
@@ -20,11 +20,11 @@ export async function listFiles(input: {
   const parsed = parseInput(ListFilesInputSchema, input, 'Invalid list input');
   if (parsed.isErr()) return err(parsed.error);
 
-  const scope = await requireOrganizationScope();
+  const scope = await requireUserScope();
   if (scope.isErr()) return err(scope.error);
 
-  const page = await listFilesForOrg({
-    organizationId: scope.value.organizationId,
+  const page = await listFilesForUser({
+    userId: scope.value.userId,
     page: parsed.value.page,
     perPage: parsed.value.perPage,
   });
