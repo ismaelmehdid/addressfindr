@@ -91,4 +91,35 @@ describe('firecrawlScraperAdapter', () => {
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
   });
+
+  it('maps an anti-bot challenge to external_api', async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        markdown: 'Vérification… geo.captcha-delivery.com',
+        rawHtml: '<html></html>',
+        metadata: { statusCode: 403 },
+      },
+    });
+    const result = await firecrawlScraperAdapter.scrape({
+      url: 'https://www.leboncoin.fr/ad/ventes_immobilieres/1',
+    });
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+
+  it('does not treat a full page carrying an anti-bot script as blocked', async () => {
+    mockFetchOnce({
+      success: true,
+      data: {
+        markdown: `${'Duplex 4 pièces 102 m² '.repeat(60)} datadome`,
+        rawHtml: '<html></html>',
+        metadata: { statusCode: 200 },
+      },
+    });
+    const result = await firecrawlScraperAdapter.scrape({
+      url: 'https://www.leboncoin.fr/ad/ventes_immobilieres/1',
+    });
+    expect(result.isOk()).toBe(true);
+  });
 });

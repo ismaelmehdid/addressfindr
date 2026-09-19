@@ -3,6 +3,7 @@ import 'server-only';
 import { err, ok, type Result } from 'neverthrow';
 import * as v from 'valibot';
 import { type AppError, externalApi, validation } from '@/core/errors';
+import { looksBlocked } from '@/core/listing/page-guards';
 import { resolvePortal } from '@/core/listing/portal-registry';
 import type {
   IListingScraper,
@@ -87,6 +88,11 @@ async function scrape(input: {
   const { markdown, rawHtml, metadata } = parsed.output.data;
   if (markdown.length === 0 && rawHtml.length === 0) {
     return err(externalApi(PROVIDER, 'Listing page returned no content'));
+  }
+
+  if (looksBlocked({ markdown, statusCode: metadata.statusCode ?? null })) {
+    log.warn('listing.scrape.failed', { portal, stage: 'blocked' });
+    return err(externalApi(PROVIDER, 'Listing page is protected by anti-bot'));
   }
 
   log.info('listing.scrape.success', {

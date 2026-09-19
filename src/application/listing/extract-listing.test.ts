@@ -189,4 +189,16 @@ describe('extractListing', () => {
       expect(result.value.sources.dpeClass).toBe('hydration');
     }
   });
+
+  it('rejects a listing that is not a dwelling', async () => {
+    const result = await extractListing(
+      { url: 'https://www.pap.fr/annonces/terrain-r2' },
+      {
+        scraper: scraper('Terrain constructible de 600 m² viabilisé', ''),
+        extractor: extractor({}),
+      },
+    );
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('validation');
+  });
 });

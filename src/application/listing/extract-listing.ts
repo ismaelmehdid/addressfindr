@@ -8,6 +8,7 @@ import {
   mergeExtractions,
   missingRequiredFields,
 } from '@/core/listing/merge-extractions';
+import { isUnsupportedCategory } from '@/core/listing/page-guards';
 import { resolvePortal } from '@/core/listing/portal-registry';
 import type { IListingExtractor } from '@/core/listing/ports/listing-extractor.port';
 import type { IListingScraper } from '@/core/listing/ports/listing-scraper.port';
@@ -107,6 +108,19 @@ export async function extractListing(
 
   const merged = mergeExtractions(layers);
   const stillMissing = missingRequiredFields(merged.values);
+
+  if (
+    merged.values.propertyType === null &&
+    isUnsupportedCategory(scraped.value.markdown)
+  ) {
+    log.warn('listing.extract.failed', {
+      portal,
+      stage: 'unsupported_category',
+    });
+    return err(
+      validation('This listing is not a dwelling we can match', 'url'),
+    );
+  }
 
   if (stillMissing.length === REQUIRED_FIELDS.length) {
     log.warn('listing.extract.failed', { portal, stage: 'unreadable' });
