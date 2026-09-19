@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MAX_MARKDOWN_CHARS } from '@/core/listing/types';
 
 vi.mock('@/shared/env', () => ({
   env: () => ({
@@ -24,6 +25,10 @@ vi.mock('@ai-sdk/openai', () => ({
 import { groqListingExtractor } from './groq-listing-extractor';
 
 describe('groqListingExtractor', () => {
+  beforeEach(() => {
+    generateObject.mockClear();
+  });
+
   it('returns the quotes the model produced', async () => {
     generateObject.mockResolvedValueOnce({
       object: { surfaceM2: '80,5 m²', dpeClass: 'DPE C' },
@@ -70,5 +75,34 @@ describe('groqListingExtractor', () => {
     });
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+
+  it('truncates the markdown to MAX_MARKDOWN_CHARS before calling the model', async () => {
+    generateObject.mockResolvedValueOnce({ object: {} });
+    await groqListingExtractor.extractQuotes({
+      markdown: 'x'.repeat(MAX_MARKDOWN_CHARS + 5000),
+      missing: ['surfaceM2'],
+    });
+    const callArg = generateObject.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    const prompt = callArg.prompt as string;
+    const xCount = (prompt.match(/x/g) ?? []).length;
+    expect(xCount).toBe(MAX_MARKDOWN_CHARS);
+  });
+
+  // why: le modele rend une LOCALISATION, pas une valeur. Toute retouche de la
+  // chaine — trim, recasse, normalisation — remettrait la production de valeur
+  // dans le modele et annulerait tout le dispositif.
+  it('returns the model quote byte-identical, without trimming or recasing', async () => {
+    const raw = '   80,5 M²  dpe C  ';
+    generateObject.mockResolvedValueOnce({ object: { surfaceM2: raw } });
+    const result = await groqListingExtractor.extractQuotes({
+      markdown: 'whatever',
+      missing: ['surfaceM2'],
+    });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.surfaceM2).toBe(raw);
   });
 });
