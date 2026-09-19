@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { extractJsonLdNodes, mapJsonLdToValues } from './json-ld';
 
 const SELOGER_HTML = `<html><head>
-<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"SeLoger","address":"2 Rue des Italiens, 75009 Paris"}</script>
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"Organization","name":"SeLoger","address":{"@type":"PostalAddress","streetAddress":"2 Rue des Italiens","addressLocality":"Paris","postalCode":"75009"}}</script>
 <script type="application/ld+json">{"@context":"https://schema.org","@type":"RealEstateListing","datePosted":"2026-08-18T00:38:00.000Z","name":"Appartement à vendre T4/F4 80 m² 249900 € Hardricourt (78250)","itemOffered":{"@type":"APARTMENT","numberOfRooms":"4","floorSize":{"@type":"QuantitativeValue","value":"80","unitCode":"MTK"}},"offers":{"@type":"Offer","price":"249900","priceCurrency":"EUR"}}</script>
 </head><body></body></html>`;
 
@@ -12,10 +12,10 @@ const PAP_HTML = `<html><head>
 
 describe('extractJsonLdNodes', () => {
   it('flattens nested nodes so itemOffered and offers are reachable', () => {
-    // Organization (1) + RealEstateListing (1) + itemOffered (1)
-    // + floorSize (1) + offers (1) = 5
+    // Organization (1) + its PostalAddress (1) + RealEstateListing (1)
+    // + itemOffered (1) + floorSize (1) + offers (1) = 6
     const nodes = extractJsonLdNodes(SELOGER_HTML);
-    expect(nodes).toHaveLength(5);
+    expect(nodes).toHaveLength(6);
     const types = nodes.map((n) => String(n['@type'] ?? '').toLowerCase());
     expect(types).toContain('apartment');
     expect(types).toContain('offer');
