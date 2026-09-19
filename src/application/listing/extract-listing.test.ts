@@ -139,4 +139,54 @@ describe('extractListing', () => {
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('validation');
   });
+
+  // why: c'est ce garde qui garde le cout marginal a zero sur leboncoin, ou
+  // l'hydratation remplit tout. Sans ce test, supprimer le `if` ne casserait
+  // rien — le modele serait appele avec un `missing` vide et rendrait {}.
+  it('does not call the model when the structured layers fill every required field', async () => {
+    const leboncoinHtml = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(
+      {
+        props: {
+          pageProps: {
+            ad: {
+              list_id: 3257628986,
+              location: { city: "Saint-Ouen-l'Aumône", zipcode: '95310' },
+              attributes: [
+                {
+                  key: 'real_estate_type',
+                  value: '2',
+                  value_label: 'Appartement',
+                },
+                { key: 'square', value: '102' },
+                { key: 'rooms', value: '4' },
+                { key: 'energy_rate', value: 'b', value_label: 'B' },
+              ],
+            },
+          },
+        },
+      },
+    )}</script>`;
+
+    let calls = 0;
+    const result = await extractListing(
+      { url: 'https://www.leboncoin.fr/ad/ventes_immobilieres/3257628986' },
+      {
+        scraper: scraper('markdown non utilise', leboncoinHtml),
+        extractor: {
+          extractQuotes: async () => {
+            calls += 1;
+            return ok({});
+          },
+        },
+      },
+    );
+
+    expect(calls).toBe(0);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.fields.surfaceM2).toBe(102);
+      expect(result.value.fields.dpeClass).toBe('B');
+      expect(result.value.sources.dpeClass).toBe('hydration');
+    }
+  });
 });
