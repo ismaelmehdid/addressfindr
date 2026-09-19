@@ -190,15 +190,40 @@ describe('extractListing', () => {
     }
   });
 
+  // why: la fixture fournit surface, pieces et commune, donc `stillMissing`
+  // n'est PAS egal a REQUIRED_FIELDS et le repli `unreadable` ne peut pas se
+  // declencher. Seul le garde de categorie peut produire l'erreur ici — sans
+  // ca, les deux chemins rendent `validation` et le test ne distingue rien.
   it('rejects a listing that is not a dwelling', async () => {
+    const commercialHtml = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente local commercial 45 m² Lyon","additionalProperty":[{"@type":"PropertyValue","name":"Surface","value":"45"},{"@type":"PropertyValue","name":"Nombre de pièces","value":2}],"address":{"@type":"PostalAddress","addressLocality":"Lyon 3e","postalCode":"69003"}}</script>`;
+
     const result = await extractListing(
-      { url: 'https://www.pap.fr/annonces/terrain-r2' },
+      { url: 'https://www.pap.fr/annonces/local-r2' },
       {
-        scraper: scraper('Terrain constructible de 600 m² viabilisé', ''),
+        scraper: scraper(
+          'Local commercial 45 m² en plein centre de Lyon',
+          commercialHtml,
+        ),
         extractor: extractor({}),
       },
     );
     expect(result.isErr()).toBe(true);
-    if (result.isErr()) expect(result.error.code).toBe('validation');
+    if (result.isErr()) {
+      expect(result.error.code).toBe('validation');
+      expect(result.error.message).toContain('dwelling');
+    }
+  });
+
+  it('does not reject a dwelling listing that merely mentions a garden', async () => {
+    const houseHtml = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"House","name":"Maison 5 pièces 120 m² Lyon","numberOfRooms":"5","floorSize":{"@type":"QuantitativeValue","value":"120"},"address":{"@type":"PostalAddress","addressLocality":"Lyon 3e"}}</script>`;
+
+    const result = await extractListing(
+      { url: 'https://www.pap.fr/annonces/maison-r3' },
+      {
+        scraper: scraper('Maison 5 pièces avec terrain arboré', houseHtml),
+        extractor: extractor({}),
+      },
+    );
+    expect(result.isOk()).toBe(true);
   });
 });
