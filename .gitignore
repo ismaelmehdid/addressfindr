@@ -41,3 +41,6 @@ next-env.d.ts
 .claude/worktrees/
 
 .claude/settings.local.json
+
+# Subagent-driven-development scratch workspace (local only)
+.superpowers/
