@@ -54,7 +54,7 @@ beforeEach(() => {
 
 describe('deleteFile', () => {
   it('returns scope error', async () => {
-    mockedScope.mockResolvedValue(err(notFound('no scope', 'organization')));
+    mockedScope.mockResolvedValue(err(notFound('no scope', 'user')));
     const r = await deleteFile('file-1');
     expect(r.isErr()).toBe(true);
   });

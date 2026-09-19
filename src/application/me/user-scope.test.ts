@@ -42,4 +42,22 @@ describe('requireUserScope — authz gate', () => {
     expect(result.isErr()).toBe(true);
     expect(result._unsafeUnwrapErr().code).toBe('unauthorized');
   });
+
+  it('returns forbidden when the signed-in user has not redeemed early access', async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(
+      ok({
+        id: 'user-1',
+        email: 'a@b.c',
+        firstName: 'A',
+        lastName: 'B',
+        image: null,
+        locale: 'en',
+        sessionId: 'sess-1',
+        hasRedeemedAccess: false,
+      }),
+    );
+    const result = await requireUserScope();
+    expect(result.isErr()).toBe(true);
+    expect(result._unsafeUnwrapErr().code).toBe('forbidden');
+  });
 });

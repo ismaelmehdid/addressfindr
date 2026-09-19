@@ -3,7 +3,7 @@ import { fakeFile } from './__test-helpers__';
 import { toFileDto } from './mappers';
 
 describe('toFileDto', () => {
-  it('exposes the public DTO with ISO dates and no userId/orgId/storageKey', () => {
+  it('exposes the public DTO with ISO dates and no userId/storageKey', () => {
     const dto = toFileDto(fakeFile());
     expect(dto).toEqual({
       id: 'file-1',

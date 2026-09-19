@@ -25,9 +25,9 @@ export async function ensureCollection(
     return ok(fastPath.value);
   }
 
-  // Always null: no stateless (cron-safe) user-name lookup exists, and every
-  // caller must derive the same name for a userId — see claimCollectionCreation.
-  const collectionName = generateCollectionName({ userId, userName: null });
+  // Deterministic by userId alone — claimCollectionCreation relies on every
+  // caller producing the same name.
+  const collectionName = generateCollectionName({ userId });
 
   const claimed = await claimCollectionCreation({ userId, collectionName });
   if (claimed.isErr()) return err(claimed.error);

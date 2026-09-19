@@ -2,7 +2,7 @@
 
 # Startup Boilerplate
 
-Everything a SaaS needs on day one — auth, organizations, database, file storage, AI chat with RAG, payments, analytics — wired up and ready to deploy.
+Everything a SaaS needs on day one — auth, database, file storage, AI chat with RAG, payments, analytics — wired up and ready to deploy.
 
 ## Setup
 

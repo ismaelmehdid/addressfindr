@@ -48,7 +48,7 @@ describe('renameFile', () => {
   });
 
   it('returns scope error', async () => {
-    mockedScope.mockResolvedValue(err(notFound('no scope', 'organization')));
+    mockedScope.mockResolvedValue(err(notFound('no scope', 'user')));
     const r = await renameFile({ fileId: 'f', originalName: 'x' });
     expect(r.isErr()).toBe(true);
   });

@@ -55,7 +55,7 @@ describe('initiateFileUpload', () => {
   });
 
   it('returns scope error', async () => {
-    mockedScope.mockResolvedValue(err(notFound('no scope', 'organization')));
+    mockedScope.mockResolvedValue(err(notFound('no scope', 'user')));
     const r = await initiateFileUpload({
       originalName: 'a.pdf',
       mimeType: 'application/pdf',
