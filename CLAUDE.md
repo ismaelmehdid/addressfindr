@@ -6,7 +6,7 @@ This is a real system with real users.
 > Build code that is **correct, simple, and maintainable**.
 > **Correctness > cleverness · Simplicity > abstraction · Explicitness > magic · Consistency > preference.**
 
-Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth, organizations, file upload + RAG indexing, and an AI chat workspace over uploaded files. **The product is built on top of that base — it does not replace it.**
+Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth and file upload + RAG indexing. **The product is built on top of that base — it does not replace it.**
 
 The user-facing brand is still undecided, so **never hard-code a product name in user-visible copy**; everything user-facing goes through `next-intl`.
 
@@ -208,13 +208,13 @@ Domains and their tables:
 
 | Domain | Owns tables | Public entry points (examples) |
 |---|---|---|
-| `auth` | `user`, `session`, `account`, `verification` | `infra/auth/auth`, `application/me/get-current-user`, `application/me/organization-scope` |
-| `organization` | `organization`, `member`, `invitation` (writes also via better-auth org plugin) | `application/organization/*` use cases |
+| `auth` | `user`, `session`, `account`, `verification` | `infra/auth/auth`, `application/me/get-current-user`, `application/me/user-scope` |
 | `early-access` | `early_access_code` | `application/early-access/redeem` |
 | `files` | `file` | `application/files/*` use cases, `core/file/types` |
 | `indexing` | `zeroentropy_*`, `failed_sync_operation` | `entity-sync-orchestrator`, `query-snippets` |
 | `chat` | none (Mastra runtime owns its PG tables) | — |
 | `transcription` / `url-fetch` / `web-search` | none | their single `application/<domain>/*` use case |
+| `listing` | none | `application/listing/*` use cases, `core/listing/types` |
 | `rate-limit` / `email` | none (platform, open to all) | `apply-rate-limit`, `llm-cost-limiter`, `email-sender` |
 
 Rules the checker enforces:

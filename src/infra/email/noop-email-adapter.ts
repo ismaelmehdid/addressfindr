@@ -9,8 +9,7 @@ import { log } from '@/shared/logger';
 const PROVIDER = 'none';
 
 // Returns ok so callers treat a deliberately disabled provider as a no-op
-// rather than a delivery failure. Invitations still persist and their accept
-// link stays valid — it just has to be shared out of band.
+// rather than a delivery failure.
 async function send(
   message: EmailMessage,
 ): Promise<Result<EmailSendResult, AppError>> {
