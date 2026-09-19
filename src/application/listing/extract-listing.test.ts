@@ -8,6 +8,7 @@ vi.mock('@/shared/env', () => ({
 import { externalApi } from '@/core/errors';
 import type { IListingExtractor } from '@/core/listing/ports/listing-extractor.port';
 import type { IListingScraper } from '@/core/listing/ports/listing-scraper.port';
+import { REQUIRED_FIELDS } from '@/core/listing/types';
 import { extractListing } from './extract-listing';
 
 const PAP_HTML = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente appartement 2 pièces 32,40 m² Paris 11E (75011)","additionalProperty":[{"@type":"PropertyValue","name":"Surface","value":"32.40"},{"@type":"PropertyValue","name":"Nombre de pièces","value":2},{"@type":"PropertyValue","name":"Type de bien","value":"Appartement"}],"address":{"@type":"PostalAddress","streetAddress":"Rue Guénot","addressLocality":"Paris 11e","postalCode":"75011"}}</script>`;
@@ -212,6 +213,31 @@ describe('extractListing', () => {
       expect(result.error.code).toBe('validation');
       expect(result.error.message).toContain('dwelling');
     }
+  });
+
+  // why: le declencheur (`missingRequiredFields`) et la demande envoyee au
+  // modele (`unfilledFields`) sont deux choses differentes — seul le premier
+  // decide SI on appelle le modele, mais QUOI on lui demande doit couvrir
+  // les 17 champs, pas seulement les 5 requis. Sans ce test, retablir
+  // `missing` comme demande ne casserait aucun test existant.
+  it('asks the model for every unfilled field, not only the required ones', async () => {
+    let askedFields: readonly string[] = [];
+    const result = await extractListing(
+      { url: 'https://www.pap.fr/annonces/x-r1' },
+      {
+        scraper: scraper(PAP_MARKDOWN, PAP_HTML),
+        extractor: {
+          extractQuotes: async (input) => {
+            askedFields = input.missing;
+            return ok({});
+          },
+        },
+      },
+    );
+    expect(result.isOk()).toBe(true);
+    expect(askedFields).toContain('gesClass');
+    expect(askedFields).toContain('priceEur');
+    expect(askedFields.length).toBeGreaterThan(REQUIRED_FIELDS.length);
   });
 
   it('does not reject a dwelling listing that merely mentions a garden', async () => {

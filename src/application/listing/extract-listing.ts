@@ -7,6 +7,7 @@ import {
   type ExtractionLayer,
   mergeExtractions,
   missingRequiredFields,
+  unfilledFields,
 } from '@/core/listing/merge-extractions';
 import { isUnsupportedCategory } from '@/core/listing/page-guards';
 import { resolvePortal } from '@/core/listing/portal-registry';
@@ -86,7 +87,7 @@ export async function extractListing(
     const extractor = deps.extractor ?? groqListingExtractor;
     const quotes = await extractor.extractQuotes({
       markdown: scraped.value.markdown,
-      missing,
+      missing: unfilledFields(structured.values),
     });
     // why: l'echec du modele ne doit pas perdre ce que le structure a deja donne
     if (quotes.isOk()) {
