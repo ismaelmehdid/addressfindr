@@ -92,6 +92,24 @@ describe('groqListingExtractor', () => {
     expect(xCount).toBe(MAX_MARKDOWN_CHARS);
   });
 
+  // why: la fenetre autour du contenu tiers doit fermer symetriquement — un
+  // marqueur ouvrant sans fermant equivalent est plus facile a confondre avec
+  // une instruction pour un modele qui lit une page non fiable.
+  it('closes the untrusted-content fence symmetrically', async () => {
+    generateObject.mockResolvedValueOnce({ object: {} });
+    await groqListingExtractor.extractQuotes({
+      markdown: 'contenu de la page',
+      missing: ['surfaceM2'],
+    });
+    const callArg = generateObject.mock.calls[0]?.[0] as Record<
+      string,
+      unknown
+    >;
+    const prompt = callArg.prompt as string;
+    expect(prompt).toContain('<<<TEXTE_SOURCE');
+    expect(prompt).toContain('TEXTE_SOURCE>>>');
+  });
+
   // why: le modele rend une LOCALISATION, pas une valeur. Toute retouche de la
   // chaine — trim, recasse, normalisation — remettrait la production de valeur
   // dans le modele et annulerait tout le dispositif.

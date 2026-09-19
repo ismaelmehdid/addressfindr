@@ -97,7 +97,7 @@ async function extractQuotes(input: {
       schema: buildSchema(input.missing),
       temperature: 0,
       system: SYSTEM_PROMPT,
-      prompt: `Champs à retrouver :\n${wanted}\n\n<<<TEXTE_SOURCE\n${source}\nTEXTE_SOURCE`,
+      prompt: `Champs à retrouver :\n${wanted}\n\n<<<TEXTE_SOURCE\n${source}\nTEXTE_SOURCE>>>`,
     });
 
     const quotes: ListingQuotes = {};
