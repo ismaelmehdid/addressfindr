@@ -60,6 +60,14 @@ async function scrape(input: {
       signal: AbortSignal.timeout(timeoutMs + 5000),
     });
   } catch (e) {
+    // why: AbortSignal.timeout() rend un TimeoutError, jamais un AbortError —
+    // c'est le seul moyen de distinguer un budget epuise d'un portail injoignable.
+    if (e instanceof Error && e.name === 'TimeoutError') {
+      log.warn('listing.scrape.failed', { portal, reason: 'timeout' });
+      return err(
+        externalApi(PROVIDER, 'Listing page took too long to respond'),
+      );
+    }
     log.warn('listing.scrape.failed', {
       portal,
       reason: e instanceof Error ? e.name : 'network',

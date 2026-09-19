@@ -20,6 +20,14 @@ function mockFetchOnce(body: unknown, status = 200) {
   return spy;
 }
 
+function mockFetchRejectingWith(error: Error) {
+  const spy = vi.fn(async () => {
+    throw error;
+  });
+  vi.stubGlobal('fetch', spy);
+  return spy;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -106,6 +114,39 @@ describe('firecrawlScraperAdapter', () => {
     });
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+
+  // why: AbortSignal.timeout() rend un TimeoutError, distinct d'un AbortError —
+  // un budget epuise doit rester distinguable d'un portail injoignable dans
+  // les logs, plutot que d'etre replie sur le meme message generique.
+  it('reports a distinct message when the request times out', async () => {
+    const timeoutError = new DOMException(
+      'The operation was aborted due to timeout',
+      'TimeoutError',
+    );
+    mockFetchRejectingWith(timeoutError);
+    const result = await firecrawlScraperAdapter.scrape({
+      url: 'https://www.pap.fr/annonces/1',
+    });
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.code).toBe('external_api');
+      expect(result.error.message).toBe(
+        'Listing page took too long to respond',
+      );
+    }
+  });
+
+  it('reports the generic unreachable message on a plain network failure', async () => {
+    mockFetchRejectingWith(new TypeError('fetch failed'));
+    const result = await firecrawlScraperAdapter.scrape({
+      url: 'https://www.pap.fr/annonces/1',
+    });
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.code).toBe('external_api');
+      expect(result.error.message).toBe('Listing page is unreachable');
+    }
   });
 
   it('does not treat a full page carrying an anti-bot script as blocked', async () => {
