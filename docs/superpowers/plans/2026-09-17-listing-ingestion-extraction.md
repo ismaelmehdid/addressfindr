@@ -2017,11 +2017,13 @@ vi.mock('@/shared/env', () => ({
 
 import { firecrawlScraperAdapter } from './firecrawl-scraper-adapter';
 
-function mockFetchOnce(body: unknown, status = 200): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => new Response(JSON.stringify(body), { status })),
-  );
+// why: le helper rend l'espion pour que les cas de rejet puissent prouver
+// qu'AUCUNE requete n'est partie — une assertion sur l'erreur retournee
+// n'etablit pas l'allowlist SSRF, seulement sa forme
+function mockFetchOnce(body: unknown, status = 200) {
+  const spy = vi.fn(async () => new Response(JSON.stringify(body), { status }));
+  vi.stubGlobal('fetch', spy);
+  return spy;
 }
 
 afterEach(() => {
@@ -2029,23 +2031,36 @@ afterEach(() => {
 });
 
 describe('firecrawlScraperAdapter', () => {
-  it('rejects a url whose domain is not a known portal', async () => {
-    mockFetchOnce({ success: true });
+  it('rejects a url whose domain is not a known portal, without calling out', async () => {
+    const spy = mockFetchOnce({ success: true });
     const result = await firecrawlScraperAdapter.scrape({
       url: 'https://example.com/annonce/1',
     });
+    expect(spy).not.toHaveBeenCalled();
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('validation');
   });
 
-  it('rejects a non-https url', async () => {
-    mockFetchOnce({ success: true });
+  it('is not fooled by a host that merely contains an allowed domain', async () => {
+    const spy = mockFetchOnce({ success: true });
     const result = await firecrawlScraperAdapter.scrape({
-      url: 'http://www.pap.fr/annonces/1',
+      url: 'https://evil-leboncoin.fr/annonce/1',
     });
+    expect(spy).not.toHaveBeenCalled();
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('validation');
   });
+
+  it('rejects a non-https url, without calling out', async () => {
+    const spy = mockFetchOnce({ success: true });
+    const result = await firecrawlScraperAdapter.scrape({
+      url: 'http://www.pap.fr/annonces/1',
+    });
+    expect(spy).not.toHaveBeenCalled();
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('validation');
+  });
+
 
   it('returns markdown and rawHtml on success', async () => {
     mockFetchOnce({
@@ -2356,6 +2371,30 @@ describe('groqListingExtractor', () => {
     });
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+
+  it('truncates the markdown to MAX_MARKDOWN_CHARS before calling the model', async () => {
+    generateObject.mockResolvedValueOnce({ object: {} });
+    await groqListingExtractor.extractQuotes({
+      markdown: 'x'.repeat(MAX_MARKDOWN_CHARS + 5000),
+      missing: ['surfaceM2'],
+    });
+    const prompt = generateObject.mock.calls[0][0].prompt as string;
+    expect(prompt.split('x').length - 1).toBe(MAX_MARKDOWN_CHARS);
+  });
+
+  // why: le modele rend une LOCALISATION, pas une valeur. Toute retouche de la
+  // chaine — trim, recasse, normalisation — remettrait la production de valeur
+  // dans le modele et annulerait tout le dispositif.
+  it('returns the model quote byte-identical, without trimming or recasing', async () => {
+    const raw = '   80,5 M²  dpe C  ';
+    generateObject.mockResolvedValueOnce({ object: { surfaceM2: raw } });
+    const result = await groqListingExtractor.extractQuotes({
+      markdown: 'whatever',
+      missing: ['surfaceM2'],
+    });
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) expect(result.value.surfaceM2).toBe(raw);
   });
 });
 ```
@@ -2678,6 +2717,56 @@ describe('extractListing', () => {
     );
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('validation');
+  });
+
+  // why: c'est ce garde qui garde le cout marginal a zero sur leboncoin, ou
+  // l'hydratation remplit tout. Sans ce test, supprimer le `if` ne casserait
+  // rien — le modele serait appele avec un `missing` vide et rendrait {}.
+  it('does not call the model when the structured layers fill every required field', async () => {
+    const leboncoinHtml = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(
+      {
+        props: {
+          pageProps: {
+            ad: {
+              list_id: 3257628986,
+              location: { city: "Saint-Ouen-l'Aumône", zipcode: '95310' },
+              attributes: [
+                {
+                  key: 'real_estate_type',
+                  value: '2',
+                  value_label: 'Appartement',
+                },
+                { key: 'square', value: '102' },
+                { key: 'rooms', value: '4' },
+                { key: 'energy_rate', value: 'b', value_label: 'B' },
+              ],
+            },
+          },
+        },
+      },
+    )}</script>`;
+
+    let calls = 0;
+    const result = await extractListing(
+      { url: 'https://www.leboncoin.fr/ad/ventes_immobilieres/3257628986' },
+      {
+        scraper: scraper('markdown non utilise', leboncoinHtml),
+        extractor: {
+          extractQuotes: async () => {
+            calls += 1;
+            return ok({});
+          },
+        },
+      },
+    );
+
+    expect(calls).toBe(0);
+    expect(result.isOk()).toBe(true);
+    if (result.isOk()) {
+      expect(result.value.fields.surfaceM2).toBe(102);
+      expect(result.value.fields.dpeClass).toBe('B');
+      expect(result.value.sources.dpeClass).toBe('hydration');
+    }
   });
 });
 ```
@@ -3128,16 +3217,41 @@ Puis, juste avant le bloc `if (stillMissing.length === REQUIRED_FIELDS.length)`,
 Ajouter dans `src/application/listing/extract-listing.test.ts` :
 
 ```ts
+  // why: la fixture fournit surface, pieces et commune, donc `stillMissing`
+  // n'est PAS egal a REQUIRED_FIELDS et le repli `unreadable` ne peut pas se
+  // declencher. Seul le garde de categorie peut produire l'erreur ici — sans
+  // ca, les deux chemins rendent `validation` et le test ne distingue rien.
   it('rejects a listing that is not a dwelling', async () => {
+    const commercialHtml = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente local commercial 45 m² Lyon","additionalProperty":[{"@type":"PropertyValue","name":"Surface","value":"45"},{"@type":"PropertyValue","name":"Nombre de pièces","value":2}],"address":{"@type":"PostalAddress","addressLocality":"Lyon 3e","postalCode":"69003"}}</script>`;
+
     const result = await extractListing(
-      { url: 'https://www.pap.fr/annonces/terrain-r2' },
+      { url: 'https://www.pap.fr/annonces/local-r2' },
       {
-        scraper: scraper('Terrain constructible de 600 m² viabilisé', ''),
+        scraper: scraper(
+          'Local commercial 45 m² en plein centre de Lyon',
+          commercialHtml,
+        ),
         extractor: extractor({}),
       },
     );
     expect(result.isErr()).toBe(true);
-    if (result.isErr()) expect(result.error.code).toBe('validation');
+    if (result.isErr()) {
+      expect(result.error.code).toBe('validation');
+      expect(result.error.message).toContain('dwelling');
+    }
+  });
+
+  it('does not reject a dwelling listing that merely mentions a garden', async () => {
+    const houseHtml = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"House","name":"Maison 5 pièces 120 m² Lyon","numberOfRooms":"5","floorSize":{"@type":"QuantitativeValue","value":"120"},"address":{"@type":"PostalAddress","addressLocality":"Lyon 3e"}}</script>`;
+
+    const result = await extractListing(
+      { url: 'https://www.pap.fr/annonces/maison-r3' },
+      {
+        scraper: scraper('Maison 5 pièces avec terrain arboré', houseHtml),
+        extractor: extractor({}),
+      },
+    );
+    expect(result.isOk()).toBe(true);
   });
 ```
 
