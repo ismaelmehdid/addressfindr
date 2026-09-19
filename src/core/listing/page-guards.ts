@@ -19,7 +19,7 @@ export function looksBlocked(args: {
 }
 
 const UNSUPPORTED_SUBJECTS =
-  /terrain(?!\s+(?:arbor|clos|de\s+\d))|local\s+commercial|fonds?\s+de\s+commerce|bureaux?\b|entrep[ôo]t|place\s+de\s+parking|box\s+ferm[ée]|cave\s+seule|immeuble\s+de\s+rapport/i;
+  /terrain|local\s+commercial|fonds?\s+de\s+commerce|bureaux?\b|entrep[ôo]t|place\s+de\s+parking|box\s+ferm[ée]|cave\s+seule|immeuble\s+de\s+rapport/i;
 
 export function isUnsupportedCategory(text: string): boolean {
   const head = text.slice(0, 400);

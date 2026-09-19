@@ -64,4 +64,23 @@ describe('isUnsupportedCategory', () => {
       false,
     );
   });
+
+  // why: ces trois formulations sont les plus courantes pour un terrain seul
+  // sur les portails francais. Le texte ne doit contenir aucun mot de logement,
+  // sinon le court-circuit sur "head" masque totalement le pattern testé.
+  it('flags a plot phrased as "terrain de N m² constructible"', () => {
+    expect(
+      isUnsupportedCategory('Terrain de 600 m² constructible, viabilisé, Lyon'),
+    ).toBe(true);
+  });
+
+  it('flags a wooded plot', () => {
+    expect(
+      isUnsupportedCategory('Terrain arboré de 600 m² constructible'),
+    ).toBe(true);
+  });
+
+  it('flags an enclosed plot', () => {
+    expect(isUnsupportedCategory('Terrain clos de 600 m²')).toBe(true);
+  });
 });
