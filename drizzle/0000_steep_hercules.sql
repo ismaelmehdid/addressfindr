@@ -15,6 +15,7 @@ CREATE TABLE "account" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "account" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "session" (
 	"id" text PRIMARY KEY NOT NULL,
 	"expires_at" timestamp NOT NULL,
@@ -22,13 +23,13 @@ CREATE TABLE "session" (
 	"ip_address" text,
 	"user_agent" text,
 	"user_id" text NOT NULL,
-	"active_organization_id" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp NOT NULL,
 	"deleted_at" timestamp,
 	CONSTRAINT "session_token_unique" UNIQUE("token")
 );
 --> statement-breakpoint
+ALTER TABLE "session" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "user" (
 	"id" text PRIMARY KEY NOT NULL,
 	"name" text NOT NULL,
@@ -44,6 +45,7 @@ CREATE TABLE "user" (
 	CONSTRAINT "user_email_unique" UNIQUE("email")
 );
 --> statement-breakpoint
+ALTER TABLE "user" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "verification" (
 	"id" text PRIMARY KEY NOT NULL,
 	"identifier" text NOT NULL,
@@ -54,6 +56,7 @@ CREATE TABLE "verification" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "verification" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "early_access_code" (
 	"id" text PRIMARY KEY NOT NULL,
 	"code_hash" text NOT NULL,
@@ -66,10 +69,10 @@ CREATE TABLE "early_access_code" (
 	CONSTRAINT "early_access_code_codeHash_unique" UNIQUE("code_hash")
 );
 --> statement-breakpoint
+ALTER TABLE "early_access_code" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "file" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" text NOT NULL,
-	"organization_id" text NOT NULL,
 	"original_name" text NOT NULL,
 	"storage_key" text NOT NULL,
 	"mime_type" text NOT NULL,
@@ -84,46 +87,11 @@ CREATE TABLE "file" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
-CREATE TABLE "invitation" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"organization_id" text NOT NULL,
-	"email" text NOT NULL,
-	"role" text DEFAULT 'member' NOT NULL,
-	"status" text DEFAULT 'pending' NOT NULL,
-	"expires_at" timestamp NOT NULL,
-	"inviter_id" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "member" (
-	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"user_id" text NOT NULL,
-	"organization_id" text NOT NULL,
-	"role" text DEFAULT 'member' NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp
-);
---> statement-breakpoint
-CREATE TABLE "organization" (
-	"id" text PRIMARY KEY NOT NULL,
-	"name" text NOT NULL,
-	"slug" text,
-	"locale" text DEFAULT 'fr' NOT NULL,
-	"logo" text DEFAULT '' NOT NULL,
-	"metadata" jsonb,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp,
-	CONSTRAINT "organization_slug_unique" UNIQUE("slug")
-);
---> statement-breakpoint
+ALTER TABLE "file" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "failed_sync_operation" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"event_id" text NOT NULL,
-	"organization_id" text NOT NULL,
+	"user_id" text NOT NULL,
 	"entity_type" text NOT NULL,
 	"entity_id" text NOT NULL,
 	"operation" text NOT NULL,
@@ -139,9 +107,10 @@ CREATE TABLE "failed_sync_operation" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "failed_sync_operation" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "zeroentropy_collection" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"organization_id" text NOT NULL,
+	"user_id" text NOT NULL,
 	"collection_name" text NOT NULL,
 	"status" text DEFAULT 'pending' NOT NULL,
 	"document_count" integer DEFAULT 0 NOT NULL,
@@ -152,6 +121,7 @@ CREATE TABLE "zeroentropy_collection" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "zeroentropy_collection" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "zeroentropy_entity" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"collection_id" text NOT NULL,
@@ -167,17 +137,13 @@ CREATE TABLE "zeroentropy_entity" (
 	"deleted_at" timestamp
 );
 --> statement-breakpoint
+ALTER TABLE "zeroentropy_entity" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "early_access_code" ADD CONSTRAINT "early_access_code_used_by_user_id_fk" FOREIGN KEY ("used_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file" ADD CONSTRAINT "file_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "file" ADD CONSTRAINT "file_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "invitation" ADD CONSTRAINT "invitation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "invitation" ADD CONSTRAINT "invitation_inviter_id_user_id_fk" FOREIGN KEY ("inviter_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "member" ADD CONSTRAINT "member_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "member" ADD CONSTRAINT "member_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "failed_sync_operation" ADD CONSTRAINT "failed_sync_operation_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "zeroentropy_collection" ADD CONSTRAINT "zeroentropy_collection_organization_id_organization_id_fk" FOREIGN KEY ("organization_id") REFERENCES "public"."organization"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "failed_sync_operation" ADD CONSTRAINT "failed_sync_operation_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "zeroentropy_collection" ADD CONSTRAINT "zeroentropy_collection_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zeroentropy_entity" ADD CONSTRAINT "zeroentropy_entity_collection_id_zeroentropy_collection_id_fk" FOREIGN KEY ("collection_id") REFERENCES "public"."zeroentropy_collection"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_user_id_idx" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "account_account_id_idx" ON "account" USING btree ("account_id");--> statement-breakpoint
@@ -189,21 +155,15 @@ CREATE INDEX "verification_expires_at_idx" ON "verification" USING btree ("expir
 CREATE INDEX "early_access_code_hash_idx" ON "early_access_code" USING btree ("code_hash");--> statement-breakpoint
 CREATE INDEX "early_access_code_used_by_idx" ON "early_access_code" USING btree ("used_by");--> statement-breakpoint
 CREATE UNIQUE INDEX "file_storage_key_unique" ON "file" USING btree ("storage_key");--> statement-breakpoint
-CREATE INDEX "file_organization_id_idx" ON "file" USING btree ("organization_id");--> statement-breakpoint
 CREATE INDEX "file_user_id_idx" ON "file" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "file_index_status_idx" ON "file" USING btree ("index_status");--> statement-breakpoint
-CREATE INDEX "file_org_status_created_idx" ON "file" USING btree ("organization_id","status","created_at" desc);--> statement-breakpoint
-CREATE INDEX "invitation_organization_id_idx" ON "invitation" USING btree ("organization_id");--> statement-breakpoint
-CREATE INDEX "invitation_email_idx" ON "invitation" USING btree ("email");--> statement-breakpoint
-CREATE INDEX "member_user_id_idx" ON "member" USING btree ("user_id");--> statement-breakpoint
-CREATE INDEX "member_organization_id_idx" ON "member" USING btree ("organization_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "member_user_org_active_unique" ON "member" USING btree ("user_id","organization_id") WHERE deleted_at IS NULL;--> statement-breakpoint
-CREATE UNIQUE INDEX "failed_sync_operation_entity_unique" ON "failed_sync_operation" USING btree ("organization_id","entity_type","entity_id");--> statement-breakpoint
+CREATE INDEX "file_user_status_created_idx" ON "file" USING btree ("user_id","status","created_at" desc);--> statement-breakpoint
+CREATE UNIQUE INDEX "failed_sync_operation_entity_unique" ON "failed_sync_operation" USING btree ("user_id","entity_type","entity_id");--> statement-breakpoint
 CREATE INDEX "failed_sync_operation_event_idx" ON "failed_sync_operation" USING btree ("event_id");--> statement-breakpoint
-CREATE INDEX "failed_sync_operation_org_idx" ON "failed_sync_operation" USING btree ("organization_id");--> statement-breakpoint
+CREATE INDEX "failed_sync_operation_user_idx" ON "failed_sync_operation" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "failed_sync_operation_next_retry_idx" ON "failed_sync_operation" USING btree ("next_retry_at");--> statement-breakpoint
 CREATE INDEX "failed_sync_operation_entity_idx" ON "failed_sync_operation" USING btree ("entity_type","entity_id");--> statement-breakpoint
-CREATE UNIQUE INDEX "zeroentropy_collection_org_unique" ON "zeroentropy_collection" USING btree ("organization_id");--> statement-breakpoint
+CREATE UNIQUE INDEX "zeroentropy_collection_user_unique" ON "zeroentropy_collection" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "zeroentropy_collection_name_unique" ON "zeroentropy_collection" USING btree ("collection_name");--> statement-breakpoint
 CREATE UNIQUE INDEX "zeroentropy_entity_unique" ON "zeroentropy_entity" USING btree ("collection_id","entity_type","entity_id");--> statement-breakpoint
 CREATE INDEX "zeroentropy_entity_collection_idx" ON "zeroentropy_entity" USING btree ("collection_id");--> statement-breakpoint
