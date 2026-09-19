@@ -5,6 +5,8 @@ import { parseJsonBody, requireAuthedRoute } from '@/shared/api-route';
 import { jsonError } from '@/shared/errors-http';
 import { log } from '@/shared/logger';
 
+export const maxDuration = 90;
+
 export async function POST(req: Request): Promise<Response> {
   const auth = await requireAuthedRoute({
     rateLimit: 'listing-extract',
