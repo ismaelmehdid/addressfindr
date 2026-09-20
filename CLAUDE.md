@@ -98,7 +98,7 @@ Verified 2026-09-17 against one real listing per portal via the Firecrawl API. A
 
 **Husky pre-commit:** `tsc --noEmit` → `lint-staged` (eslint + biome on `*.{js,jsx,ts,tsx}`, biome format on JSON except `drizzle/**`) → `scripts/check-domain-boundaries.mjs` (layer purity, no barrels, and the domain-isolation rules below). Do **not** bypass with `--no-verify` unless explicitly asked.
 
-**Pre-push** blocks direct push to `master`/`prod`. Use a feature branch + PR.
+**Pre-push** blocks direct push to `main`/`master`/`prod`. Use a feature branch + PR.
 
 **Migrations are generated, never hand-written.** Edit schema in `src/infra/database/schema/*`, then `pnpm drizzle:generate` (writes to `drizzle/`).
 
@@ -202,7 +202,7 @@ The codebase is partitioned into **domains** declared in `scripts/boundaries/man
 2. **Whole-tree checker** — `scripts/check-domain-boundaries.mjs` (`pnpm check:boundaries`) adds file-level rules (unassigned files, unowned schemas, barrels) and scans everything including regex-level dynamic-import detection. Runs in husky pre-commit and `pnpm validate`.
 3. **Vitest** — `scripts/domain-boundaries.test.ts` runs the same checker inside `pnpm test`, so the CI `test` job enforces it too.
 4. **CI** — a dedicated `boundaries` job runs on every push and pull request.
-5. **Branch protection (do this once per clone)** — in GitHub settings, protect `master` and require the `boundaries`, `test`, and `type-check` checks. That is the only gate a developer cannot bypass locally; everything above is fast feedback for it.
+5. **Branch protection (do this once per clone)** — in GitHub settings, protect `main` and require the `boundaries`, `test`, and `type-check` checks. That is the only gate a developer cannot bypass locally; everything above is fast feedback for it.
 
 Domains and their tables:
 
