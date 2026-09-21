@@ -42,9 +42,6 @@ const REQUIRED = [
   'SUPABASE_URL',
   'SUPABASE_SECRET_KEY',
   'SUPABASE_PUBLISHABLE_KEY',
-  'SUPABASE_STORAGE_BUCKET',
-  'ZEROENTROPY_API_URL',
-  'CRON_SECRET',
 ];
 const REQUIRED_IN_PRODUCTION = ['AUTUMN_SECRET_KEY'];
 
@@ -109,10 +106,11 @@ if (missing.length > 0 || placeholders.length > 0) process.exit(1);
 
 // Localhost URLs in a production push is nearly always a mistake — warn, don't rewrite.
 if (TARGET === 'production') {
-  for (const k of ['NEXT_PUBLIC_APP_URL', 'BETTER_AUTH_URL']) {
-    if (vars.get(k)?.includes('localhost')) {
+  for (const k of ['NEXT_PUBLIC_APP_URL', 'BETTER_AUTH_URL', 'DATABASE_URL']) {
+    const value = vars.get(k) ?? '';
+    if (value.includes('localhost') || value.includes('127.0.0.1')) {
       console.warn(
-        `WARNING  ${k} points at localhost — set the production URL first.`,
+        `WARNING  ${k} points at the local machine — set the production value first.`,
       );
     }
   }
