@@ -21,8 +21,11 @@ export const PORTAL_IDS = [
 ] as const;
 export type PortalId = (typeof PORTAL_IDS)[number];
 
-export type TransactionType = 'sale' | 'rent';
-export type PropertyType = 'apartment' | 'house';
+export const TRANSACTION_TYPES = ['sale', 'rent'] as const;
+export type TransactionType = (typeof TRANSACTION_TYPES)[number];
+
+export const PROPERTY_TYPES = ['apartment', 'house'] as const;
+export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
 export type ExtractedValues = {
   listingId: string | null;
@@ -65,7 +68,8 @@ export const EXTRACTED_FIELD_NAMES = [
 ] as const;
 export type ExtractedFieldName = (typeof EXTRACTED_FIELD_NAMES)[number];
 
-export type FieldSource = 'json-ld' | 'hydration' | 'llm' | 'absent';
+export const FIELD_SOURCES = ['json-ld', 'hydration', 'llm', 'absent'] as const;
+export type FieldSource = (typeof FIELD_SOURCES)[number];
 
 export type ListingFields = ExtractedValues & {
   portal: PortalId;

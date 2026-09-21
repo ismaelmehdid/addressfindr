@@ -108,6 +108,11 @@
     "errorEmpty": "Paste a listing address to continue.",
     "errorMalformed": "That link isn't valid. Make sure it starts with https://",
     "errorUnsupportedPortal": "That site isn't supported yet. Try a listing from SeLoger, Leboncoin, PAP or Bien'ici.",
-    "notAvailable": "Link recognized. Listing analysis isn't available yet."
+    "analyzing": "Reading the listing…",
+    "resultHeading": "Extracted fields",
+    "errorNotExtractable": "Couldn't read this listing. It may not be a home, or the page hides the details.",
+    "errorRateLimited": "Too many analyses. Wait a moment and try again.",
+    "errorSignedOut": "Your session expired. Sign in again to continue.",
+    "errorUnknown": "Something went wrong reading that listing. Try again."
   }
 }

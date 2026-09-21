@@ -1,4 +1,5 @@
 import { err, ok } from 'neverthrow';
+import * as v from 'valibot';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/shared/env', () => ({
@@ -9,6 +10,7 @@ import { externalApi } from '@/core/errors';
 import type { IListingExtractor } from '@/core/listing/ports/listing-extractor.port';
 import type { IListingScraper } from '@/core/listing/ports/listing-scraper.port';
 import { REQUIRED_FIELDS } from '@/core/listing/types';
+import { ExtractedListingSchema } from './dto';
 import { extractListing } from './extract-listing';
 
 const PAP_HTML = `<script type="application/ld+json">{"@context":"https://schema.org","@type":"Product","name":"Vente appartement 2 pièces 32,40 m² Paris 11E (75011)","additionalProperty":[{"@type":"PropertyValue","name":"Surface","value":"32.40"},{"@type":"PropertyValue","name":"Nombre de pièces","value":2},{"@type":"PropertyValue","name":"Type de bien","value":"Appartement"}],"address":{"@type":"PostalAddress","streetAddress":"Rue Guénot","addressLocality":"Paris 11e","postalCode":"75011"}}</script>`;
@@ -251,5 +253,20 @@ describe('extractListing', () => {
       },
     );
     expect(result.isOk()).toBe(true);
+  });
+  it('emits a payload the wire schema accepts after JSON transport', async () => {
+    const result = await extractListing(
+      { url: 'https://www.pap.fr/annonces/x-r1' },
+      {
+        scraper: scraper(PAP_MARKDOWN, PAP_HTML),
+        extractor: extractor({ dpeClass: 'DPE conforme' }),
+      },
+    );
+    expect(result.isOk()).toBe(true);
+    if (result.isErr()) return;
+
+    const overTheWire: unknown = JSON.parse(JSON.stringify(result.value));
+    const parsed = v.safeParse(ExtractedListingSchema, overTheWire);
+    expect(parsed.success).toBe(true);
   });
 });
