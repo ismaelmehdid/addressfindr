@@ -30,7 +30,6 @@ const SUPABASE_REF = optionValue('--supabase-ref', null);
 // Random secrets. Lengths comfortably exceed the minimums in src/shared/env.ts.
 const SECRETS = {
   BETTER_AUTH_SECRET: () => crypto.randomBytes(32).toString('base64'),
-  EARLY_ACCESS_PEPPER: () => crypto.randomBytes(32).toString('hex'),
   CRON_SECRET: () => crypto.randomBytes(32).toString('hex'),
   ENCRYPTION_KEY: () => crypto.randomBytes(32).toString('hex'),
 };

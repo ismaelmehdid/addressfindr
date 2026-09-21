@@ -9,14 +9,6 @@
     "google": "Continue with Google",
     "microsoft": "Continue with Microsoft"
   },
-  "Onboarding": {
-    "title": "Enter your access code",
-    "subtitle": "Use the early-access code you received to continue.",
-    "code": "Early-access code",
-    "submit": "Continue",
-    "invalidCode": "Invalid or already-used code.",
-    "unknownError": "Something went wrong. Please try again."
-  },
   "Paywall": {
     "title": "Choose a plan to continue",
     "subtitle": "Your workspace needs an active subscription to use the app.",
@@ -31,7 +23,6 @@
   },
   "Meta": {
     "signIn": "Sign in",
-    "onboarding": "Welcome",
     "dashboard": "Dashboard",
     "settings": "Settings"
   },

@@ -5,7 +5,6 @@ import postgres from 'postgres';
 import { env } from '@/shared/env';
 import { DbLogger } from '@/shared/logger';
 import * as authSchema from './schema/auth-schema';
-import * as earlyAccessSchema from './schema/early-access-schema';
 import * as fileSchema from './schema/file-schema';
 import * as zeroentropySchema from './schema/zeroentropy-schema';
 
@@ -40,7 +39,6 @@ export const db = drizzle(conn, {
   casing: 'snake_case',
   schema: {
     ...authSchema,
-    ...earlyAccessSchema,
     ...fileSchema,
     ...zeroentropySchema,
   },

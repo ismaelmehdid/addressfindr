@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { authClient } from '@/shared/auth-client';
 
-const CALLBACK_URL = '/onboarding';
+const CALLBACK_URL = '/dashboard';
 
 type Props = {
   microsoftEnabled: boolean;

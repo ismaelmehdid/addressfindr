@@ -9,14 +9,6 @@
     "google": "Continuer avec Google",
     "microsoft": "Continuer avec Microsoft"
   },
-  "Onboarding": {
-    "title": "Saisissez votre code d'accès",
-    "subtitle": "Utilisez le code d'accès anticipé que vous avez reçu pour continuer.",
-    "code": "Code d'accès anticipé",
-    "submit": "Continuer",
-    "invalidCode": "Code invalide ou déjà utilisé.",
-    "unknownError": "Une erreur est survenue. Veuillez réessayer."
-  },
   "Paywall": {
     "title": "Choisissez une formule pour continuer",
     "subtitle": "Votre espace de travail nécessite un abonnement actif pour utiliser l'application.",
@@ -31,7 +23,6 @@
   },
   "Meta": {
     "signIn": "Connexion",
-    "onboarding": "Bienvenue",
     "dashboard": "Tableau de bord",
     "settings": "Paramètres"
   },

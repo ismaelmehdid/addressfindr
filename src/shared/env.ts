@@ -40,8 +40,6 @@ const EnvSchema = v.object({
 
   ENCRYPTION_KEY: v.optional(v.string()),
 
-  EARLY_ACCESS_PEPPER: v.pipe(v.string(), v.minLength(16)),
-
   // Optional: when unset the app still boots and every OpenAI consumer
   // catches the SDK auth error and degrades to a Result / fallback.
   OPENAI_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),

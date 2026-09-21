@@ -9,6 +9,5 @@ export default async function AppLayout({
 }): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
   if (currentUser.isErr()) redirect('/sign-in');
-  if (!currentUser.value.hasRedeemedAccess) redirect('/onboarding');
   return <>{children}</>;
 }

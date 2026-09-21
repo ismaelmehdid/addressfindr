@@ -209,7 +209,6 @@ Domains and their tables:
 | Domain | Owns tables | Public entry points (examples) |
 |---|---|---|
 | `auth` | `user`, `session`, `account`, `verification` | `infra/auth/auth`, `application/me/get-current-user`, `application/me/user-scope` |
-| `early-access` | `early_access_code` | `application/early-access/redeem`, `application/early-access/has-redeemed-code` |
 | `files` | `file` | `application/files/*` use cases, `core/file/types` |
 | `indexing` | `zeroentropy_*`, `failed_sync_operation` | `entity-sync-orchestrator`, `query-snippets` |
 | `chat` | none (Mastra runtime owns its PG tables) | — |

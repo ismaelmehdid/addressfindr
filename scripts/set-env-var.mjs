@@ -38,7 +38,6 @@ const RULES = {
   SMTP_FROM_EMAIL: { email: true },
   SMTP_PASS: { minLength: 8 },
   BETTER_AUTH_SECRET: { minLength: 32 },
-  EARLY_ACCESS_PEPPER: { minLength: 16 },
   CRON_SECRET: { minLength: 16 },
   DATABASE_URL: { database: true },
 };

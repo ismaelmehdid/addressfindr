@@ -57,19 +57,6 @@ CREATE TABLE "verification" (
 );
 --> statement-breakpoint
 ALTER TABLE "verification" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
-CREATE TABLE "early_access_code" (
-	"id" text PRIMARY KEY NOT NULL,
-	"code_hash" text NOT NULL,
-	"used_by" text,
-	"used_at" timestamp,
-	"note" text,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp NOT NULL,
-	"deleted_at" timestamp,
-	CONSTRAINT "early_access_code_codeHash_unique" UNIQUE("code_hash")
-);
---> statement-breakpoint
-ALTER TABLE "early_access_code" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 CREATE TABLE "file" (
 	"id" text PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" text NOT NULL,
@@ -140,7 +127,6 @@ CREATE TABLE "zeroentropy_entity" (
 ALTER TABLE "zeroentropy_entity" ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "early_access_code" ADD CONSTRAINT "early_access_code_used_by_user_id_fk" FOREIGN KEY ("used_by") REFERENCES "public"."user"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "file" ADD CONSTRAINT "file_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "failed_sync_operation" ADD CONSTRAINT "failed_sync_operation_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "zeroentropy_collection" ADD CONSTRAINT "zeroentropy_collection_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -152,8 +138,6 @@ CREATE INDEX "session_user_id_idx" ON "session" USING btree ("user_id");--> stat
 CREATE INDEX "session_expires_at_idx" ON "session" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");--> statement-breakpoint
 CREATE INDEX "verification_expires_at_idx" ON "verification" USING btree ("expires_at");--> statement-breakpoint
-CREATE INDEX "early_access_code_hash_idx" ON "early_access_code" USING btree ("code_hash");--> statement-breakpoint
-CREATE INDEX "early_access_code_used_by_idx" ON "early_access_code" USING btree ("used_by");--> statement-breakpoint
 CREATE UNIQUE INDEX "file_storage_key_unique" ON "file" USING btree ("storage_key");--> statement-breakpoint
 CREATE INDEX "file_user_id_idx" ON "file" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "file_index_status_idx" ON "file" USING btree ("index_status");--> statement-breakpoint

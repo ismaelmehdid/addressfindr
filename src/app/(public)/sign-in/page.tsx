@@ -12,10 +12,6 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function SignInPage(): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
-  if (currentUser.isOk()) {
-    redirect(
-      currentUser.value.hasRedeemedAccess ? '/dashboard' : '/onboarding',
-    );
-  }
+  if (currentUser.isOk()) redirect('/dashboard');
   return <SignInForm microsoftEnabled={isMicrosoftAuthEnabled} />;
 }

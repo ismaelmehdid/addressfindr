@@ -40,27 +40,8 @@ describe('requireAuthedRoute — authz gate', () => {
     expect(result.response.status).toBe(401);
   });
 
-  it('rejects a signed-in caller who has not redeemed an early-access code', async () => {
-    mockedUser.mockResolvedValue(
-      ok({ id: 'user-1', hasRedeemedAccess: false } as never),
-    );
-
-    const result = await requireAuthedRoute({
-      rateLimit: 'default',
-      event: 'test.event',
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.response.status).toBe(403);
-    const body = await result.response.json();
-    expect(body.error).toBe('forbidden');
-  });
-
-  it('allows a signed-in caller who has redeemed an early-access code', async () => {
-    mockedUser.mockResolvedValue(
-      ok({ id: 'user-1', hasRedeemedAccess: true } as never),
-    );
+  it('allows a signed-in caller', async () => {
+    mockedUser.mockResolvedValue(ok({ id: 'user-1' } as never));
 
     const result = await requireAuthedRoute({
       rateLimit: 'default',

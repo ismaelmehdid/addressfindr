@@ -7,7 +7,6 @@ const REQUIRED_ENV = {
   BETTER_AUTH_URL: 'http://localhost:3000',
   GOOGLE_CLIENT_ID: 'google-client-id',
   GOOGLE_CLIENT_SECRET: 'google-client-secret',
-  EARLY_ACCESS_PEPPER: 'y'.repeat(16),
   SUPABASE_URL: 'https://project.supabase.co',
   SUPABASE_SECRET_KEY: 'sb_secret_abc',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc',

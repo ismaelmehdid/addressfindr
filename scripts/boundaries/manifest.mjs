@@ -18,20 +18,6 @@ export const DOMAINS = [
     openToAll: true,
   },
   {
-    name: 'early-access',
-    dirs: [
-      'src/application/early-access',
-      'src/infra/data-access/early-access',
-      'src/app/(public)/onboarding',
-      'src/app/api/early-access',
-    ],
-    schemas: ['src/infra/database/schema/early-access-schema'],
-    public: [
-      'src/application/early-access/redeem',
-      'src/application/early-access/has-redeemed-code',
-    ],
-  },
-  {
     name: 'files',
     dirs: [
       'src/core/file',
@@ -193,7 +179,6 @@ export const DOMAINS = [
 ];
 
 export const ALLOWED_EDGES = [
-  ['auth', 'early-access'],
   ['indexing', 'files'],
   ['files', 'indexing'],
 ];

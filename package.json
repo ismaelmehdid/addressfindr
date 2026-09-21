@@ -14,7 +14,6 @@
     "drizzle:push": "drizzle-kit push",
     "drizzle:pull": "drizzle-kit pull",
     "drizzle:drop": "drizzle-kit drop",
-    "early-access:hash": "tsx --env-file=.env scripts/hash-early-access-code.ts",
     "format": "biome format --write .",
     "format:check": "biome format .",
     "lint": "eslint .",
