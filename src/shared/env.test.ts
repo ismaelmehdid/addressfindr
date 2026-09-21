@@ -10,9 +10,6 @@ const REQUIRED_ENV = {
   SUPABASE_URL: 'https://project.supabase.co',
   SUPABASE_SECRET_KEY: 'sb_secret_abc',
   SUPABASE_PUBLISHABLE_KEY: 'sb_publishable_abc',
-  SUPABASE_STORAGE_BUCKET: 'files',
-  ZEROENTROPY_API_URL: 'https://api.zeroentropy.dev/v1',
-  CRON_SECRET: 'z'.repeat(16),
 };
 
 async function loadEnv(overrides: Record<string, string>) {
@@ -76,5 +73,24 @@ describe('env empty values', () => {
   it('still rejects an empty required value', async () => {
     const env = await loadEnv({ EMAIL_PROVIDER: 'none', DATABASE_URL: '' });
     expect(() => env()).toThrow(/DATABASE_URL/);
+  });
+});
+
+describe('env optional infrastructure values', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('boots without a storage bucket, a zeroentropy url or a cron secret', async () => {
+    const env = await loadEnv({ EMAIL_PROVIDER: 'none' });
+    expect(() => env()).not.toThrow();
+    expect(env().SUPABASE_STORAGE_BUCKET).toBe('files');
+    expect(env().ZEROENTROPY_API_URL).toBe('https://eu-api.zeroentropy.dev/v1');
+    expect(env().CRON_SECRET).toBeUndefined();
+  });
+
+  it('still rejects a cron secret shorter than 16 characters', async () => {
+    const env = await loadEnv({ EMAIL_PROVIDER: 'none', CRON_SECRET: 'short' });
+    expect(() => env()).toThrow(/CRON_SECRET/);
   });
 });

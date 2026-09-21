@@ -9,10 +9,20 @@ export const maxDuration = 60;
 const BATCH_LIMIT = 50;
 
 export async function GET(req: Request): Promise<Response> {
+  const secret = env().CRON_SECRET;
+  if (!secret) {
+    log.warn('api.cron.zeroentropy_retry.unauthorized', {
+      reason: 'cron_secret_not_configured',
+    });
+    return new Response('Unauthorized', { status: 401 });
+  }
+
   const auth = req.headers.get('authorization');
   const received = auth?.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!timingSafeCompareStrings(received, env().CRON_SECRET)) {
-    log.warn('api.cron.zeroentropy_retry.unauthorized');
+  if (!timingSafeCompareStrings(received, secret)) {
+    log.warn('api.cron.zeroentropy_retry.unauthorized', {
+      reason: 'bad_secret',
+    });
     return new Response('Unauthorized', { status: 401 });
   }
 

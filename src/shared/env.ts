@@ -97,15 +97,20 @@ const EnvSchema = v.object({
     v.startsWith('sb_secret_'),
   ),
   SUPABASE_PUBLISHABLE_KEY: v.pipe(v.string(), v.startsWith('sb_publishable_')),
-  SUPABASE_STORAGE_BUCKET: v.picklist(BUCKETS),
+  SUPABASE_STORAGE_BUCKET: v.optional(v.picklist(BUCKETS), 'files'),
   SUPABASE_STORAGE_HOST: v.optional(v.pipe(v.string(), v.url())),
 
   // Optional: when unset the ZeroEntropy client fails fast with NOT_CONFIGURED
-  // instead of sending an unauthenticated request.
+  // instead of sending an unauthenticated request, so the url is never reached.
   ZEROENTROPY_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
-  ZEROENTROPY_API_URL: v.pipe(v.string(), v.url()),
+  ZEROENTROPY_API_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://eu-api.zeroentropy.dev/v1',
+  ),
 
-  CRON_SECRET: v.pipe(v.string(), v.minLength(16)),
+  // Optional: when unset the cron route rejects every caller, so an
+  // unconfigured deployment cannot expose an unauthenticated endpoint.
+  CRON_SECRET: v.optional(v.pipe(v.string(), v.minLength(16))),
 
   EMAIL_PROVIDER: v.optional(v.picklist(['resend', 'smtp', 'none']), 'smtp'),
 
