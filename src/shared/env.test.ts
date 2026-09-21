@@ -30,6 +30,12 @@ describe('env email provider', () => {
     vi.unstubAllEnvs();
   });
 
+  it('defaults to none so a machine with no mail credentials boots', async () => {
+    const env = await loadEnv({});
+    expect(() => env()).not.toThrow();
+    expect(env().EMAIL_PROVIDER).toBe('none');
+  });
+
   it('boots with EMAIL_PROVIDER=none and no credentials', async () => {
     const env = await loadEnv({ EMAIL_PROVIDER: 'none' });
     expect(env().EMAIL_PROVIDER).toBe('none');

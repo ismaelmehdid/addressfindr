@@ -112,7 +112,7 @@ const EnvSchema = v.object({
   // unconfigured deployment cannot expose an unauthenticated endpoint.
   CRON_SECRET: v.optional(v.pipe(v.string(), v.minLength(16))),
 
-  EMAIL_PROVIDER: v.optional(v.picklist(['resend', 'smtp', 'none']), 'smtp'),
+  EMAIL_PROVIDER: v.optional(v.picklist(['resend', 'smtp', 'none']), 'none'),
 
   RESEND_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
   RESEND_FROM_EMAIL: v.optional(v.pipe(v.string(), v.email())),
