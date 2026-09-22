@@ -43,13 +43,13 @@ This is why, throughout the `listing` domain:
 1. **Ingest** — user pastes a listing URL; the backend scrapes it via Firecrawl, asking for `markdown` + `rawHtml` in one call.
 2. **Extract** — structured first (`__NEXT_DATA__` / `__NUXT__`, then JSON-LD), LLM on the markdown only for fields still empty.
 3. **Normalise** — commune resolution, surface conventions (habitable/Carrez vs terrain), French number formats.
-4. **Candidates** — filter the ADEME base on commune + type + surface range + DPE. *(not built yet)*
-5. **Score and disambiguate** — return an address with a confidence, or nothing. *(not built yet)*
+4. **Candidates** — filter the ADEME base on commune + type + surface range + DPE.
+5. **Score and disambiguate** — return a ranked shortlist of addresses with a confidence each, or nothing.
 
 ### Current state
 
-- **Built:** the `listing` domain — ingestion + extraction. `URL → normalised fields + per-field provenance`.
-- **Not started:** everything ADEME — data access, candidate generation, scoring, and the UI.
+- **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring, via data.ademe.fr), and the dashboard UI that chains extract → match.
+- **Not started:** the `__NUXT__` mapping for the two lefigaro portals. Needs one real listing URL to inspect — Firecrawl only ever returns lefigaro's search page as nav chrome, so the payload paths cannot be mapped without one.
 - Spec: `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md`
 - Plan: `docs/superpowers/plans/2026-09-17-listing-ingestion-extraction.md`
 
@@ -72,6 +72,24 @@ Verified 2026-09-17 against one real listing per portal via the Firecrawl API. A
 - `logic-immo.com` returns a JS shell even with `waitFor: 8000`.
 - The DPE survives Firecrawl's markdown conversion only by accident: clean on seloger, present on century21 only because the agent typed it in free text, present on orpi only in an image `alt`, and **entirely absent on pap.fr**.
 - A listing page's markdown contains neighbouring properties ("biens similaires") and nearby metro stations. On the pap.fr listing measured, the markdown lists `Rue des Boulets` (a metro stop) while the real street `Rue Guénot` appears only in the JSON-LD. **Never trust a street name that came from page prose.**
+
+### Measured facts — ADEME and commune resolution (2026-09-22)
+
+Verified against the live `dpe03existant` dataset (15 604 436 rows) and geo.api.gouv.fr. Both APIs are free, public and keyless.
+
+- **The DPE letter does not identify a property.** Lyon 3e (`69383`), apartment, exact 63 m², DPE `D`, GES `D` still leaves **28** rows. The letter narrows, it never resolves.
+- **The numeric DPE does.** `conso_5_usages_par_m2_ep` and `emission_ges_5_usages_par_m2` are populated on **141/141** sampled rows, and a ±5 kWh window cuts 141 candidates to **3**. Both numbers are printed on the label every French listing must display. This is why `dpeKwhM2Year` / `gesKgCo2M2Year` are extracted.
+- **`typologie_logement` (T1…T7) is empty in practice** — 0 of 94 sampled rows. **Rooms cannot be matched against ADEME**, whatever the field list suggests.
+- **`numero_etage_appartement` is a trap.** Populated on 89/94 rows, but **85 of those are `0`**. It is a default, not a ground floor. Never hard-filter on it.
+- **ADEME keys on the arrondissement, not the commune.** `69383` holds 36 709 rows, `69123` (Lyon) holds 61. `75115` holds 94 389, `75056` (Paris) holds 419.
+- **geo.api.gouv.fr `/communes` returns the parent commune by default** — `codePostal=69003` gives `69123 Lyon`, not `69383`. Pass `type=commune-actuelle,arrondissement-municipal`.
+- **Commune name search is not usable as a key.** Querying `nom=Lyon 3e` returns `Beauvoir-en-Lyons` and `Beauficel-en-Lyons`. A name may only break a tie, never select on its own.
+- **A postal code can span many communes** — `01400` covers 10.
+- **1266 of Lyon 3e's 35 311 apartment rows carry no street number** (559 of 3198 in Saint-Genis-Laval). They match every other criterion and rank at 100%, so they are excluded at the query.
+- **Some ADEME rows are stored double-encoded** — `58 Rue de l<mojibake>Abondance` beside a clean `70 Rue de l'Abondance` on the same street.
+- `size` on `/lines` accepts up to **10000**; 10001 returns 400.
+
+---
 
 ### Traps that have already bitten us
 
@@ -214,6 +232,8 @@ Domains and their tables:
 | `chat` | none (Mastra runtime owns its PG tables) | — |
 | `transcription` / `url-fetch` / `web-search` | none | their single `application/<domain>/*` use case |
 | `listing` | none | `application/listing/*` use cases, `core/listing/types` |
+| `commune` | none | `application/commune/resolve-commune`, `core/commune/types` |
+| `ademe` | none | `application/ademe/find-address-candidates`, `application/ademe/dto`, `core/ademe/types` |
 | `rate-limit` / `email` | none (platform, open to all) | `apply-rate-limit`, `llm-cost-limiter`, `email-sender` |
 
 Rules the checker enforces:
