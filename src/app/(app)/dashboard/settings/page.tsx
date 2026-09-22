@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { listLinkedAccounts } from '@/application/settings/list-accounts';
@@ -13,31 +14,25 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SettingsPage(): Promise<React.ReactElement> {
-  const [me, sessionsResult, accountsResult] = await Promise.all([
-    getCurrentUser(),
+  const me = await getCurrentUser();
+  // why: the middleware already redirects, but settings must not render for an
+  // anonymous visitor if that redirect ever stops running.
+  if (me.isErr()) redirect('/sign-in');
+
+  const [sessionsResult, accountsResult] = await Promise.all([
     listUserSessions(),
     listLinkedAccounts(),
   ]);
 
-  const user = me.isOk()
-    ? {
+  return (
+    <SettingsContent
+      user={{
         firstName: me.value.firstName,
         lastName: me.value.lastName,
         email: me.value.email,
         image: me.value.image,
         currentSessionId: me.value.sessionId,
-      }
-    : {
-        firstName: '',
-        lastName: '',
-        email: '',
-        image: null,
-        currentSessionId: '',
-      };
-
-  return (
-    <SettingsContent
-      user={user}
+      }}
       initialSessions={sessionsResult.isOk() ? sessionsResult.value : []}
       initialAccounts={accountsResult.isOk() ? accountsResult.value : []}
     />

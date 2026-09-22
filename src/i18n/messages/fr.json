@@ -18,6 +18,7 @@
   "Nav": {
     "dashboard": "Tableau de bord",
     "settings": "Paramètres",
+    "signIn": "Se connecter",
     "signOut": "Se déconnecter",
     "language": "Langue"
   },

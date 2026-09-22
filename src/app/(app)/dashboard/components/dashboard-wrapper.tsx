@@ -13,7 +13,7 @@ export function DashboardWrapper({
   user,
   children,
 }: {
-  user: AuthenticatedUser;
+  user: AuthenticatedUser | null;
   children: ReactNode;
 }) {
   return (

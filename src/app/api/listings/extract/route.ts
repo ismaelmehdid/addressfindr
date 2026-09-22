@@ -1,18 +1,19 @@
 import { NextResponse } from 'next/server';
 import { ExtractListingInputSchema } from '@/application/listing/dto';
 import { extractListing } from '@/application/listing/extract-listing';
-import { parseJsonBody, requireAuthedRoute } from '@/shared/api-route';
+import { openRoute, parseJsonBody } from '@/shared/api-route';
 import { jsonError } from '@/shared/errors-http';
 import { log } from '@/shared/logger';
 
 export const maxDuration = 90;
 
 export async function POST(req: Request): Promise<Response> {
-  const auth = await requireAuthedRoute({
+  const caller = await openRoute({
+    req,
     rateLimit: 'listing-extract',
     event: 'api.listings.extract',
   });
-  if (!auth.ok) return auth.response;
+  if (!caller.ok) return caller.response;
 
   const body = await parseJsonBody(req, ExtractListingInputSchema);
   if (!body.ok) return body.response;
@@ -22,7 +23,7 @@ export async function POST(req: Request): Promise<Response> {
     log.warn('api.listings.extract.failure', {
       code: result.error.code,
       message: result.error.message,
-      userId: auth.ctx.userId,
+      authenticated: caller.caller.userId !== null,
     });
     return jsonError(result.error);
   }

@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const SESSION_COOKIE = 'better-auth.session_token';
 const SECURE_SESSION_COOKIE = '__Secure-better-auth.session_token';
 
-const PROTECTED_PREFIXES = ['/dashboard'];
+const PROTECTED_PREFIXES = ['/dashboard/settings'];
 const SIGN_IN_PATH = '/sign-in';
 
 function hasSession(req: NextRequest): boolean {

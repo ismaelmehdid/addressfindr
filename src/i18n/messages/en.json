@@ -18,6 +18,7 @@
   "Nav": {
     "dashboard": "Dashboard",
     "settings": "Settings",
+    "signIn": "Sign in",
     "signOut": "Sign out",
     "language": "Language"
   },

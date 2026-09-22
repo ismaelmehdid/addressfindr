@@ -16,7 +16,7 @@ vi.mock('@/application/rate-limit/apply-rate-limit', () => ({
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { applyRateLimit } from '@/application/rate-limit/apply-rate-limit';
 import { unauthorized } from '@/core/errors';
-import { requireAuthedRoute } from './api-route';
+import { openRoute, requireAuthedRoute } from './api-route';
 
 const mockedUser = vi.mocked(getCurrentUser);
 const mockedRateLimit = vi.mocked(applyRateLimit);
@@ -51,5 +51,82 @@ describe('requireAuthedRoute — authz gate', () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.ctx).toEqual({ userId: 'user-1' });
+  });
+});
+
+function extractRequest(headers: Record<string, string> = {}): Request {
+  return new Request('https://app.test/api/listings/extract', {
+    method: 'POST',
+    headers,
+  });
+}
+
+describe('openRoute — anonymous access with a rate limit', () => {
+  it('lets a signed-out caller through with a null user id', async () => {
+    mockedUser.mockResolvedValue(err(unauthorized('no session')));
+
+    const result = await openRoute({
+      req: extractRequest({ 'x-forwarded-for': '203.0.113.7' }),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.caller).toEqual({ userId: null });
+  });
+
+  it('keys the limit on the client address for a signed-out caller', async () => {
+    mockedUser.mockResolvedValue(err(unauthorized('no session')));
+
+    await openRoute({
+      req: extractRequest({ 'x-forwarded-for': '203.0.113.7' }),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(mockedRateLimit).toHaveBeenCalledWith({
+      identifier: 'ip:203.0.113.7',
+      limit: 'listing-extract',
+    });
+  });
+
+  it('keys the limit on the user id for a signed-in caller', async () => {
+    mockedUser.mockResolvedValue(ok({ id: 'user-1' } as never));
+
+    const result = await openRoute({
+      req: extractRequest({ 'x-forwarded-for': '203.0.113.7' }),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(mockedRateLimit).toHaveBeenCalledWith({
+      identifier: 'user-1',
+      limit: 'listing-extract',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.caller).toEqual({ userId: 'user-1' });
+  });
+
+  it('rejects a signed-out caller over the limit', async () => {
+    mockedUser.mockResolvedValue(err(unauthorized('no session')));
+    mockedRateLimit.mockResolvedValue({
+      success: false,
+      remaining: 0,
+      reset: 42,
+    });
+
+    const result = await openRoute({
+      req: extractRequest({ 'x-forwarded-for': '203.0.113.7' }),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(429);
+    const body = await result.response.json();
+    expect(body.error).toBe('rate_limited');
   });
 });

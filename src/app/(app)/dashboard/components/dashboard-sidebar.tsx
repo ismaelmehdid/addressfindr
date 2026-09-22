@@ -1,6 +1,6 @@
 'use client';
 
-import { Home } from 'lucide-react';
+import { Home, LogIn } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -33,7 +33,7 @@ function isActive(pathname: string, href: string, exact: boolean): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function DashboardSidebar({ user }: { user: AuthenticatedUser }) {
+export function DashboardSidebar({ user }: { user: AuthenticatedUser | null }) {
   const t = useTranslations('Nav');
   const pathname = usePathname();
 
@@ -75,12 +75,23 @@ export function DashboardSidebar({ user }: { user: AuthenticatedUser }) {
       <SidebarFooter className="p-1 pb-3">
         <div className="flex flex-col items-center gap-1.5">
           <LanguageSwitcher />
-          <UserMenu
-            firstName={user.firstName}
-            lastName={user.lastName}
-            email={user.email}
-            image={user.image}
-          />
+          {user === null ? (
+            <SidebarMenuButton
+              render={<Link href="/sign-in" />}
+              tooltip={t('signIn')}
+              className="justify-center"
+            >
+              <LogIn />
+              <span className="sr-only">{t('signIn')}</span>
+            </SidebarMenuButton>
+          ) : (
+            <UserMenu
+              firstName={user.firstName}
+              lastName={user.lastName}
+              email={user.email}
+              image={user.image}
+            />
+          )}
         </div>
       </SidebarFooter>
     </Sidebar>

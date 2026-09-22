@@ -1,6 +1,4 @@
-import { redirect } from 'next/navigation';
 import type { ReactNode } from 'react';
-import { getAppEntitlement } from '@/application/billing/get-app-entitlement';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { DashboardMainShell } from './components/dashboard-main-shell';
 import { DashboardWrapper } from './components/dashboard-wrapper';
@@ -13,13 +11,10 @@ export default async function DashboardLayout({
   header: ReactNode;
 }): Promise<React.ReactElement> {
   const currentUser = await getCurrentUser();
-  if (currentUser.isErr()) redirect('/sign-in');
-
-  const entitlement = await getAppEntitlement();
-  if (entitlement.isErr() || !entitlement.value.allowed) redirect('/paywall');
+  const user = currentUser.isOk() ? currentUser.value : null;
 
   return (
-    <DashboardWrapper user={currentUser.value}>
+    <DashboardWrapper user={user}>
       <DashboardMainShell header={header}>{children}</DashboardMainShell>
     </DashboardWrapper>
   );
