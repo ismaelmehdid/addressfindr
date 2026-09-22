@@ -1,0 +1,231 @@
+import 'server-only';
+
+import { err, ok, type Result } from 'neverthrow';
+import * as v from 'valibot';
+import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
+import { repairMojibake } from '@/core/ademe/repair-mojibake';
+import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
+import { isInseeCode } from '@/core/commune/types';
+import { type AppError, externalApi, validation } from '@/core/errors';
+import {
+  ENERGY_CLASSES,
+  type EnergyClass,
+  type PropertyType,
+} from '@/core/listing/types';
+import { env } from '@/shared/env';
+import { log } from '@/shared/logger';
+
+const PROVIDER = 'ademe';
+const DATASET = 'dpe03existant';
+
+const SELECTED_FIELDS = [
+  'numero_dpe',
+  'adresse_ban',
+  'numero_voie_ban',
+  'nom_rue_ban',
+  'code_postal_ban',
+  'nom_commune_ban',
+  'code_insee_ban',
+  'type_batiment',
+  'surface_habitable_logement',
+  'etiquette_dpe',
+  'etiquette_ges',
+  'conso_5_usages_par_m2_ep',
+  'emission_ges_5_usages_par_m2',
+  'annee_construction',
+  'numero_etage_appartement',
+  'complement_adresse_batiment',
+  'date_etablissement_dpe',
+  'score_ban',
+].join(',');
+
+const BUILDING_TYPE: Record<PropertyType, string> = {
+  apartment: 'appartement',
+  house: 'maison',
+};
+
+const PROPERTY_TYPE_BY_BUILDING: Record<string, PropertyType> = {
+  appartement: 'apartment',
+  maison: 'house',
+};
+
+const RowSchema = v.object({
+  numero_dpe: v.optional(v.nullable(v.string())),
+  adresse_ban: v.optional(v.nullable(v.string())),
+  numero_voie_ban: v.optional(v.nullable(v.string())),
+  nom_rue_ban: v.optional(v.nullable(v.string())),
+  code_postal_ban: v.optional(v.nullable(v.string())),
+  nom_commune_ban: v.optional(v.nullable(v.string())),
+  code_insee_ban: v.optional(v.nullable(v.string())),
+  type_batiment: v.optional(v.nullable(v.string())),
+  surface_habitable_logement: v.optional(v.nullable(v.number())),
+  etiquette_dpe: v.optional(v.nullable(v.string())),
+  etiquette_ges: v.optional(v.nullable(v.string())),
+  conso_5_usages_par_m2_ep: v.optional(v.nullable(v.number())),
+  emission_ges_5_usages_par_m2: v.optional(v.nullable(v.number())),
+  annee_construction: v.optional(v.nullable(v.number())),
+  numero_etage_appartement: v.optional(v.nullable(v.number())),
+  complement_adresse_batiment: v.optional(v.nullable(v.string())),
+  date_etablissement_dpe: v.optional(v.nullable(v.string())),
+  score_ban: v.optional(v.nullable(v.number())),
+});
+
+const ResponseSchema = v.object({
+  total: v.optional(v.number(), 0),
+  results: v.optional(v.array(RowSchema), []),
+});
+
+type Row = v.InferOutput<typeof RowSchema>;
+
+function toEnergyClass(raw: string | null | undefined): EnergyClass | null {
+  if (typeof raw !== 'string') return null;
+  const letter = raw.trim().toUpperCase();
+  return (ENERGY_CLASSES as readonly string[]).includes(letter)
+    ? (letter as EnergyClass)
+    : null;
+}
+
+function text(raw: string | null | undefined): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = repairMojibake(raw).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function numeric(raw: number | null | undefined): number | null {
+  return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+}
+
+function toRecord(row: Row): DpeRecord | null {
+  const dpeNumber = text(row.numero_dpe);
+  const inseeCode = text(row.code_insee_ban);
+  const address = text(row.adresse_ban);
+  const streetNumber = text(row.numero_voie_ban);
+  if (
+    dpeNumber === null ||
+    inseeCode === null ||
+    address === null ||
+    streetNumber === null
+  ) {
+    return null;
+  }
+
+  const building = text(row.type_batiment)?.toLowerCase() ?? '';
+
+  return {
+    dpeNumber,
+    address,
+    streetNumber,
+    street: text(row.nom_rue_ban),
+    postalCode: text(row.code_postal_ban),
+    city: text(row.nom_commune_ban),
+    inseeCode: inseeCode.toUpperCase(),
+    propertyType: PROPERTY_TYPE_BY_BUILDING[building] ?? null,
+    surfaceM2: numeric(row.surface_habitable_logement),
+    dpeClass: toEnergyClass(row.etiquette_dpe),
+    gesClass: toEnergyClass(row.etiquette_ges),
+    dpeKwhM2Year: numeric(row.conso_5_usages_par_m2_ep),
+    gesKgCo2M2Year: numeric(row.emission_ges_5_usages_par_m2),
+    yearBuilt: numeric(row.annee_construction),
+    floor: numeric(row.numero_etage_appartement),
+    buildingComplement: text(row.complement_adresse_batiment),
+    establishedOn: text(row.date_etablissement_dpe),
+    geocodingScore: numeric(row.score_ban),
+  };
+}
+
+function buildQueryString(filter: DpeSearchFilter): string {
+  // why: le produit promet une adresse exacte. Une ligne sans numero de voie
+  // ne peut pas en etre une, et elle concourt sur tous les autres criteres :
+  // laissee dans le lot, elle remonte a 100% sur "Rue Jules Verne 69003 Lyon".
+  // Mesure du 2026-09-22 : 1266 des 35311 appartements de Lyon 3e, 559 des
+  // 3198 de Saint-Genis-Laval.
+  const clauses = [
+    `code_insee_ban:"${filter.inseeCode}"`,
+    '_exists_:numero_voie_ban',
+  ];
+
+  if (filter.propertyType !== null) {
+    clauses.push(`type_batiment:"${BUILDING_TYPE[filter.propertyType]}"`);
+  }
+  clauses.push(
+    `surface_habitable_logement:[${filter.surfaceMin.toFixed(2)} TO ${filter.surfaceMax.toFixed(2)}]`,
+  );
+  if (filter.dpeClass !== null) {
+    clauses.push(`etiquette_dpe:"${filter.dpeClass}"`);
+  }
+
+  return clauses.join(' AND ');
+}
+
+async function search(
+  filter: DpeSearchFilter,
+): Promise<Result<{ records: DpeRecord[]; total: number }, AppError>> {
+  // why: la valeur part dans une requete Lucene. Elle vient d'une commune
+  // resolue, mais on ne la prend pas sur parole avant de l'interpoler.
+  if (!isInseeCode(filter.inseeCode)) {
+    return err(validation('Invalid INSEE code', 'inseeCode'));
+  }
+
+  const url = new URL(
+    `${env().ADEME_BASE_URL}/data-fair/api/v1/datasets/${DATASET}/lines`,
+  );
+  url.searchParams.set('qs', buildQueryString(filter));
+  url.searchParams.set('select', SELECTED_FIELDS);
+  url.searchParams.set('size', String(filter.limit));
+
+  log.info('ademe.search.start', {
+    inseeCode: filter.inseeCode,
+    hasDpeClass: filter.dpeClass !== null,
+    limit: filter.limit,
+  });
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(env().ADEME_TIMEOUT_MS),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => '');
+      log.warn('ademe.search.http_failure', {
+        status: response.status,
+        body: body.slice(0, 200),
+      });
+      return err(externalApi(PROVIDER, `HTTP ${response.status}`));
+    }
+
+    let json: unknown;
+    try {
+      json = await response.json();
+    } catch {
+      return err(externalApi(PROVIDER, 'Response was not JSON'));
+    }
+
+    const parsed = v.safeParse(ResponseSchema, json);
+    if (!parsed.success) {
+      log.warn('ademe.search.parse_failure', {
+        issues: parsed.issues.map((i) => i.message).slice(0, 3),
+      });
+      return err(externalApi(PROVIDER, 'Unexpected response shape'));
+    }
+
+    const records = parsed.output.results
+      .map(toRecord)
+      .filter((record): record is DpeRecord => record !== null);
+
+    log.info('ademe.search.success', {
+      total: parsed.output.total,
+      returned: records.length,
+    });
+    return ok({ records, total: parsed.output.total });
+  } catch (e) {
+    if (e instanceof Error && e.name === 'TimeoutError') {
+      return err(externalApi(PROVIDER, 'Request timed out'));
+    }
+    log.error('ademe.search.exception', e);
+    return err(externalApi(PROVIDER, 'Network or parser failure'));
+  }
+}
+
+export const ademeDpeDirectory: IDpeDirectory = { search };

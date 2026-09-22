@@ -105,6 +105,25 @@
     "errorNotExtractable": "Impossible de lire cette annonce. Ce n'est peut-être pas un logement, ou la page masque les détails.",
     "errorRateLimited": "Trop d'analyses. Patientez un instant et réessayez.",
     "errorSignedOut": "Votre session a expiré. Reconnectez-vous pour continuer.",
-    "errorUnknown": "Une erreur est survenue pendant la lecture de l'annonce. Réessayez."
+    "errorUnknown": "Une erreur est survenue pendant la lecture de l'annonce. Réessayez.",
+    "addressHeading": "Adresses candidates",
+    "addressSearching": "Recherche dans la base DPE…",
+    "addressNone": "Aucune ligne DPE ne correspond assez precisement a cette annonce pour en nommer l'adresse.",
+    "addressConfidence": "{percent}% de correspondance",
+    "addressMatchedOn": "Concorde sur : {signals}",
+    "addressDivergedOn": "Diverge sur : {signals}",
+    "addressInspected": "{inspected} lignes DPE evaluees dans cette commune.",
+    "addressTruncated": "Plus de lignes correspondent qu'il n'a ete possible d'evaluer ; les {inspected} premieres ont ete classees. Ajoutez l'etage ou l'annee de construction pour affiner.",
+    "errorMatchNotEnoughSignal": "Cette annonce ne donne pas assez d'elements pour interroger la base. Une commune et une surface sont necessaires.",
+    "errorMatchRateLimited": "Trop de recherches. Patientez un instant puis reessayez.",
+    "errorMatchUnavailable": "La base publique des DPE n'a pas repondu. Reessayez dans un instant.",
+    "errorMatchUnknown": "Une erreur est survenue pendant la recherche d'adresse. Reessayez.",
+    "signalSurface": "surface",
+    "signalDpeClass": "lettre DPE",
+    "signalGesClass": "lettre GES",
+    "signalDpeValue": "valeur DPE",
+    "signalGesValue": "valeur GES",
+    "signalYearBuilt": "annee de construction",
+    "signalFloor": "etage"
   }
 }

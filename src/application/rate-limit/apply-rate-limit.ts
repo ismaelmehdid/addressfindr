@@ -16,6 +16,7 @@ const globalForRateLimit = globalThis as unknown as {
   uploadRatelimit: Ratelimit | null | undefined;
   transcribeRatelimit: Ratelimit | null | undefined;
   listingExtractRatelimit: Ratelimit | null | undefined;
+  listingMatchRatelimit: Ratelimit | null | undefined;
 };
 
 function buildRatelimit(tokens: number, window: '1 m'): Ratelimit | null {
@@ -65,16 +66,27 @@ function getListingExtractRatelimit(): Ratelimit | null {
   return limiter;
 }
 
+function getListingMatchRatelimit(): Ratelimit | null {
+  if (globalForRateLimit.listingMatchRatelimit !== undefined) {
+    return globalForRateLimit.listingMatchRatelimit;
+  }
+  const limiter = buildRatelimit(20, '1 m');
+  globalForRateLimit.listingMatchRatelimit = limiter;
+  return limiter;
+}
+
 export type RateLimitBucket =
   | 'default'
   | 'upload'
   | 'transcribe'
-  | 'listing-extract';
+  | 'listing-extract'
+  | 'listing-match';
 
 function getLimiter(bucket: RateLimitBucket): Ratelimit | null {
   if (bucket === 'upload') return getUploadRatelimit();
   if (bucket === 'transcribe') return getTranscribeRatelimit();
   if (bucket === 'listing-extract') return getListingExtractRatelimit();
+  if (bucket === 'listing-match') return getListingMatchRatelimit();
   return getDefaultRatelimit();
 }
 

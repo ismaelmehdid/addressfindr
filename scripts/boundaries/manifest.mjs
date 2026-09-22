@@ -121,6 +121,21 @@ export const DOMAINS = [
     ],
   },
   {
+    name: 'ademe',
+    dirs: [
+      'src/core/ademe',
+      'src/application/ademe',
+      'src/infra/external-apis/ademe',
+      'src/app/api/listings/match',
+    ],
+    schemas: [],
+    public: [
+      'src/application/ademe/find-address-candidates',
+      'src/application/ademe/dto',
+      'src/core/ademe/types',
+    ],
+  },
+  {
     name: 'commune',
     dirs: [
       'src/core/commune',
@@ -195,6 +210,15 @@ export const DOMAINS = [
 export const ALLOWED_EDGES = [
   ['indexing', 'files'],
   ['files', 'indexing'],
+  // ademe lit les champs extraits d'une annonce et a besoin du code INSEE
+  // de sa commune pour interroger la base DPE.
+  ['ademe', 'listing'],
+  ['ademe', 'commune'],
+  // le retour : le formulaire d'annonce enchaine l'extraction sur la recherche
+  // d'adresse et affiche ses candidats. Couplage bidirectionnel assume, sur le
+  // modele de files <-> indexing : aucun cycle d'import au niveau des modules,
+  // ademe ne depend que de core/listing, listing que de l'API publique d'ademe.
+  ['listing', 'ademe'],
 ];
 
 export const SHARED_PREFIXES = [

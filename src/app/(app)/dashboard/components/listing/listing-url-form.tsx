@@ -4,9 +4,11 @@ import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
 import * as v from 'valibot';
+import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { AddressMatch, MatchSignal } from '@/core/ademe/types';
 import {
   EXTRACTED_FIELD_NAMES,
   type ExtractedListing,
@@ -35,52 +37,115 @@ const FAILURE_KEY = {
   unknown: 'errorUnknown',
 } as const satisfies Record<ExtractionFailure, string>;
 
+type MatchFailure =
+  | 'not-enough-signal'
+  | 'rate-limited'
+  | 'unavailable'
+  | 'unknown';
+
+const MATCH_FAILURE_KEY = {
+  'not-enough-signal': 'errorMatchNotEnoughSignal',
+  'rate-limited': 'errorMatchRateLimited',
+  unavailable: 'errorMatchUnavailable',
+  unknown: 'errorMatchUnknown',
+} as const satisfies Record<MatchFailure, string>;
+
+const SIGNAL_KEY = {
+  surfaceM2: 'signalSurface',
+  dpeClass: 'signalDpeClass',
+  gesClass: 'signalGesClass',
+  dpeKwhM2Year: 'signalDpeValue',
+  gesKgCo2M2Year: 'signalGesValue',
+  yearBuilt: 'signalYearBuilt',
+  floor: 'signalFloor',
+} as const satisfies Record<MatchSignal, string>;
+
+type MatchState =
+  | { kind: 'pending' }
+  | { kind: 'found'; match: AddressMatch }
+  | { kind: 'failed'; failure: MatchFailure };
+
 type Status =
   | { kind: 'idle' }
   | { kind: 'rejected'; reason: ListingUrlRejection }
   | { kind: 'pending' }
   | { kind: 'failed'; failure: ExtractionFailure }
-  | { kind: 'extracted'; listing: ExtractedListing };
+  | { kind: 'extracted'; listing: ExtractedListing; match: MatchState };
 
 type ExtractionOutcome =
   | { ok: true; listing: ExtractedListing }
   | { ok: false; failure: ExtractionFailure };
 
+type MatchOutcome =
+  | { ok: true; match: AddressMatch }
+  | { ok: false; failure: MatchFailure };
+
+function errorCode(body: unknown): unknown {
+  return typeof body === 'object' && body !== null && 'error' in body
+    ? (body as { error: unknown }).error
+    : null;
+}
+
 function toFailure(body: unknown): ExtractionFailure {
-  const code =
-    typeof body === 'object' && body !== null && 'error' in body
-      ? (body as { error: unknown }).error
-      : null;
+  const code = errorCode(body);
   if (code === 'validation') return 'not-extractable';
   if (code === 'rate_limited') return 'rate-limited';
   if (code === 'unauthorized' || code === 'forbidden') return 'signed-out';
   return 'unknown';
 }
 
-async function requestExtraction(url: string): Promise<ExtractionOutcome> {
+function toMatchFailure(body: unknown): MatchFailure {
+  const code = errorCode(body);
+  if (code === 'validation') return 'not-enough-signal';
+  if (code === 'rate_limited') return 'rate-limited';
+  if (code === 'external_api') return 'unavailable';
+  return 'unknown';
+}
+
+async function postJson(
+  path: string,
+  payload: unknown,
+): Promise<{ ok: boolean; body: unknown } | null> {
   let response: Response;
   try {
-    response = await fetch('/api/listings/extract', {
+    response = await fetch(path, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ url }),
+      body: JSON.stringify(payload),
     });
   } catch {
-    return { ok: false, failure: 'unknown' };
+    return null;
   }
 
-  let body: unknown;
   try {
-    body = await response.json();
+    return { ok: response.ok, body: await response.json() };
   } catch {
-    return { ok: false, failure: 'unknown' };
+    return null;
+  }
+}
+
+async function requestExtraction(url: string): Promise<ExtractionOutcome> {
+  const response = await postJson('/api/listings/extract', { url });
+  if (response === null) return { ok: false, failure: 'unknown' };
+  if (!response.ok) {
+    return { ok: false, failure: toFailure(response.body) };
   }
 
-  if (!response.ok) return { ok: false, failure: toFailure(body) };
-
-  const parsed = v.safeParse(ExtractedListingSchema, body);
+  const parsed = v.safeParse(ExtractedListingSchema, response.body);
   if (!parsed.success) return { ok: false, failure: 'unknown' };
   return { ok: true, listing: parsed.output };
+}
+
+async function requestMatch(listing: ExtractedListing): Promise<MatchOutcome> {
+  const response = await postJson('/api/listings/match', { listing });
+  if (response === null) return { ok: false, failure: 'unknown' };
+  if (!response.ok) {
+    return { ok: false, failure: toMatchFailure(response.body) };
+  }
+
+  const parsed = v.safeParse(AddressMatchSchema, response.body);
+  if (!parsed.success) return { ok: false, failure: 'unknown' };
+  return { ok: true, match: parsed.output };
 }
 
 const NAME_WIDTH = 16;
@@ -118,11 +183,25 @@ export function ListingUrlForm() {
 
     setStatus({ kind: 'pending' });
     const outcome = await requestExtraction(validated.canonicalUrl);
-    setStatus(
-      outcome.ok
-        ? { kind: 'extracted', listing: outcome.listing }
-        : { kind: 'failed', failure: outcome.failure },
-    );
+    if (!outcome.ok) {
+      setStatus({ kind: 'failed', failure: outcome.failure });
+      return;
+    }
+
+    setStatus({
+      kind: 'extracted',
+      listing: outcome.listing,
+      match: { kind: 'pending' },
+    });
+
+    const matched = await requestMatch(outcome.listing);
+    setStatus({
+      kind: 'extracted',
+      listing: outcome.listing,
+      match: matched.ok
+        ? { kind: 'found', match: matched.match }
+        : { kind: 'failed', failure: matched.failure },
+    });
   }
 
   const isRejected = status.kind === 'rejected';
@@ -190,16 +269,99 @@ export function ListingUrlForm() {
           </p>
         )}
         {status.kind === 'extracted' && (
-          <section aria-live="polite" className="mt-6">
-            <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
-              {t('resultHeading')}
-            </h2>
-            <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-card p-3 font-mono text-[12px] leading-[1.6] text-ink">
-              {formatExtraction(status.listing)}
-            </pre>
-          </section>
+          <>
+            <AddressSection state={status.match} />
+            <section aria-live="polite" className="mt-6">
+              <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
+                {t('resultHeading')}
+              </h2>
+              <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-card p-3 font-mono text-[12px] leading-[1.6] text-ink">
+                {formatExtraction(status.listing)}
+              </pre>
+            </section>
+          </>
         )}
       </div>
     </div>
+  );
+}
+
+function AddressSection({ state }: { state: MatchState }) {
+  const t = useTranslations('Listing');
+
+  return (
+    <section aria-live="polite" className="mt-6">
+      <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
+        {t('addressHeading')}
+      </h2>
+      {state.kind === 'pending' && (
+        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
+          {t('addressSearching')}
+        </p>
+      )}
+      {state.kind === 'failed' && (
+        <p className="mt-2 text-[13px] tracking-[-0.08px] text-destructive">
+          {t(MATCH_FAILURE_KEY[state.failure])}
+        </p>
+      )}
+      {state.kind === 'found' && <AddressList match={state.match} />}
+    </section>
+  );
+}
+
+function AddressList({ match }: { match: AddressMatch }) {
+  const t = useTranslations('Listing');
+
+  if (match.candidates.length === 0) {
+    return (
+      <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
+        {t('addressNone')}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <ol className="mt-2 flex flex-col gap-2">
+        {match.candidates.map((candidate) => (
+          <li
+            key={candidate.record.dpeNumber}
+            className="rounded-lg border border-border bg-card p-3"
+          >
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-[14px] font-medium tracking-[-0.08px] text-ink">
+                {candidate.record.address}
+              </span>
+              <span className="shrink-0 font-mono text-[12px] text-slate-neutral">
+                {t('addressConfidence', {
+                  percent: Math.round(candidate.confidence * 100),
+                })}
+              </span>
+            </div>
+            <p className="mt-1 text-[12px] leading-[1.6] tracking-[-0.08px] text-slate-neutral">
+              {t('addressMatchedOn', {
+                signals: candidate.matched
+                  .map((signal) => t(SIGNAL_KEY[signal]))
+                  .join(', '),
+              })}
+            </p>
+            {candidate.diverged.length > 0 && (
+              <p className="mt-0.5 text-[12px] leading-[1.6] tracking-[-0.08px] text-destructive">
+                {t('addressDivergedOn', {
+                  signals: candidate.diverged
+                    .map((signal) => t(SIGNAL_KEY[signal]))
+                    .join(', '),
+                })}
+              </p>
+            )}
+          </li>
+        ))}
+      </ol>
+      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {match.truncated
+          ? t('addressTruncated', { inspected: match.inspected })
+          : t('addressInspected', { inspected: match.inspected })}
+      </p>
+    </>
   );
 }
