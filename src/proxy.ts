@@ -12,7 +12,7 @@ function hasSession(req: NextRequest): boolean {
   );
 }
 
-export default function middleware(req: NextRequest): NextResponse {
+export default function proxy(req: NextRequest): NextResponse {
   const { pathname } = req.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 

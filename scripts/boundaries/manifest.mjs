@@ -193,6 +193,7 @@ export const SHARED_PREFIXES = [
   'src/core/types',
   'src/core/ports',
   'src/global.d',
+  'src/proxy',
   'src/instrumentation',
   'src/instrumentation-client',
   'src/infra/external-apis/openai',
