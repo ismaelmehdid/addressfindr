@@ -90,6 +90,17 @@ const EnvSchema = v.object({
 
   BRAVE_SEARCH_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
 
+  GEO_GOUV_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://geo.api.gouv.fr',
+  ),
+  GEO_GOUV_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '8000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
   SUPABASE_URL: v.pipe(v.string(), v.url()),
   SUPABASE_SECRET_KEY: v.pipe(
     v.string(),

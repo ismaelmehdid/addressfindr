@@ -121,6 +121,20 @@ export const DOMAINS = [
     ],
   },
   {
+    name: 'commune',
+    dirs: [
+      'src/core/commune',
+      'src/application/commune',
+      'src/infra/external-apis/geo-gouv',
+    ],
+    schemas: [],
+    public: [
+      'src/application/commune/resolve-commune',
+      'src/application/commune/dto',
+      'src/core/commune/types',
+    ],
+  },
+  {
     name: 'web-search',
     dirs: [
       'src/core/web-search',
