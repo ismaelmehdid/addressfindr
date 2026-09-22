@@ -39,6 +39,8 @@ export type ExtractedValues = {
   yearBuilt: number | null;
   dpeClass: EnergyClass | null;
   gesClass: EnergyClass | null;
+  dpeKwhM2Year: number | null;
+  gesKgCo2M2Year: number | null;
   city: string | null;
   postalCode: string | null;
   inseeCode: string | null;
@@ -59,6 +61,8 @@ export const EXTRACTED_FIELD_NAMES = [
   'yearBuilt',
   'dpeClass',
   'gesClass',
+  'dpeKwhM2Year',
+  'gesKgCo2M2Year',
   'city',
   'postalCode',
   'inseeCode',
@@ -109,6 +113,8 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   yearBuilt: null,
   dpeClass: null,
   gesClass: null,
+  dpeKwhM2Year: null,
+  gesKgCo2M2Year: null,
   city: null,
   postalCode: null,
   inseeCode: null,

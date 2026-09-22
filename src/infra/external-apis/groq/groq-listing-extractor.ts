@@ -42,6 +42,10 @@ const FIELD_HINTS: Record<ExtractedFieldName, string> = {
   yearBuilt: 'année de construction',
   dpeClass: 'lettre du DPE, A à G',
   gesClass: 'lettre du GES, A à G',
+  dpeKwhM2Year:
+    "consommation de l'etiquette DPE en kWh/m2/an, jamais un total annuel",
+  gesKgCo2M2Year:
+    "emissions de l'etiquette GES en kg CO2/m2/an, jamais un total annuel",
   city: 'commune',
   postalCode: 'code postal',
   inseeCode: 'code INSEE de la commune',

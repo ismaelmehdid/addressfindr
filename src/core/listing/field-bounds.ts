@@ -9,6 +9,8 @@ const STATIC_BOUNDS: Partial<Record<ExtractedFieldName, NumericBound>> = {
   floor: { min: -2, max: 60 },
   buildingFloors: { min: 0, max: 60 },
   priceEur: { min: 1000, max: 100_000_000 },
+  dpeKwhM2Year: { min: 1, max: 2000 },
+  gesKgCo2M2Year: { min: 0, max: 1000 },
 };
 
 function boundsFor(field: ExtractedFieldName): NumericBound | null {

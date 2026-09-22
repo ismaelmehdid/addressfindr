@@ -7,11 +7,16 @@ import {
 
 const SPACE_VARIANTS = /[     ]/g;
 
-export function parseFrenchNumber(raw: string): number | null {
+function joinDigitGroups(raw: string): string {
   let s = raw.replace(SPACE_VARIANTS, ' ');
   while (/\d \d{3}(?!\d)/.test(s)) {
     s = s.replace(/(\d) (\d{3})(?!\d)/, '$1$2');
   }
+  return s;
+}
+
+export function parseFrenchNumber(raw: string): number | null {
+  const s = joinDigitGroups(raw);
   const match = /-?\d+(?:[.,]\d+)?/.exec(s);
   if (!match) return null;
   const value = Number.parseFloat(match[0].replace(',', '.'));
@@ -50,6 +55,24 @@ export function parseEnergyClass(
   return (ENERGY_CLASSES as readonly string[]).includes(letter)
     ? (letter as EnergyClass)
     : null;
+}
+
+// why: exiger le marqueur par-surface. Une annonce peut citer la consommation
+// annuelle totale ("1822 kWh"), qui n'est pas la valeur portee par l'etiquette
+// DPE et ne correspond a aucune colonne ADEME.
+const DPE_ENERGY_PATTERN =
+  /(\d{1,4}(?:[.,]\d{1,2})?)\s*k\s?wh[^\d]{0,12}?m\s?[2\u00B2]/i;
+const GES_EMISSION_PATTERN =
+  /(\d{1,4}(?:[.,]\d{1,2})?)\s*kg[^\d]{0,16}?co\s?[2\u2082][^\d]{0,12}?m\s?[2\u00B2]/i;
+
+export function parseDpeEnergyValue(raw: string): number | null {
+  const match = DPE_ENERGY_PATTERN.exec(joinDigitGroups(raw));
+  return match?.[1] ? parseFrenchNumber(match[1]) : null;
+}
+
+export function parseGesEmissionValue(raw: string): number | null {
+  const match = GES_EMISSION_PATTERN.exec(joinDigitGroups(raw));
+  return match?.[1] ? parseFrenchNumber(match[1]) : null;
 }
 
 export function parseCount(raw: string): number | null {

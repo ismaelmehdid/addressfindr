@@ -3,8 +3,10 @@ import {
   parseBedroomCount,
   parseCity,
   parseCount,
+  parseDpeEnergyValue,
   parseEnergyClass,
   parseFrenchNumber,
+  parseGesEmissionValue,
   parseInseeCode,
   parsePostalCode,
   parsePriceEur,
@@ -232,5 +234,56 @@ describe('parseCity', () => {
 
   it('returns null for an empty string', () => {
     expect(parseCity('   ')).toBeNull();
+  });
+});
+
+describe('parseDpeEnergyValue', () => {
+  it('reads the value off a standard DPE label', () => {
+    expect(parseDpeEnergyValue('Consommation : 199 kWh/m²/an')).toBe(199);
+  });
+
+  it('accepts the primary-energy spelling and an ascii m2', () => {
+    expect(parseDpeEnergyValue('logement 199 kWhEP/m2/an')).toBe(199);
+  });
+
+  it('joins a narrow no-break space used as thousands separator', () => {
+    const narrowNbsp = String.fromCharCode(0x202f);
+    const raw = `1${narrowNbsp}234 kWh/m²/an`;
+    expect(raw).toContain(narrowNbsp);
+    expect(parseDpeEnergyValue(raw)).toBe(1234);
+  });
+
+  it('refuses a total annual consumption with no per-surface marker', () => {
+    expect(parseDpeEnergyValue('Chauffage 1822 kWh par an')).toBeNull();
+  });
+
+  it('refuses a GES quote', () => {
+    expect(parseDpeEnergyValue('40 kg CO₂/m²/an')).toBeNull();
+  });
+
+  it('reads only the energy figure from a combined label', () => {
+    expect(parseDpeEnergyValue('199 kWh/m²/an et 40 kg CO₂/m²/an')).toBe(199);
+  });
+});
+
+describe('parseGesEmissionValue', () => {
+  it('reads the value off a standard GES label', () => {
+    expect(parseGesEmissionValue('40 kg CO₂/m²/an')).toBe(40);
+  });
+
+  it('accepts the ascii CO2 spelling with an equivalence marker', () => {
+    expect(parseGesEmissionValue('40 kg éq. CO2/m2/an')).toBe(40);
+  });
+
+  it('accepts the unspaced unit', () => {
+    expect(parseGesEmissionValue('emissions 12 kgCO2/m²/an')).toBe(12);
+  });
+
+  it('refuses a DPE quote', () => {
+    expect(parseGesEmissionValue('199 kWh/m²/an')).toBeNull();
+  });
+
+  it('reads only the emission figure from a combined label', () => {
+    expect(parseGesEmissionValue('199 kWh/m²/an et 40 kg CO₂/m²/an')).toBe(40);
   });
 });
