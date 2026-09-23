@@ -31,7 +31,21 @@ describe('repairMojibake', () => {
     );
   });
 
+  // why: l'ancienne version de ce test utilisait "Rue Ã seule" — le marqueur
+  // exige un octet de continuation apres le Ã, donc la chaine sortait par la
+  // garde d'entree sans jamais atteindre le TextDecoder. La garde fatale, qui
+  // est la seule chose empechant de reecrire une adresse non prouvee, n'etait
+  // donc pas testee : passer fatal a false laissait la suite verte.
   it('returns the input unchanged when the bytes do not re-read as utf-8', () => {
+    // marqueur present (Ã suivi d'un octet de continuation), mais la sequence
+    // se termine sur un octet de tete orphelin : UTF-8 invalide.
+    const truncated = `Ch${String.fromCharCode(0x00c3, 0x00a2)}teau ${String.fromCharCode(0x00c3)}`;
+    expect(truncated).toContain(String.fromCharCode(0x00c3));
+    expect(repairMojibake(truncated)).toBe(truncated);
+    expect(repairMojibake(truncated)).not.toContain('\uFFFD');
+  });
+
+  it('returns the input unchanged when the marker never matches', () => {
     const notMojibake = `Rue ${String.fromCharCode(0x00c3)} seule`;
     expect(repairMojibake(notMojibake)).toBe(notMojibake);
   });

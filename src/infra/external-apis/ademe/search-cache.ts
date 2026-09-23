@@ -5,7 +5,11 @@ import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
 import { getRedisClient } from '@/infra/external-apis/redis/client';
 import { log } from '@/shared/logger';
 
-export type CachedSearch = { records: DpeRecord[]; total: number };
+export type CachedSearch = {
+  records: DpeRecord[];
+  total: number;
+  truncated: boolean;
+};
 
 const REDIS_KEY_PREFIX = 'app:ademe-search';
 const TTL_SECONDS = 6 * 60 * 60;

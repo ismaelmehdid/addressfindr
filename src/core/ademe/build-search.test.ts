@@ -57,3 +57,20 @@ describe('surfaceWindow', () => {
     expect(window.max).toBeCloseTo(206);
   });
 });
+
+describe('surfaceWindow — bornes', () => {
+  // why: /api/listings/match est une route ouverte, donc surfaceM2 arrive d'un
+  // corps de requete, pas du chemin d'extraction borne. Une surface de 1 m2
+  // produisait `surface_habitable_logement:[-1.00 TO 3.00]`, et l'ADEME rend
+  // un HTTP 400 sur le `-` : l'utilisateur voyait une panne du registre.
+  it('never produces a negative lower bound', () => {
+    expect(surfaceWindow(1).min).toBeGreaterThanOrEqual(0);
+    expect(surfaceWindow(0.5).min).toBeGreaterThanOrEqual(0);
+  });
+
+  it('still brackets the stated surface on a tiny one', () => {
+    const window = surfaceWindow(1);
+    expect(window.min).toBeLessThanOrEqual(1);
+    expect(window.max).toBeGreaterThanOrEqual(1);
+  });
+});

@@ -785,3 +785,79 @@ describe('scoreCandidate — surface de terrain', () => {
     expect(scored.diverged).not.toContain('landSurfaceM2');
   });
 });
+
+describe('scoreCandidate — echelle de la surface', () => {
+  // why: tous les tests de ce fichier comparaient 63 a 63, donc seul le
+  // premier palier etait exerce. Les deux autres etaient morts sous test, y
+  // compris l'invariant que le commentaire du code enonce : un ecart residuel
+  // rapporte moins, jamais moins que rien. Passer le repli de 1 a -3 laissait
+  // la suite verte, et l'interface se mettait alors a annoncer une divergence
+  // de surface sur la bonne ligne.
+  function confidenceAtSurface(recordSurface: number): number {
+    return scoreCandidate({
+      values: { ...LISTING, surfaceM2: 63 },
+      record: record({ dpeNumber: 'a', surfaceM2: recordSurface }),
+    }).confidence;
+  }
+
+  it('credits an exact surface most', () => {
+    expect(confidenceAtSurface(63)).toBe(1);
+  });
+
+  it('credits a near surface less, but still credits it', () => {
+    const near = scoreCandidate({
+      values: { ...LISTING, surfaceM2: 63 },
+      record: record({ dpeNumber: 'a', surfaceM2: 64 }),
+    });
+    expect(near.matched).toContain('surfaceM2');
+    expect(near.confidence).toBeLessThan(1);
+    expect(near.confidence).toBeGreaterThan(0.8);
+  });
+
+  it('still credits a surface at the far edge of the search window', () => {
+    const far = scoreCandidate({
+      values: { ...LISTING, surfaceM2: 63 },
+      record: record({ dpeNumber: 'a', surfaceM2: 61 }),
+    });
+    expect(far.matched).toContain('surfaceM2');
+    expect(far.diverged).not.toContain('surfaceM2');
+    expect(far.confidence).toBeGreaterThan(0.8);
+  });
+
+  it('orders the three surface tiers', () => {
+    expect(confidenceAtSurface(63)).toBeGreaterThan(confidenceAtSurface(64));
+    expect(confidenceAtSurface(64)).toBeGreaterThan(confidenceAtSurface(61));
+  });
+});
+
+describe('rankCandidates — le departage par geocodage est bien celui qui joue', () => {
+  // why: l'ancien test nommait la ligne bien geocodee 'a' et l'autre 'b', or
+  // le dernier cran du comparateur trie par numero de DPE — 'a' sortait
+  // premier meme sans le cran geocodage. Les noms sont donc inverses pour que
+  // seul le geocodage puisse produire l'ordre attendu.
+  it('prefers the better geocoded address when confidences are equal', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        record({
+          dpeNumber: 'aaa-mal-geocode',
+          address: '1 Rue Mal Geocodee 69003 Lyon',
+          banId: '69383_1000_00001',
+          geocodingScore: 0.55,
+        }),
+        record({
+          dpeNumber: 'zzz-bien-geocode',
+          address: '2 Rue Bien Geocodee 69003 Lyon',
+          banId: '69383_1000_00002',
+          geocodingScore: 0.95,
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates[0]?.confidence).toBe(
+      ranked.candidates[1]?.confidence,
+    );
+    expect(ranked.candidates[0]?.record.dpeNumber).toBe('zzz-bien-geocode');
+  });
+});

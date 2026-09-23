@@ -114,7 +114,7 @@ export async function findAddressCandidates(
       facts: buildingFacts,
       parcelAreas: parcels?.isOk() ? parcels.value : [],
     }),
-    truncated: found.value.total > search.filter.limit,
+    truncated: found.value.truncated,
   });
 
   log.info('ademe.match.success', {

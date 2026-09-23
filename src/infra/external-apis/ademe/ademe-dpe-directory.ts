@@ -244,7 +244,9 @@ async function searchRegister(
 
 async function search(
   filter: DpeSearchFilter,
-): Promise<Result<{ records: DpeRecord[]; total: number }, AppError>> {
+): Promise<
+  Result<{ records: DpeRecord[]; total: number; truncated: boolean }, AppError>
+> {
   // why: la valeur part dans une requete Lucene. Elle vient d'une commune
   // resolue, mais on ne la prend pas sur parole avant de l'interpoler.
   if (!isInseeCode(filter.inseeCode)) {
@@ -286,10 +288,12 @@ async function search(
   const seen = new Set<string>();
   const records: DpeRecord[] = [];
   let total = 0;
+  let truncated = false;
 
   for (const outcome of outcomes) {
     if (outcome.isErr()) continue;
     total += outcome.value.total;
+    if (outcome.value.total > filter.limit) truncated = true;
     for (const record of outcome.value.records) {
       if (seen.has(record.dpeNumber)) continue;
       seen.add(record.dpeNumber);
@@ -302,15 +306,16 @@ async function search(
   // reponse est partielle et la mettre en cache prolongerait la panne bien
   // au-dela d'elle.
   if (answered === REGISTERS.length) {
-    await writeCachedSearch(filter, { records, total }, now);
+    await writeCachedSearch(filter, { records, total, truncated }, now);
   }
 
   log.info('ademe.search.success', {
     total,
     returned: records.length,
+    truncated,
     registersAnswered: answered,
   });
-  return ok({ records, total });
+  return ok({ records, total, truncated });
 }
 
 export const ademeDpeDirectory: IDpeDirectory = { search };
