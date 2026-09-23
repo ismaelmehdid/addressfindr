@@ -125,7 +125,7 @@ jobs:
         run: echo "DATABASE_URL=${{ secrets.DEV_DATABASE_URL }}" >> $GITHUB_ENV
 
       - name: Set up environment variables for prod
-        if: github.ref_name == 'master'
+        if: github.ref_name == 'main'
         run: echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> $GITHUB_ENV
 
       - name: Verify database url
