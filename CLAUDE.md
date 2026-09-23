@@ -48,7 +48,8 @@ This is why, throughout the `listing` domain:
 
 ### Current state
 
-- **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring, via data.ademe.fr), and the dashboard UI that chains extract → match.
+- **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring over both DPE registers, via data.ademe.fr), and the dashboard UI that chains extract → match.
+- **Ground truth:** `pnpm eval:address` runs the pipeline over live pap.fr listings, hides their published street and reports at what rank it comes back. It hits Firecrawl, Groq and the public APIs for real, so it is excluded from `pnpm test` and from CI. Last run: 6/6 correctly refused for lack of a discriminating signal.
 - **Not started:** the `__NUXT__` mapping for the two lefigaro portals. Needs one real listing URL to inspect — Firecrawl only ever returns lefigaro's search page as nav chrome, so the payload paths cannot be mapped without one.
 - Spec: `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md`
 - Plan: `docs/superpowers/plans/2026-09-17-listing-ingestion-extraction.md`
@@ -64,7 +65,7 @@ Verified 2026-09-17 against one real listing per portal via the Firecrawl API. A
 | `proprietes.lefigaro.fr` | `__NUXT__` (paths not yet mapped) | yes, plus `inseeCode` |
 | `iadfrance.fr` | JSON-LD `Apartment` | partial; has `yearBuilt` |
 | `seloger.com` | JSON-LD `RealEstateListing` | no |
-| `pap.fr` | JSON-LD `Product` | no — but exposes **`streetAddress`** outright |
+| `pap.fr` | JSON-LD `Product` | no — but exposes **`streetAddress`**, street only, no house number |
 | `century21.fr`, `orpi.com`, `logic-immo.com`, `bellesdemeures.com` | none | — |
 
 - **No portal exposes the DPE in JSON-LD.** The most discriminating field is never in the standard markup. It comes from hydration payloads or from the page text.
@@ -88,6 +89,13 @@ Verified against the live `dpe03existant` dataset (15 604 436 rows) and geo.api.
 - **1266 of Lyon 3e's 35 311 apartment rows carry no street number** (559 of 3198 in Saint-Genis-Laval). They match every other criterion and rank at 100%, so they are excluded at the query.
 - **Some ADEME rows are stored double-encoded** — `58 Rue de l<mojibake>Abondance` beside a clean `70 Rue de l'Abondance` on the same street.
 - `size` on `/lines` accepts up to **10000**; 10001 returns 400.
+- **The new-dwelling register is a second dataset.** `DPE Logements neufs`, 1 429 026 rows. Its readable slug does not resolve — `dpe03neuf` returns 404; only `g3cgx7jb3cmys5voxz1mrm22` answers. Field schema is identical to the existing register, checked field by field. For Lyon 3e apartments it holds 42 rows in class A, 337 in B, 573 in C — the classes a new build advertises.
+- **`identifiant_ban` beats the address string as a grouping key.** Populated on 34 045/34 045 rows. On one 600-row sample: 365 identifiers against 372 distinct spellings, 6 identifiers carrying more than one spelling, and no address carrying more than one identifier. Format `69383_4180_00016`.
+- **Rows are not addresses.** 600 Lyon 3e rows carry only 372 distinct addresses; one address appears 15 times, and a Saint-Genis-Laval building carries 35.
+- **`type_energie_principale_chauffage` is fully populated** and splits a pool roughly three ways (gas 334, electricity 218, district heating 45 on one realistic filter). Its vocabulary has 15 values; `Non affecté` means unrecorded and `Réseau de Froid Urbain` is not heating.
+- **`score_ban` is mostly mid-range**: only 5 069 of 34 045 Lyon 3e rows reach 0.8, and 372 fall below 0.5.
+- **pap.fr's ground truth is street-level.** Measured on 6 real listings: `streetAddress` reads `Rue Tholozé 75018 Paris`, `Rue Brancion` — the street without the number. Useful as an eval reference, not as a full address.
+- **pap.fr shows no energy label at all**, so extraction there yields only commune, type and surface. Since surface is already a hard filter, every returned row agreed on the only comparable signal and scored 100%. This is why the matcher now refuses without a discriminating signal.
 
 ---
 
@@ -110,6 +118,7 @@ Verified against the live `dpe03existant` dataset (15 604 436 rows) and geo.api.
 - `pnpm format` / `pnpm format:check` — biome format only
 - `pnpm check:boundaries` — domain-isolation checker (`scripts/check-domain-boundaries.mjs`)
 - `pnpm validate` — `type-check && check && lint && check:boundaries && test`
+- `pnpm eval:address` — ground-truth harness against live pap.fr listings. **Costs Firecrawl and Groq credits, hits the public APIs, never runs in CI.**
 - `pnpm drizzle:generate` / `migrate` / `push` / `pull` / `drop` — Drizzle migrations
 
 **Done-gate before claiming work complete:** `pnpm validate`.
