@@ -114,6 +114,23 @@ function isComparable(signal: MatchSignal, record: DpeRecord): boolean {
   return signal !== 'floor' || (record.floor !== null && record.floor !== 0);
 }
 
+// why: score_ban dit a quel point l'ADEME est sure d'avoir rattache la ligne a
+// cette adresse. Une ligne peut coller parfaitement au logement et pointer la
+// mauvaise porte — c'est l'erreur la plus couteuse du produit. Mesure du
+// 2026-09-22 a Lyon 3e : 372 lignes sur 34045 sont sous 0.5, donc la
+// penalite ne mord que sur une minorite et ne descend jamais plus bas que la
+// moitie, faute de quoi une adresse vraie mais mal geocodee sortirait du
+// classement au lieu d'y figurer avec une reserve.
+const GEOCODING_DOUBT_BELOW = 0.5;
+const GEOCODING_WORST_FACTOR = 0.6;
+
+function geocodingFactor(score: number | null): number {
+  if (score === null || score >= GEOCODING_DOUBT_BELOW) return 1;
+  const clamped = Math.max(0, score);
+  const shortfall = (GEOCODING_DOUBT_BELOW - clamped) / GEOCODING_DOUBT_BELOW;
+  return 1 - shortfall * (1 - GEOCODING_WORST_FACTOR);
+}
+
 export function scoreCandidate(input: {
   values: ExtractedValues;
   record: DpeRecord;
@@ -140,8 +157,9 @@ export function scoreCandidate(input: {
     else diverged.push(signal);
   }
 
-  const confidence =
+  const agreement =
     available === 0 ? 0 : Math.min(1, Math.max(0, awarded / available));
+  const confidence = agreement * geocodingFactor(input.record.geocodingScore);
 
   return {
     record: input.record,

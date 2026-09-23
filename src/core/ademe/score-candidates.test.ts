@@ -398,3 +398,71 @@ describe('scoreCandidate — energie de chauffage', () => {
     expect(gas.confidence).toBeGreaterThan(electric.confidence);
   });
 });
+
+describe('scoreCandidate — qualite du geocodage', () => {
+  // why: score_ban dit a quel point l'ADEME est sure d'avoir rattache la ligne
+  // a cette adresse. Mesure du 2026-09-22 : 372 lignes sur 34045 sont sous 0.5
+  // a Lyon 3e. Une ligne mal geocodee peut correspondre parfaitement au
+  // logement et pointer la mauvaise adresse — c'est exactement l'erreur qui
+  // coute le plus cher.
+  it('caps confidence on a doubtfully geocoded row', () => {
+    const scored = scoreCandidate({
+      values: LISTING,
+      record: record({ dpeNumber: 'A', geocodingScore: 0.3 }),
+    });
+    expect(scored.confidence).toBeLessThan(1);
+    expect(scored.confidence).toBeGreaterThan(0);
+  });
+
+  it('leaves a well geocoded row untouched', () => {
+    const scored = scoreCandidate({
+      values: LISTING,
+      record: record({ dpeNumber: 'A', geocodingScore: 0.9 }),
+    });
+    expect(scored.confidence).toBe(1);
+  });
+
+  it('leaves a mid-range geocoding untouched', () => {
+    const scored = scoreCandidate({
+      values: LISTING,
+      record: record({ dpeNumber: 'A', geocodingScore: 0.62 }),
+    });
+    expect(scored.confidence).toBe(1);
+  });
+
+  it('does not penalise a row that reports no geocoding score', () => {
+    const scored = scoreCandidate({
+      values: LISTING,
+      record: record({ dpeNumber: 'A', geocodingScore: null }),
+    });
+    expect(scored.confidence).toBe(1);
+  });
+
+  it('ranks a well geocoded row above an identically scored doubtful one', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        record({
+          dpeNumber: 'doubtful',
+          address: '1 Rue Douteuse 69003 Lyon',
+          geocodingScore: 0.2,
+        }),
+        record({
+          dpeNumber: 'sure',
+          address: '2 Rue Sure 69003 Lyon',
+          geocodingScore: 0.9,
+        }),
+      ],
+      truncated: false,
+    });
+    expect(ranked.candidates[0]?.record.address).toBe('2 Rue Sure 69003 Lyon');
+  });
+
+  it('never drives a fully agreeing row to zero on geocoding alone', () => {
+    const scored = scoreCandidate({
+      values: LISTING,
+      record: record({ dpeNumber: 'A', geocodingScore: 0 }),
+    });
+    expect(scored.confidence).toBeGreaterThan(0.5);
+  });
+});
