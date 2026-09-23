@@ -124,6 +124,7 @@
     "signalDpeValue": "valeur DPE",
     "signalGesValue": "valeur GES",
     "signalYearBuilt": "annee de construction",
-    "signalFloor": "etage"
+    "signalFloor": "etage",
+    "signalHeating": "chauffage"
   }
 }

@@ -56,6 +56,7 @@ const SIGNAL_KEY = {
   gesClass: 'signalGesClass',
   dpeKwhM2Year: 'signalDpeValue',
   gesKgCo2M2Year: 'signalGesValue',
+  heatingEnergy: 'signalHeating',
   yearBuilt: 'signalYearBuilt',
   floor: 'signalFloor',
 } as const satisfies Record<MatchSignal, string>;

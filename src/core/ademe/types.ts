@@ -1,4 +1,8 @@
-import type { EnergyClass, PropertyType } from '@/core/listing/types';
+import type {
+  EnergyClass,
+  HeatingEnergy,
+  PropertyType,
+} from '@/core/listing/types';
 
 export const DPE_REGISTERS = ['existing', 'new'] as const;
 export type DpeRegister = (typeof DPE_REGISTERS)[number];
@@ -19,6 +23,7 @@ export type DpeRecord = {
   gesClass: EnergyClass | null;
   dpeKwhM2Year: number | null;
   gesKgCo2M2Year: number | null;
+  heatingEnergy: HeatingEnergy | null;
   yearBuilt: number | null;
   floor: number | null;
   buildingComplement: string | null;
@@ -41,6 +46,7 @@ export type MatchSignal =
   | 'gesClass'
   | 'dpeKwhM2Year'
   | 'gesKgCo2M2Year'
+  | 'heatingEnergy'
   | 'yearBuilt'
   | 'floor';
 

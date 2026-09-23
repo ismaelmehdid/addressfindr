@@ -19,6 +19,7 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     gesClass: 'D',
     dpeKwhM2Year: 200,
     gesKgCo2M2Year: 40,
+    heatingEnergy: null,
     yearBuilt: 1989,
     floor: 0,
     buildingComplement: null,
@@ -343,5 +344,57 @@ describe('rankCandidates — regroupement par adresse', () => {
     });
     expect(ranked.candidates).toHaveLength(10);
     expect(ranked.inspected).toBe(25);
+  });
+});
+
+describe('scoreCandidate — energie de chauffage', () => {
+  it('credits a heating energy both sides agree on', () => {
+    const scored = scoreCandidate({
+      values: { ...LISTING, heatingEnergy: 'gas' },
+      record: record({ dpeNumber: 'A', heatingEnergy: 'gas' }),
+    });
+    expect(scored.matched).toContain('heatingEnergy');
+    expect(scored.confidence).toBe(1);
+  });
+
+  it('penalises a heating energy the two sides disagree on', () => {
+    const scored = scoreCandidate({
+      values: { ...LISTING, heatingEnergy: 'gas' },
+      record: record({ dpeNumber: 'A', heatingEnergy: 'electricity' }),
+    });
+    expect(scored.diverged).toContain('heatingEnergy');
+    expect(scored.confidence).toBeLessThan(1);
+  });
+
+  it('ignores the signal when the listing never stated one', () => {
+    const scored = scoreCandidate({
+      values: { ...LISTING, heatingEnergy: null },
+      record: record({ dpeNumber: 'A', heatingEnergy: 'gas' }),
+    });
+    expect(scored.matched).not.toContain('heatingEnergy');
+    expect(scored.diverged).not.toContain('heatingEnergy');
+    expect(scored.confidence).toBe(1);
+  });
+
+  it('ignores the signal when the ADEME row never stated one', () => {
+    const scored = scoreCandidate({
+      values: { ...LISTING, heatingEnergy: 'gas' },
+      record: record({ dpeNumber: 'A', heatingEnergy: null }),
+    });
+    expect(scored.matched).not.toContain('heatingEnergy');
+    expect(scored.diverged).not.toContain('heatingEnergy');
+  });
+
+  it('separates a gas row from an electric row on that signal alone', () => {
+    const values = { ...LISTING, heatingEnergy: 'gas' as const };
+    const gas = scoreCandidate({
+      values,
+      record: record({ dpeNumber: 'gas', heatingEnergy: 'gas' }),
+    });
+    const electric = scoreCandidate({
+      values,
+      record: record({ dpeNumber: 'elec', heatingEnergy: 'electricity' }),
+    });
+    expect(gas.confidence).toBeGreaterThan(electric.confidence);
   });
 });

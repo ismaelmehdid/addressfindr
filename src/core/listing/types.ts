@@ -24,6 +24,17 @@ export type PortalId = (typeof PORTAL_IDS)[number];
 export const TRANSACTION_TYPES = ['sale', 'rent'] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
+export const HEATING_ENERGIES = [
+  'gas',
+  'electricity',
+  'district-heating',
+  'fuel-oil',
+  'wood',
+  'lpg',
+  'coal',
+] as const;
+export type HeatingEnergy = (typeof HEATING_ENERGIES)[number];
+
 export const PROPERTY_TYPES = ['apartment', 'house'] as const;
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
@@ -41,6 +52,7 @@ export type ExtractedValues = {
   gesClass: EnergyClass | null;
   dpeKwhM2Year: number | null;
   gesKgCo2M2Year: number | null;
+  heatingEnergy: HeatingEnergy | null;
   city: string | null;
   postalCode: string | null;
   inseeCode: string | null;
@@ -63,6 +75,7 @@ export const EXTRACTED_FIELD_NAMES = [
   'gesClass',
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
+  'heatingEnergy',
   'city',
   'postalCode',
   'inseeCode',
@@ -115,6 +128,7 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   gesClass: null,
   dpeKwhM2Year: null,
   gesKgCo2M2Year: null,
+  heatingEnergy: null,
   city: null,
   postalCode: null,
   inseeCode: null,

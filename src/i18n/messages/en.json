@@ -124,6 +124,7 @@
     "signalDpeValue": "DPE value",
     "signalGesValue": "GES value",
     "signalYearBuilt": "year built",
-    "signalFloor": "floor"
+    "signalFloor": "floor",
+    "signalHeating": "heating"
   }
 }

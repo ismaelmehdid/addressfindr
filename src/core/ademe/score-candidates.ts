@@ -27,7 +27,15 @@ function gradeSignal(
   listed: number | string,
   found: number | string,
 ): SignalVerdict | null {
-  if (signal === 'dpeClass' || signal === 'gesClass') {
+  // why: mesure du 2026-09-22, type_energie_principale_chauffage est renseigne
+  // sur 34045 lignes sur 34045 et decoupe un lot en trois (gaz 334,
+  // electricite 218, urbain 45). Comme pour une lettre, un desaccord est net :
+  // ce n'est pas une valeur qui glisse d'un cran.
+  if (
+    signal === 'dpeClass' ||
+    signal === 'gesClass' ||
+    signal === 'heatingEnergy'
+  ) {
     return listed === found
       ? { award: 2, weight: 2 }
       : { award: -2, weight: 2 };
@@ -94,6 +102,7 @@ const SIGNALS: readonly MatchSignal[] = [
   'gesClass',
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
+  'heatingEnergy',
   'yearBuilt',
   'floor',
 ];

@@ -50,6 +50,7 @@ const ROW = {
   etiquette_ges: 'D',
   conso_5_usages_par_m2_ep: 200,
   emission_ges_5_usages_par_m2: 40,
+  type_energie_principale_chauffage: 'Gaz naturel',
   annee_construction: 1989,
   numero_etage_appartement: 0,
   complement_adresse_batiment: null,
@@ -69,9 +70,9 @@ describe('ademeDpeDirectory.search', () => {
     const qs = calledUrl(spy).searchParams.get('qs') ?? '';
     expect(qs).toContain('code_insee_ban:"69383"');
     expect(qs).toContain('_exists_:numero_voie_ban');
-    expect(calledUrl(spy).searchParams.get('select')).toContain(
-      'identifiant_ban',
-    );
+    const select = calledUrl(spy).searchParams.get('select') ?? '';
+    expect(select).toContain('identifiant_ban');
+    expect(select).toContain('type_energie_principale_chauffage');
     expect(qs).toContain('type_batiment:"appartement"');
     expect(qs).toContain('surface_habitable_logement:[61.00 TO 65.00]');
     expect(qs).toContain('etiquette_dpe:"D"');
@@ -125,6 +126,7 @@ describe('ademeDpeDirectory.search', () => {
       gesClass: 'D',
       dpeKwhM2Year: 200,
       gesKgCo2M2Year: 40,
+      heatingEnergy: 'gas',
       yearBuilt: 1989,
       floor: 0,
       buildingComplement: null,
@@ -153,6 +155,17 @@ describe('ademeDpeDirectory.search', () => {
     expect(result.isOk()).toBe(true);
     if (!result.isOk()) return;
     expect(result.value.records).toHaveLength(1);
+  });
+
+  it('leaves an unrecorded heating energy null rather than guessing', async () => {
+    mockFetchOnce({
+      total: 1,
+      results: [{ ...ROW, type_energie_principale_chauffage: 'Non affecté' }],
+    });
+    const result = await ademeDpeDirectory.search(filter());
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.records[0]?.heatingEnergy).toBeNull();
   });
 
   it('leaves an unmappable building type null rather than guessing', async () => {

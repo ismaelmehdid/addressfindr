@@ -1,6 +1,7 @@
 import * as v from 'valibot';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { type AddressMatch, DPE_REGISTERS } from '@/core/ademe/types';
+import { HEATING_ENERGIES } from '@/core/listing/types';
 
 export const FindAddressCandidatesInputSchema = v.object({
   listing: ExtractedListingSchema,
@@ -16,6 +17,7 @@ const MatchSignalSchema = v.picklist([
   'gesClass',
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
+  'heatingEnergy',
   'yearBuilt',
   'floor',
 ]);
@@ -36,6 +38,7 @@ const DpeRecordSchema = v.object({
   gesClass: v.nullable(v.picklist(['A', 'B', 'C', 'D', 'E', 'F', 'G'])),
   dpeKwhM2Year: v.nullable(v.number()),
   gesKgCo2M2Year: v.nullable(v.number()),
+  heatingEnergy: v.nullable(v.picklist(HEATING_ENERGIES)),
   yearBuilt: v.nullable(v.number()),
   floor: v.nullable(v.number()),
   buildingComplement: v.nullable(v.string()),

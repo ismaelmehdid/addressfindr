@@ -1,6 +1,7 @@
 import {
   ENERGY_CLASSES,
   type EnergyClass,
+  type HeatingEnergy,
   type PropertyType,
   type TransactionType,
 } from './types';
@@ -73,6 +74,39 @@ export function parseDpeEnergyValue(raw: string): number | null {
 export function parseGesEmissionValue(raw: string): number | null {
   const match = GES_EMISSION_PATTERN.exec(joinDigitGroups(raw));
   return match?.[1] ? parseFrenchNumber(match[1]) : null;
+}
+
+// why: le libelle doit nommer le chauffage, pas l'eau chaude seule, sinon une
+// annonce "eau chaude sanitaire au gaz" ferait croire a un chauffage au gaz.
+const HEATING_SUBJECT =
+  /chauff|chaudi[èe]re|po[êe]le|radiateur|convecteur|r[ée]seau de chaleur/i;
+
+const HEATING_ENERGY_WORDS: readonly [RegExp, HeatingEnergy][] = [
+  [/\bgaz\b|\bgpl\b(?= ?naturel)/i, 'gas'],
+  [/[ée]lectri/i, 'electricity'],
+  [/urbain|r[ée]seau de chaleur/i, 'district-heating'],
+  [/fioul|mazout/i, 'fuel-oil'],
+  [/\bbois\b|granul[ée]s?|pellets?|b[ûu]ches?|plaquettes?/i, 'wood'],
+  [/propane|butane|\bgpl\b/i, 'lpg'],
+  [/charbon/i, 'coal'],
+];
+
+// why: une pompe a chaleur ne dit pas son energie dans l'ADEME de facon
+// fiable. Deviner "electricite" ecarterait la bonne ligne quand le registre la
+// range autrement.
+const HEATING_AMBIGUOUS = /pompe [àa] chaleur|\bpac\b|g[ée]othermi/i;
+
+export function parseHeatingEnergy(raw: string): HeatingEnergy | null {
+  if (!HEATING_SUBJECT.test(raw)) return null;
+  if (HEATING_AMBIGUOUS.test(raw)) return null;
+
+  const found = new Set<HeatingEnergy>();
+  for (const [pattern, energy] of HEATING_ENERGY_WORDS) {
+    if (pattern.test(raw)) found.add(energy);
+  }
+  if (found.size !== 1) return null;
+  const [only] = [...found];
+  return only ?? null;
 }
 
 export function parseCount(raw: string): number | null {

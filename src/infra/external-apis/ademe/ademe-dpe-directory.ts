@@ -18,6 +18,7 @@ import {
 } from '@/core/listing/types';
 import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
+import { toHeatingEnergy } from './heating-energy';
 
 const PROVIDER = 'ademe';
 
@@ -45,6 +46,7 @@ const SELECTED_FIELDS = [
   'etiquette_ges',
   'conso_5_usages_par_m2_ep',
   'emission_ges_5_usages_par_m2',
+  'type_energie_principale_chauffage',
   'annee_construction',
   'numero_etage_appartement',
   'complement_adresse_batiment',
@@ -77,6 +79,7 @@ const RowSchema = v.object({
   etiquette_ges: v.optional(v.nullable(v.string())),
   conso_5_usages_par_m2_ep: v.optional(v.nullable(v.number())),
   emission_ges_5_usages_par_m2: v.optional(v.nullable(v.number())),
+  type_energie_principale_chauffage: v.optional(v.nullable(v.string())),
   annee_construction: v.optional(v.nullable(v.number())),
   numero_etage_appartement: v.optional(v.nullable(v.number())),
   complement_adresse_batiment: v.optional(v.nullable(v.string())),
@@ -141,6 +144,7 @@ function toRecord(row: Row, dataset: DpeRegister): DpeRecord | null {
     gesClass: toEnergyClass(row.etiquette_ges),
     dpeKwhM2Year: numeric(row.conso_5_usages_par_m2_ep),
     gesKgCo2M2Year: numeric(row.emission_ges_5_usages_par_m2),
+    heatingEnergy: toHeatingEnergy(row.type_energie_principale_chauffage),
     yearBuilt: numeric(row.annee_construction),
     floor: numeric(row.numero_etage_appartement),
     buildingComplement: text(row.complement_adresse_batiment),
