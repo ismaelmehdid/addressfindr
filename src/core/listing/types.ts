@@ -24,6 +24,17 @@ export type PortalId = (typeof PORTAL_IDS)[number];
 export const TRANSACTION_TYPES = ['sale', 'rent'] as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[number];
 
+export const HEATING_ENERGIES = [
+  'gas',
+  'electricity',
+  'district-heating',
+  'fuel-oil',
+  'wood',
+  'lpg',
+  'coal',
+] as const;
+export type HeatingEnergy = (typeof HEATING_ENERGIES)[number];
+
 export const PROPERTY_TYPES = ['apartment', 'house'] as const;
 export type PropertyType = (typeof PROPERTY_TYPES)[number];
 
@@ -32,6 +43,7 @@ export type ExtractedValues = {
   transactionType: TransactionType | null;
   propertyType: PropertyType | null;
   surfaceM2: number | null;
+  landSurfaceM2: number | null;
   rooms: number | null;
   bedrooms: number | null;
   floor: number | null;
@@ -39,6 +51,9 @@ export type ExtractedValues = {
   yearBuilt: number | null;
   dpeClass: EnergyClass | null;
   gesClass: EnergyClass | null;
+  dpeKwhM2Year: number | null;
+  gesKgCo2M2Year: number | null;
+  heatingEnergy: HeatingEnergy | null;
   city: string | null;
   postalCode: string | null;
   inseeCode: string | null;
@@ -52,6 +67,7 @@ export const EXTRACTED_FIELD_NAMES = [
   'transactionType',
   'propertyType',
   'surfaceM2',
+  'landSurfaceM2',
   'rooms',
   'bedrooms',
   'floor',
@@ -59,6 +75,9 @@ export const EXTRACTED_FIELD_NAMES = [
   'yearBuilt',
   'dpeClass',
   'gesClass',
+  'dpeKwhM2Year',
+  'gesKgCo2M2Year',
+  'heatingEnergy',
   'city',
   'postalCode',
   'inseeCode',
@@ -102,6 +121,7 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   transactionType: null,
   propertyType: null,
   surfaceM2: null,
+  landSurfaceM2: null,
   rooms: null,
   bedrooms: null,
   floor: null,
@@ -109,6 +129,9 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   yearBuilt: null,
   dpeClass: null,
   gesClass: null,
+  dpeKwhM2Year: null,
+  gesKgCo2M2Year: null,
+  heatingEnergy: null,
   city: null,
   postalCode: null,
   inseeCode: null,

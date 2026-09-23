@@ -35,6 +35,8 @@ const FIELD_HINTS: Record<ExtractedFieldName, string> = {
   transactionType: 'vente ou location',
   propertyType: 'appartement ou maison',
   surfaceM2: 'surface habitable ou Carrez, pas le terrain ni une pièce',
+  landSurfaceM2:
+    'surface du terrain ou de la parcelle, jamais la surface habitable ni un jardin',
   rooms: 'nombre de pièces',
   bedrooms: 'nombre de chambres',
   floor: 'étage du logement',
@@ -42,6 +44,12 @@ const FIELD_HINTS: Record<ExtractedFieldName, string> = {
   yearBuilt: 'année de construction',
   dpeClass: 'lettre du DPE, A à G',
   gesClass: 'lettre du GES, A à G',
+  dpeKwhM2Year:
+    "consommation de l'etiquette DPE en kWh/m2/an, jamais un total annuel",
+  gesKgCo2M2Year:
+    "emissions de l'etiquette GES en kg CO2/m2/an, jamais un total annuel",
+  heatingEnergy:
+    "energie du chauffage : gaz, electrique, urbain, fioul, bois, propane ou charbon. Jamais l'eau chaude seule.",
   city: 'commune',
   postalCode: 'code postal',
   inseeCode: 'code INSEE de la commune',

@@ -1,17 +1,23 @@
 import {
   ENERGY_CLASSES,
   type EnergyClass,
+  type HeatingEnergy,
   type PropertyType,
   type TransactionType,
 } from './types';
 
 const SPACE_VARIANTS = /[     ]/g;
 
-export function parseFrenchNumber(raw: string): number | null {
+function joinDigitGroups(raw: string): string {
   let s = raw.replace(SPACE_VARIANTS, ' ');
   while (/\d \d{3}(?!\d)/.test(s)) {
     s = s.replace(/(\d) (\d{3})(?!\d)/, '$1$2');
   }
+  return s;
+}
+
+export function parseFrenchNumber(raw: string): number | null {
+  const s = joinDigitGroups(raw);
   const match = /-?\d+(?:[.,]\d+)?/.exec(s);
   if (!match) return null;
   const value = Number.parseFloat(match[0].replace(',', '.'));
@@ -27,6 +33,40 @@ export function parseSurfaceM2(raw: string): number | null {
   const match = SURFACE_PATTERN.exec(raw.replace(SPACE_VARIANTS, ' '));
   if (!match || !match[1]) return null;
   return parseFrenchNumber(match[1]);
+}
+
+// why: une annonce de maison chiffre son terrain, et l'ADEME n'a pas cette
+// donnee — le cadastre si. Mais surface habitable et surface de terrain se
+// ressemblent dans un texte : confondre les deux ferait comparer un salon a
+// une parcelle. Le libelle doit donc nommer la parcelle, et ne nommer ni
+// l'habitable, ni un jardin, ni une terrasse, qui ne sont pas le terrain.
+const LAND_SUBJECT = /terrain|parcelle/i;
+const LAND_EXCLUSIONS =
+  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine/i;
+const LAND_M2_PATTERN = /(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:m²|m2|M²|M2)/;
+const LAND_ARE_PATTERN = /(\d{1,5}(?:[.,]\d{1,2})?)\s*ares?\b/i;
+const LAND_HECTARE_PATTERN = /(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:hectares?|ha)\b/i;
+
+const SQUARE_METRES_PER_ARE = 100;
+const SQUARE_METRES_PER_HECTARE = 10_000;
+
+export function parseLandSurfaceM2(raw: string): number | null {
+  if (!LAND_SUBJECT.test(raw)) return null;
+  if (LAND_EXCLUSIONS.test(raw)) return null;
+
+  const text = joinDigitGroups(raw);
+  for (const [pattern, factor] of [
+    [LAND_HECTARE_PATTERN, SQUARE_METRES_PER_HECTARE],
+    [LAND_ARE_PATTERN, SQUARE_METRES_PER_ARE],
+    [LAND_M2_PATTERN, 1],
+  ] as const) {
+    const match = pattern.exec(text);
+    if (!match?.[1]) continue;
+    const value = parseFrenchNumber(match[1]);
+    if (value === null) continue;
+    return Math.round(value * factor);
+  }
+  return null;
 }
 
 const DPE_CONTEXT = /\bdpe\b|consommation|[ée]nerg/i;
@@ -50,6 +90,57 @@ export function parseEnergyClass(
   return (ENERGY_CLASSES as readonly string[]).includes(letter)
     ? (letter as EnergyClass)
     : null;
+}
+
+// why: exiger le marqueur par-surface. Une annonce peut citer la consommation
+// annuelle totale ("1822 kWh"), qui n'est pas la valeur portee par l'etiquette
+// DPE et ne correspond a aucune colonne ADEME.
+const DPE_ENERGY_PATTERN =
+  /(\d{1,4}(?:[.,]\d{1,2})?)\s*k\s?wh[^\d]{0,12}?m\s?[2\u00B2]/i;
+const GES_EMISSION_PATTERN =
+  /(\d{1,4}(?:[.,]\d{1,2})?)\s*kg[^\d]{0,16}?co\s?[2\u2082][^\d]{0,12}?m\s?[2\u00B2]/i;
+
+export function parseDpeEnergyValue(raw: string): number | null {
+  const match = DPE_ENERGY_PATTERN.exec(joinDigitGroups(raw));
+  return match?.[1] ? parseFrenchNumber(match[1]) : null;
+}
+
+export function parseGesEmissionValue(raw: string): number | null {
+  const match = GES_EMISSION_PATTERN.exec(joinDigitGroups(raw));
+  return match?.[1] ? parseFrenchNumber(match[1]) : null;
+}
+
+// why: le libelle doit nommer le chauffage, pas l'eau chaude seule, sinon une
+// annonce "eau chaude sanitaire au gaz" ferait croire a un chauffage au gaz.
+const HEATING_SUBJECT =
+  /chauff|chaudi[èe]re|po[êe]le|radiateur|convecteur|r[ée]seau de chaleur/i;
+
+const HEATING_ENERGY_WORDS: readonly [RegExp, HeatingEnergy][] = [
+  [/\bgaz\b|\bgpl\b(?= ?naturel)/i, 'gas'],
+  [/[ée]lectri/i, 'electricity'],
+  [/urbain|r[ée]seau de chaleur/i, 'district-heating'],
+  [/fioul|mazout/i, 'fuel-oil'],
+  [/\bbois\b|granul[ée]s?|pellets?|b[ûu]ches?|plaquettes?/i, 'wood'],
+  [/propane|butane|\bgpl\b/i, 'lpg'],
+  [/charbon/i, 'coal'],
+];
+
+// why: une pompe a chaleur ne dit pas son energie dans l'ADEME de facon
+// fiable. Deviner "electricite" ecarterait la bonne ligne quand le registre la
+// range autrement.
+const HEATING_AMBIGUOUS = /pompe [àa] chaleur|\bpac\b|g[ée]othermi/i;
+
+export function parseHeatingEnergy(raw: string): HeatingEnergy | null {
+  if (!HEATING_SUBJECT.test(raw)) return null;
+  if (HEATING_AMBIGUOUS.test(raw)) return null;
+
+  const found = new Set<HeatingEnergy>();
+  for (const [pattern, energy] of HEATING_ENERGY_WORDS) {
+    if (pattern.test(raw)) found.add(energy);
+  }
+  if (found.size !== 1) return null;
+  const [only] = [...found];
+  return only ?? null;
 }
 
 export function parseCount(raw: string): number | null {

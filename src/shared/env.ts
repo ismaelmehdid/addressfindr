@@ -90,6 +90,47 @@ const EnvSchema = v.object({
 
   BRAVE_SEARCH_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
 
+  GEO_GOUV_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://geo.api.gouv.fr',
+  ),
+  GEO_GOUV_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '8000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
+  ADEME_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://data.ademe.fr',
+  ),
+  ADEME_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '15000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
+  BDNB_BASE_URL: v.optional(v.pipe(v.string(), v.url()), 'https://api.bdnb.io'),
+  BDNB_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '10000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
+  CADASTRE_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://apicarto.ign.fr',
+  ),
+  CADASTRE_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '10000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
   SUPABASE_URL: v.pipe(v.string(), v.url()),
   SUPABASE_SECRET_KEY: v.pipe(
     v.string(),

@@ -1,8 +1,13 @@
 import * as v from 'valibot';
 import {
+  LAND_SURFACE_BOUNDS,
+  SURFACE_BOUNDS,
+} from '@/core/listing/field-bounds';
+import {
   ENERGY_CLASSES,
   type ExtractedListing,
   FIELD_SOURCES,
+  HEATING_ENERGIES,
   PORTAL_IDS,
   PROPERTY_TYPES,
   TRANSACTION_TYPES,
@@ -22,7 +27,20 @@ const ListingFieldsSchema = v.object({
   listingId: v.nullable(v.string()),
   transactionType: v.nullable(v.picklist(TRANSACTION_TYPES)),
   propertyType: v.nullable(v.picklist(PROPERTY_TYPES)),
-  surfaceM2: v.nullable(v.number()),
+  surfaceM2: v.nullable(
+    v.pipe(
+      v.number(),
+      v.minValue(SURFACE_BOUNDS.min),
+      v.maxValue(SURFACE_BOUNDS.max),
+    ),
+  ),
+  landSurfaceM2: v.nullable(
+    v.pipe(
+      v.number(),
+      v.minValue(LAND_SURFACE_BOUNDS.min),
+      v.maxValue(LAND_SURFACE_BOUNDS.max),
+    ),
+  ),
   rooms: v.nullable(v.number()),
   bedrooms: v.nullable(v.number()),
   floor: v.nullable(v.number()),
@@ -30,6 +48,9 @@ const ListingFieldsSchema = v.object({
   yearBuilt: v.nullable(v.number()),
   dpeClass: v.nullable(v.picklist(ENERGY_CLASSES)),
   gesClass: v.nullable(v.picklist(ENERGY_CLASSES)),
+  dpeKwhM2Year: v.nullable(v.number()),
+  gesKgCo2M2Year: v.nullable(v.number()),
+  heatingEnergy: v.nullable(v.picklist(HEATING_ENERGIES)),
   city: v.nullable(v.string()),
   postalCode: v.nullable(v.string()),
   inseeCode: v.nullable(v.string()),
@@ -45,6 +66,7 @@ const ListingSourcesSchema = v.object({
   transactionType: FieldSourceSchema,
   propertyType: FieldSourceSchema,
   surfaceM2: FieldSourceSchema,
+  landSurfaceM2: FieldSourceSchema,
   rooms: FieldSourceSchema,
   bedrooms: FieldSourceSchema,
   floor: FieldSourceSchema,
@@ -52,6 +74,9 @@ const ListingSourcesSchema = v.object({
   yearBuilt: FieldSourceSchema,
   dpeClass: FieldSourceSchema,
   gesClass: FieldSourceSchema,
+  dpeKwhM2Year: FieldSourceSchema,
+  gesKgCo2M2Year: FieldSourceSchema,
+  heatingEnergy: FieldSourceSchema,
   city: FieldSourceSchema,
   postalCode: FieldSourceSchema,
   inseeCode: FieldSourceSchema,

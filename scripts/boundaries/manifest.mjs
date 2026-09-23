@@ -121,6 +121,49 @@ export const DOMAINS = [
     ],
   },
   {
+    name: 'ademe',
+    dirs: [
+      'src/core/ademe',
+      'src/application/ademe',
+      'src/infra/external-apis/ademe',
+      'src/infra/external-apis/cadastre',
+      'src/app/api/listings/match',
+    ],
+    schemas: [],
+    public: [
+      'src/application/ademe/find-address-candidates',
+      'src/application/ademe/dto',
+      'src/core/ademe/types',
+    ],
+  },
+  {
+    name: 'building',
+    dirs: [
+      'src/core/building',
+      'src/application/building',
+      'src/infra/external-apis/bdnb',
+    ],
+    schemas: [],
+    public: [
+      'src/application/building/get-building-facts',
+      'src/core/building/types',
+    ],
+  },
+  {
+    name: 'commune',
+    dirs: [
+      'src/core/commune',
+      'src/application/commune',
+      'src/infra/external-apis/geo-gouv',
+    ],
+    schemas: [],
+    public: [
+      'src/application/commune/resolve-commune',
+      'src/application/commune/dto',
+      'src/core/commune/types',
+    ],
+  },
+  {
     name: 'web-search',
     dirs: [
       'src/core/web-search',
@@ -181,6 +224,17 @@ export const DOMAINS = [
 export const ALLOWED_EDGES = [
   ['indexing', 'files'],
   ['files', 'indexing'],
+  // ademe lit les champs extraits d'une annonce et a besoin du code INSEE
+  // de sa commune pour interroger la base DPE.
+  ['ademe', 'listing'],
+  ['ademe', 'commune'],
+  // ademe complete ses lignes avec le batiment quand l'ADEME est muette.
+  ['ademe', 'building'],
+  // le retour : le formulaire d'annonce enchaine l'extraction sur la recherche
+  // d'adresse et affiche ses candidats. Couplage bidirectionnel assume, sur le
+  // modele de files <-> indexing : aucun cycle d'import au niveau des modules,
+  // ademe ne depend que de core/listing, listing que de l'API publique d'ademe.
+  ['listing', 'ademe'],
 ];
 
 export const SHARED_PREFIXES = [

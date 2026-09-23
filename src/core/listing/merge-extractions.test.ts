@@ -4,6 +4,7 @@ import {
   missingRequiredFields,
   unfilledFields,
 } from './merge-extractions';
+import { EXTRACTED_FIELD_NAMES } from './types';
 
 describe('mergeExtractions', () => {
   it('prefers hydration over json-ld for the same field', () => {
@@ -50,7 +51,9 @@ describe('mergeExtractions', () => {
 
   it('fills sources for every known field', () => {
     const merged = mergeExtractions([]);
-    expect(Object.keys(merged.sources)).toHaveLength(17);
+    expect(Object.keys(merged.sources).sort()).toEqual(
+      [...EXTRACTED_FIELD_NAMES].sort(),
+    );
   });
 });
 
