@@ -11,6 +11,7 @@ vi.mock('@/shared/env', () => ({
 
 import type { DpeSearchFilter } from '@/core/ademe/types';
 import { ademeDpeDirectory } from './ademe-dpe-directory';
+import { clearLocalSearchCache } from './search-cache';
 
 function filter(over: Partial<DpeSearchFilter> = {}): DpeSearchFilter {
   return {
@@ -60,6 +61,7 @@ const ROW = {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  clearLocalSearchCache();
 });
 
 describe('ademeDpeDirectory.search', () => {
@@ -313,5 +315,74 @@ describe('ademeDpeDirectory.search — logements neufs', () => {
     const result = await ademeDpeDirectory.search(filter());
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+});
+
+describe('ademeDpeDirectory.search — cache', () => {
+  it('serves a second identical search without calling the registers again', async () => {
+    const spy = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal('fetch', spy);
+
+    const first = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69001' }),
+    );
+    const callsAfterFirst = spy.mock.calls.length;
+    const second = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69001' }),
+    );
+
+    expect(callsAfterFirst).toBe(2);
+    expect(spy.mock.calls.length).toBe(2);
+    expect(first.isOk() && second.isOk()).toBe(true);
+    if (!first.isOk() || !second.isOk()) return;
+    expect(second.value.records).toEqual(first.value.records);
+  });
+
+  it('does not serve a different search from that entry', async () => {
+    const spy = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+          status: 200,
+        }),
+    );
+    vi.stubGlobal('fetch', spy);
+
+    await ademeDpeDirectory.search(filter({ inseeCode: '69002' }));
+    await ademeDpeDirectory.search(filter({ inseeCode: '69005' }));
+
+    expect(spy.mock.calls.length).toBe(4);
+  });
+
+  // why: une recherche ratee ne doit pas se figer en cache, sinon une panne
+  // passagere de l'ADEME condamnerait la commune pour toute la duree de vie.
+  it('never caches a failed search', async () => {
+    let status = 500;
+    const spy = vi.fn(async () => new Response('{}', { status }));
+    vi.stubGlobal('fetch', spy);
+
+    const failed = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69007' }),
+    );
+    expect(failed.isErr()).toBe(true);
+
+    status = 200;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+            status: 200,
+          }),
+      ),
+    );
+    const retried = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69007' }),
+    );
+    expect(retried.isOk()).toBe(true);
   });
 });

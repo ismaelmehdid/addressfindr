@@ -19,6 +19,7 @@ import {
 import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
 import { toHeatingEnergy } from './heating-energy';
+import { readCachedSearch, writeCachedSearch } from './search-cache';
 
 const PROVIDER = 'ademe';
 
@@ -250,6 +251,16 @@ async function search(
     limit: filter.limit,
   });
 
+  const now = Date.now();
+  const cached = await readCachedSearch(filter, now);
+  if (cached !== null) {
+    log.info('ademe.search.cache_hit', {
+      inseeCode: filter.inseeCode,
+      returned: cached.records.length,
+    });
+    return ok(cached);
+  }
+
   const outcomes = await Promise.all(
     REGISTERS.map((register) => searchRegister(register, filter)),
   );
@@ -280,10 +291,18 @@ async function search(
     }
   }
 
+  const answered = outcomes.filter((o) => o.isOk()).length;
+  // why: on ne fige que les recherches completes. Si un registre est tombe, la
+  // reponse est partielle et la mettre en cache prolongerait la panne bien
+  // au-dela d'elle.
+  if (answered === REGISTERS.length) {
+    await writeCachedSearch(filter, { records, total }, now);
+  }
+
   log.info('ademe.search.success', {
     total,
     returned: records.length,
-    registersAnswered: outcomes.filter((o) => o.isOk()).length,
+    registersAnswered: answered,
   });
   return ok({ records, total });
 }
