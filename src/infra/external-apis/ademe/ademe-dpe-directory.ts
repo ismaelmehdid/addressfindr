@@ -20,6 +20,7 @@ const DATASET = 'dpe03existant';
 
 const SELECTED_FIELDS = [
   'numero_dpe',
+  'identifiant_ban',
   'adresse_ban',
   'numero_voie_ban',
   'nom_rue_ban',
@@ -51,6 +52,7 @@ const PROPERTY_TYPE_BY_BUILDING: Record<string, PropertyType> = {
 
 const RowSchema = v.object({
   numero_dpe: v.optional(v.nullable(v.string())),
+  identifiant_ban: v.optional(v.nullable(v.string())),
   adresse_ban: v.optional(v.nullable(v.string())),
   numero_voie_ban: v.optional(v.nullable(v.string())),
   nom_rue_ban: v.optional(v.nullable(v.string())),
@@ -113,6 +115,7 @@ function toRecord(row: Row): DpeRecord | null {
 
   return {
     dpeNumber,
+    banId: text(row.identifiant_ban),
     address,
     streetNumber,
     street: text(row.nom_rue_ban),

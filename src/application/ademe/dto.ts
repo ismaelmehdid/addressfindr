@@ -22,6 +22,7 @@ const MatchSignalSchema = v.picklist([
 
 const DpeRecordSchema = v.object({
   dpeNumber: v.string(),
+  banId: v.nullable(v.string()),
   address: v.string(),
   streetNumber: v.nullable(v.string()),
   street: v.nullable(v.string()),
@@ -48,6 +49,7 @@ export const AddressMatchSchema = v.object({
       confidence: v.number(),
       matched: v.array(MatchSignalSchema),
       diverged: v.array(MatchSignalSchema),
+      supportingRecords: v.number(),
     }),
   ),
   inspected: v.number(),

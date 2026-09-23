@@ -5,6 +5,7 @@ import type { DpeRecord } from './types';
 
 function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
   return {
+    banId: null,
     address: '16 Rue Lavoisier 69003 Lyon',
     streetNumber: '16',
     street: 'Rue Lavoisier',
@@ -121,8 +122,13 @@ describe('rankCandidates', () => {
     const ranked = rankCandidates({
       values: LISTING,
       records: [
-        record({ dpeNumber: 'weak', dpeKwhM2Year: 330, gesKgCo2M2Year: 90 }),
-        record({ dpeNumber: 'strong' }),
+        record({
+          dpeNumber: 'weak',
+          address: '1 Rue Faible 69003 Lyon',
+          dpeKwhM2Year: 330,
+          gesKgCo2M2Year: 90,
+        }),
+        record({ dpeNumber: 'strong', address: '2 Rue Forte 69003 Lyon' }),
       ],
       truncated: false,
     });
@@ -139,15 +145,23 @@ describe('rankCandidates', () => {
     const ranked = rankCandidates({
       values: LISTING,
       records: [
-        record({ dpeNumber: 'b', geocodingScore: 0.5 }),
-        record({ dpeNumber: 'a', geocodingScore: 0.9 }),
+        record({
+          dpeNumber: 'b',
+          address: '1 Rue B 69003 Lyon',
+          geocodingScore: 0.5,
+        }),
+        record({
+          dpeNumber: 'a',
+          address: '2 Rue A 69003 Lyon',
+          geocodingScore: 0.9,
+        }),
       ],
       truncated: false,
     });
     expect(ranked.candidates[0]?.record.dpeNumber).toBe('a');
   });
 
-  it('caps the shortlist and reports truncation', () => {
+  it('collapses many rows at one address into a single answer', () => {
     const records = Array.from({ length: 25 }, (_, i) =>
       record({ dpeNumber: `dpe-${i}` }),
     );
@@ -156,8 +170,177 @@ describe('rankCandidates', () => {
       records,
       truncated: true,
     });
-    expect(ranked.candidates).toHaveLength(10);
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.candidates[0]?.supportingRecords).toBe(25);
     expect(ranked.inspected).toBe(25);
     expect(ranked.truncated).toBe(true);
+  });
+});
+
+describe('rankCandidates — regroupement par adresse', () => {
+  function atAddress(
+    dpeNumber: string,
+    banId: string | null,
+    over: Partial<DpeRecord> = {},
+  ): DpeRecord {
+    return record({ dpeNumber, banId, ...over });
+  }
+
+  it('renders one candidate per address, not one per DPE row', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('a1', '69383_4180_00016'),
+        atAddress('a2', '69383_4180_00016'),
+        atAddress('a3', '69383_4180_00016'),
+        atAddress('b1', '69383_9999_00002', {
+          address: '5 Rue Autre 69003 Lyon',
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toHaveLength(2);
+    expect(ranked.inspected).toBe(4);
+  });
+
+  it('counts the rows backing each address', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('a1', '69383_4180_00016'),
+        atAddress('a2', '69383_4180_00016'),
+        atAddress('a3', '69383_4180_00016'),
+        atAddress('b1', '69383_9999_00002', {
+          address: '5 Rue Autre 69003 Lyon',
+        }),
+      ],
+      truncated: false,
+    });
+
+    const byAddress = new Map(
+      ranked.candidates.map((c) => [c.record.address, c.supportingRecords]),
+    );
+    expect(byAddress.get('16 Rue Lavoisier 69003 Lyon')).toBe(3);
+    expect(byAddress.get('5 Rue Autre 69003 Lyon')).toBe(1);
+  });
+
+  it('keeps the best-scoring row as the face of its address', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('weak', '69383_4180_00016', { dpeKwhM2Year: 320 }),
+        atAddress('strong', '69383_4180_00016'),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.candidates[0]?.record.dpeNumber).toBe('strong');
+    expect(ranked.candidates[0]?.confidence).toBe(1);
+  });
+
+  it('groups two spellings of one address that share a BAN identifier', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('a1', '69383_4180_00016', {
+          address: "17 Rue de l'Abondance 69003 Lyon",
+        }),
+        atAddress('a2', '69383_4180_00016', {
+          address: `17 Rue de l${String.fromCharCode(0x2019)}Abondance 69003 LYON`,
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.candidates[0]?.supportingRecords).toBe(2);
+  });
+
+  it('groups rows with no BAN identifier on their normalised address', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('a1', null, { address: '16 Rue Lavoisier 69003 Lyon' }),
+        atAddress('a2', null, { address: '16 RUE LAVOISIER, 69003 lyon' }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.candidates[0]?.supportingRecords).toBe(2);
+  });
+
+  // why: le nombre de lignes d'appui n'est pas encore calibre contre une verite
+  // terrain, donc il departage seulement. Il ne doit jamais remonter une adresse
+  // moins bien notee au-dessus d'une mieux notee.
+  it('never lets the support count outrank a better-scoring address', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('m1', '69383_1111_00001', {
+          address: '1 Rue Nombreuse 69003 Lyon',
+          dpeKwhM2Year: 320,
+        }),
+        atAddress('m2', '69383_1111_00001', {
+          address: '1 Rue Nombreuse 69003 Lyon',
+          dpeKwhM2Year: 320,
+        }),
+        atAddress('m3', '69383_1111_00001', {
+          address: '1 Rue Nombreuse 69003 Lyon',
+          dpeKwhM2Year: 320,
+        }),
+        atAddress('s1', '69383_2222_00002', {
+          address: '2 Rue Unique 69003 Lyon',
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates[0]?.record.address).toBe(
+      '2 Rue Unique 69003 Lyon',
+    );
+  });
+
+  it('breaks a tie between two equally scored addresses on the support count', () => {
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        atAddress('lonely', '69383_2222_00002', {
+          address: '2 Rue Unique 69003 Lyon',
+          geocodingScore: 0.7,
+        }),
+        atAddress('busy1', '69383_1111_00001', {
+          address: '1 Rue Nombreuse 69003 Lyon',
+          geocodingScore: 0.7,
+        }),
+        atAddress('busy2', '69383_1111_00001', {
+          address: '1 Rue Nombreuse 69003 Lyon',
+          geocodingScore: 0.7,
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates[0]?.record.address).toBe(
+      '1 Rue Nombreuse 69003 Lyon',
+    );
+    expect(ranked.candidates[0]?.supportingRecords).toBe(2);
+  });
+
+  it('caps the shortlist on distinct addresses', () => {
+    const records = Array.from({ length: 25 }, (_, i) =>
+      atAddress(`dpe-${i}`, `69383_0000_${String(i).padStart(5, '0')}`, {
+        address: `${i} Rue Numerotee 69003 Lyon`,
+      }),
+    );
+    const ranked = rankCandidates({
+      values: LISTING,
+      records,
+      truncated: false,
+    });
+    expect(ranked.candidates).toHaveLength(10);
+    expect(ranked.inspected).toBe(25);
   });
 });

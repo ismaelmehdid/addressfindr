@@ -1,4 +1,5 @@
 import type { ExtractedValues } from '@/core/listing/types';
+import { addressGroupKey } from './address-identity';
 import {
   type AddressCandidate,
   type AddressMatch,
@@ -133,7 +134,41 @@ export function scoreCandidate(input: {
   const confidence =
     available === 0 ? 0 : Math.min(1, Math.max(0, awarded / available));
 
-  return { record: input.record, confidence, matched, diverged };
+  return {
+    record: input.record,
+    confidence,
+    matched,
+    diverged,
+    supportingRecords: 1,
+  };
+}
+
+// why: le produit rend une adresse, pas une ligne DPE. Mesure du 2026-09-22 :
+// 600 lignes Lyon 3e ne portent que 372 adresses distinctes, une adresse
+// revenant 15 fois. Sans regroupement, une liste de dix peut n'etre que trois
+// immeubles, et un immeuble uniforme — l'indice le plus fort — se lit comme
+// quinze reponses concurrentes.
+function groupByAddress(
+  scored: readonly AddressCandidate[],
+): AddressCandidate[] {
+  const groups = new Map<string, AddressCandidate>();
+
+  for (const candidate of scored) {
+    const key = addressGroupKey(candidate.record);
+    const current = groups.get(key);
+    if (current === undefined) {
+      groups.set(key, { ...candidate, supportingRecords: 1 });
+      continue;
+    }
+    const face =
+      candidate.confidence > current.confidence ? candidate : current;
+    groups.set(key, {
+      ...face,
+      supportingRecords: current.supportingRecords + 1,
+    });
+  }
+
+  return [...groups.values()];
 }
 
 export function rankCandidates(input: {
@@ -141,15 +176,23 @@ export function rankCandidates(input: {
   records: readonly DpeRecord[];
   truncated: boolean;
 }): AddressMatch {
-  const candidates = input.records
-    .map((record) => scoreCandidate({ values: input.values, record }))
-    .sort((a, b) => {
-      if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-      const scoreGap =
-        (b.record.geocodingScore ?? 0) - (a.record.geocodingScore ?? 0);
-      if (scoreGap !== 0) return scoreGap;
-      return a.record.dpeNumber.localeCompare(b.record.dpeNumber);
-    });
+  const scored = input.records.map((record) =>
+    scoreCandidate({ values: input.values, record }),
+  );
+
+  // why: le nombre de lignes d'appui n'est pas calibre contre une verite
+  // terrain, donc il departage seulement. Il ne remonte jamais une adresse
+  // moins bien notee au-dessus d'une mieux notee.
+  const candidates = groupByAddress(scored).sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    if (b.supportingRecords !== a.supportingRecords) {
+      return b.supportingRecords - a.supportingRecords;
+    }
+    const scoreGap =
+      (b.record.geocodingScore ?? 0) - (a.record.geocodingScore ?? 0);
+    if (scoreGap !== 0) return scoreGap;
+    return a.record.dpeNumber.localeCompare(b.record.dpeNumber);
+  });
 
   return {
     candidates: candidates.slice(0, MAX_CANDIDATES_RETURNED),

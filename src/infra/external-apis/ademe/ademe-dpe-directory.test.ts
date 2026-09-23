@@ -37,6 +37,7 @@ function calledUrl(spy: ReturnType<typeof mockFetchOnce>): URL {
 
 const ROW = {
   numero_dpe: '2269E0123456X',
+  identifiant_ban: '69383_4180_00016',
   adresse_ban: '16 Rue Lavoisier 69003 Lyon',
   numero_voie_ban: '16',
   nom_rue_ban: 'Rue Lavoisier',
@@ -68,6 +69,9 @@ describe('ademeDpeDirectory.search', () => {
     const qs = calledUrl(spy).searchParams.get('qs') ?? '';
     expect(qs).toContain('code_insee_ban:"69383"');
     expect(qs).toContain('_exists_:numero_voie_ban');
+    expect(calledUrl(spy).searchParams.get('select')).toContain(
+      'identifiant_ban',
+    );
     expect(qs).toContain('type_batiment:"appartement"');
     expect(qs).toContain('surface_habitable_logement:[61.00 TO 65.00]');
     expect(qs).toContain('etiquette_dpe:"D"');
@@ -94,6 +98,7 @@ describe('ademeDpeDirectory.search', () => {
     expect(result.value.total).toBe(1);
     expect(result.value.records[0]).toEqual({
       dpeNumber: '2269E0123456X',
+      banId: '69383_4180_00016',
       address: '16 Rue Lavoisier 69003 Lyon',
       streetNumber: '16',
       street: 'Rue Lavoisier',

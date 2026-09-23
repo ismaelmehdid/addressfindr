@@ -2,6 +2,7 @@ import type { EnergyClass, PropertyType } from '@/core/listing/types';
 
 export type DpeRecord = {
   dpeNumber: string;
+  banId: string | null;
   address: string;
   streetNumber: string | null;
   street: string | null;
@@ -44,6 +45,7 @@ export type AddressCandidate = {
   confidence: number;
   matched: readonly MatchSignal[];
   diverged: readonly MatchSignal[];
+  supportingRecords: number;
 };
 
 export type AddressMatch = {
