@@ -494,10 +494,18 @@ describe('rankCandidates — refus faute de preuve', () => {
     expect(ranked.inspected).toBe(2);
   });
 
+  // why: dpeClass ne compte pas — la recherche l'a deja pose en filtre exact,
+  // donc toute ligne rendue porte la meme lettre. gesClass n'est jamais filtre.
   it('answers as soon as one discriminating signal is comparable', () => {
     const ranked = rankCandidates({
-      values: { ...SURFACE_ONLY, dpeClass: 'D' },
-      records: [record({ dpeNumber: 'a', address: '1 Rue A 69003 Lyon' })],
+      values: { ...SURFACE_ONLY, gesClass: 'D' },
+      records: [
+        record({
+          dpeNumber: 'a',
+          address: '1 Rue A 69003 Lyon',
+          gesClass: 'D',
+        }),
+      ],
       truncated: false,
     });
 
@@ -557,5 +565,156 @@ describe('rankCandidates — refus faute de preuve', () => {
     });
     expect(ranked.candidates).toEqual([]);
     expect(ranked.refusedFor).toBeNull();
+  });
+});
+
+describe('rankCandidates — defauts trouves en revue adversariale', () => {
+  const SURFACE_ONLY = {
+    ...EMPTY_EXTRACTED_VALUES,
+    propertyType: 'apartment' as const,
+    surfaceM2: 63,
+  };
+
+  // why: buildDpeSearch met dpeClass dans le filtre et l'adaptateur en fait la
+  // clause exacte etiquette_dpe:"D". Toute ligne qui revient porte donc la meme
+  // lettre : elle ne separe rien, exactement comme la surface. Pire, la surface
+  // est un filtre d'intervalle — les lignes en different — la lettre est un
+  // filtre exact. Le signal exclu discriminait plus que le signal inclus.
+  it('refuses when the DPE letter is the only thing beyond the surface', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, dpeClass: 'D' },
+      records: Array.from({ length: 12 }, (_, i) =>
+        record({
+          dpeNumber: `d-${i}`,
+          address: `${i} Rue Identique 69003 Lyon`,
+          banId: `69383_0001_${String(i).padStart(5, '0')}`,
+          dpeClass: 'D',
+          gesClass: null,
+          dpeKwhM2Year: null,
+          gesKgCo2M2Year: null,
+          yearBuilt: null,
+        }),
+      ),
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBe('insufficient-evidence');
+  });
+
+  it('still answers when the GES letter is present, which the search never filters on', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, dpeClass: 'D', gesClass: 'D' },
+      records: [record({ dpeNumber: 'a', dpeClass: 'D', gesClass: 'D' })],
+      truncated: false,
+    });
+    expect(ranked.refusedFor).toBeNull();
+    expect(ranked.candidates).toHaveLength(1);
+  });
+
+  // why: la porte se decidait sur toute la population avant la coupe a dix.
+  // Une seule ligne enfouie au rang 500 debloquait donc une liste de dix
+  // adresses dont aucune ne portait la moindre preuve.
+  it('decides the gate on the shortlist it actually returns', () => {
+    const mute = Array.from({ length: 11 }, (_, i) =>
+      record({
+        dpeNumber: `mute-${i}`,
+        address: `${i} Rue Muette 69003 Lyon`,
+        banId: `69383_0002_${String(i).padStart(5, '0')}`,
+        yearBuilt: null,
+        gesClass: null,
+        dpeKwhM2Year: null,
+        gesKgCo2M2Year: null,
+      }),
+    );
+    const speaking = record({
+      dpeNumber: 'zzz-speaking',
+      address: '99 Rue Parlante 69003 Lyon',
+      banId: '69383_0003_00099',
+      yearBuilt: 1989,
+      gesClass: null,
+      dpeKwhM2Year: null,
+      gesKgCo2M2Year: null,
+    });
+
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, yearBuilt: 1989 },
+      records: [...mute, speaking],
+      truncated: false,
+    });
+
+    const returnedHaveEvidence = ranked.candidates.every((c) =>
+      [...c.matched, ...c.diverged].some((s) => s !== 'surfaceM2'),
+    );
+    expect(
+      ranked.refusedFor === 'insufficient-evidence' || returnedHaveEvidence,
+    ).toBe(true);
+  });
+
+  // why: un appui est une ligne qui confirme, pas une ligne qui contredit.
+  // Compter les contradictions faisait remonter une adresse au rang 1 grace
+  // aux lignes qui la refutaient.
+  it('does not count a contradicting row as support', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, gesClass: 'D' },
+      records: [
+        record({
+          dpeNumber: 'agree',
+          address: '1 Rue Contredite 69003 Lyon',
+          banId: '69383_0004_00001',
+          gesClass: 'D',
+        }),
+        record({
+          dpeNumber: 'contradict-1',
+          address: '1 Rue Contredite 69003 Lyon',
+          banId: '69383_0004_00001',
+          gesClass: 'A',
+        }),
+        record({
+          dpeNumber: 'contradict-2',
+          address: '1 Rue Contredite 69003 Lyon',
+          banId: '69383_0004_00001',
+          gesClass: 'A',
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates[0]?.supportingRecords).toBe(1);
+  });
+
+  it('does not let contradicting rows outrank a cleanly supported address', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, gesClass: 'D' },
+      records: [
+        ...Array.from({ length: 3 }, (_, i) =>
+          record({
+            dpeNumber: `noisy-${i}`,
+            address: '1 Rue Bruyante 69003 Lyon',
+            banId: '69383_0005_00001',
+            gesClass: i === 0 ? 'D' : 'A',
+            geocodingScore: 0.7,
+          }),
+        ),
+        record({
+          dpeNumber: 'clean-1',
+          address: '2 Rue Nette 69003 Lyon',
+          banId: '69383_0006_00002',
+          gesClass: 'D',
+          geocodingScore: 0.7,
+        }),
+        record({
+          dpeNumber: 'clean-2',
+          address: '2 Rue Nette 69003 Lyon',
+          banId: '69383_0006_00002',
+          gesClass: 'D',
+          geocodingScore: 0.7,
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates[0]?.record.address).toBe('2 Rue Nette 69003 Lyon');
+    expect(ranked.candidates[0]?.supportingRecords).toBe(2);
   });
 });

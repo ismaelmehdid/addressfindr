@@ -97,14 +97,17 @@ function gradeSignal(
   return delta === 0 ? { award: 1.5, weight: 1.5 } : { award: -1, weight: 1.5 };
 }
 
-// why: la surface est deja un filtre dur de la recherche, donc tout candidat
-// qui revient s'accorde dessus. Elle ne distingue rien. Mesure du 2026-09-22 :
-// sur pap.fr, qui n'affiche aucun DPE, l'extraction ne rend que commune, type
-// et surface — le classement sortait alors dix adresses a 100% que rien ne
-// separait. Sans au moins un signal discriminant reellement comparable des
-// deux cotes, il vaut mieux ne rien rendre.
+// why: un signal deja pose en filtre dur de la recherche ne discrimine rien —
+// toute ligne qui revient s'accorde dessus par construction. C'est le cas de la
+// surface ET de la lettre DPE : buildDpeSearch les met toutes deux dans le
+// filtre, et l'adaptateur en fait `surface_habitable_logement:[a TO b]` et
+// `etiquette_dpe:"D"`. La lettre est meme le pire des deux : la surface est un
+// intervalle, donc les lignes en different et le signal separe un peu ; la
+// lettre est une egalite exacte, donc elle ne separe jamais.
+// La lettre GES, elle, n'est jamais filtree : elle discrimine vraiment.
+// Mesure du 2026-09-22 : sans cette liste, une annonce pap.fr sans DPE sortait
+// dix adresses a 100% que rien ne separait.
 const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
-  'dpeClass',
   'gesClass',
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
@@ -201,14 +204,21 @@ function groupByAddress(
     const key = addressGroupKey(candidate.record);
     const current = groups.get(key);
     if (current === undefined) {
-      groups.set(key, { ...candidate, supportingRecords: 1 });
+      groups.set(key, {
+        ...candidate,
+        supportingRecords: supports(candidate) ? 1 : 0,
+      });
       continue;
     }
     const face =
       candidate.confidence > current.confidence ? candidate : current;
+    // why: un appui est une ligne qui confirme l'annonce, pas une ligne qui la
+    // contredit. Les compter toutes faisait remonter une adresse au rang 1
+    // grace aux lignes qui la refutaient.
     groups.set(key, {
       ...face,
-      supportingRecords: current.supportingRecords + 1,
+      supportingRecords:
+        current.supportingRecords + (supports(candidate) ? 1 : 0),
     });
   }
 
@@ -223,6 +233,10 @@ function hasDiscriminatingEvidence(
       DISCRIMINATING_SIGNALS.includes(signal),
     ),
   );
+}
+
+function supports(candidate: AddressCandidate): boolean {
+  return candidate.diverged.length === 0 && candidate.matched.length > 0;
 }
 
 export function rankCandidates(input: {
@@ -248,14 +262,18 @@ export function rankCandidates(input: {
     return a.record.dpeNumber.localeCompare(b.record.dpeNumber);
   });
 
+  // why: la porte se decidait sur toute la population avant la coupe. Une
+  // seule ligne enfouie loin dans le classement debloquait donc une liste
+  // entiere dont aucune entree ne portait la moindre preuve. Elle se decide
+  // desormais sur la liste reellement rendue.
+  const shortlist = candidates.slice(0, MAX_CANDIDATES_RETURNED);
   const refusedFor: MatchRefusal | null =
-    candidates.length > 0 && !hasDiscriminatingEvidence(candidates)
+    shortlist.length > 0 && !hasDiscriminatingEvidence(shortlist)
       ? 'insufficient-evidence'
       : null;
 
   return {
-    candidates:
-      refusedFor === null ? candidates.slice(0, MAX_CANDIDATES_RETURNED) : [],
+    candidates: refusedFor === null ? shortlist : [],
     inspected: input.records.length,
     truncated: input.truncated,
     refusedFor,
