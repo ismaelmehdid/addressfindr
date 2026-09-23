@@ -48,6 +48,12 @@ const DpeRecordSchema = v.object({
   buildingComplement: v.nullable(v.string()),
   establishedOn: v.nullable(v.string()),
   geocodingScore: v.nullable(v.number()),
+  point: v.nullable(
+    v.object({
+      latitude: v.number(),
+      longitude: v.number(),
+    }),
+  ),
 });
 
 export const AddressMatchSchema = v.object({

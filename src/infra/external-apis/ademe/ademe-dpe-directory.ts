@@ -11,6 +11,7 @@ import type {
 } from '@/core/ademe/types';
 import { isInseeCode } from '@/core/commune/types';
 import { type AppError, externalApi, validation } from '@/core/errors';
+import { resolveMappablePoint } from '@/core/geo/resolve-mappable-point';
 import {
   ENERGY_CLASSES,
   type EnergyClass,
@@ -54,6 +55,8 @@ const SELECTED_FIELDS = [
   'complement_adresse_batiment',
   'date_etablissement_dpe',
   'score_ban',
+  'statut_geocodage',
+  '_geopoint',
 ].join(',');
 
 const BUILDING_TYPE: Record<PropertyType, string> = {
@@ -88,6 +91,8 @@ const RowSchema = v.object({
   complement_adresse_batiment: v.optional(v.nullable(v.string())),
   date_etablissement_dpe: v.optional(v.nullable(v.string())),
   score_ban: v.optional(v.nullable(v.number())),
+  statut_geocodage: v.optional(v.nullable(v.string())),
+  _geopoint: v.optional(v.nullable(v.string())),
 });
 
 const ResponseSchema = v.object({
@@ -113,6 +118,28 @@ function text(raw: string | null | undefined): string | null {
 
 function numeric(raw: number | null | undefined): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
+}
+
+// why: l'ADEME annonce son geocodage dans une phrase libre, et certaines lignes
+// sont stockees en double encodage. Une egalite brute sur la chaine accentuee
+// casse des qu'un caractere est repare, d'ou la comparaison sur forme pliee.
+// Tout libelle inconnu est refuse : la mesure du 2026-09-23 sur 5000 lignes
+// n'en connait que deux, mais une valeur inattendue doit fermer la porte.
+const GEOCODED_TO_ADDRESS = "adresse geocodee ban a l'adresse";
+
+function foldGeocodingStatus(raw: string): string {
+  return repairMojibake(raw)
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[‘’ʼ]/g, "'")
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function isGeocodedToAddress(raw: string | null | undefined): boolean {
+  if (typeof raw !== 'string') return false;
+  return foldGeocodingStatus(raw) === GEOCODED_TO_ADDRESS;
 }
 
 function toRecord(row: Row, dataset: DpeRegister): DpeRecord | null {
@@ -157,6 +184,11 @@ function toRecord(row: Row, dataset: DpeRegister): DpeRecord | null {
     buildingComplement: text(row.complement_adresse_batiment),
     establishedOn: text(row.date_etablissement_dpe),
     geocodingScore: numeric(row.score_ban),
+    point: resolveMappablePoint({
+      rawPoint: text(row._geopoint),
+      geocodedToAddress: isGeocodedToAddress(row.statut_geocodage),
+      postalCode: text(row.code_postal_ban),
+    }),
   };
 }
 

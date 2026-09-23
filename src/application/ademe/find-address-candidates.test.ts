@@ -77,6 +77,7 @@ function record(over: Partial<DpeRecord> = {}): DpeRecord {
     buildingComplement: null,
     establishedOn: '2026-01-07',
     geocodingScore: 0.62,
+    point: null,
     ...over,
   };
 }

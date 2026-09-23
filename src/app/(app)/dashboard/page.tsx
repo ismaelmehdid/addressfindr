@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
+import { env } from '@/shared/env';
 import { ListingUrlForm } from './components/listing/listing-url-form';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -8,5 +9,9 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function DashboardHomePage(): React.ReactElement {
-  return <ListingUrlForm />;
+  return (
+    <ListingUrlForm
+      mapboxAccessToken={env().NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? ''}
+    />
+  );
 }

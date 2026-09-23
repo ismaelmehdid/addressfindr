@@ -10,7 +10,7 @@ vi.mock('@/shared/env', () => ({
 }));
 
 import type { DpeSearchFilter } from '@/core/ademe/types';
-import { ademeDpeDirectory } from './ademe-dpe-directory';
+import { ademeDpeDirectory, isGeocodedToAddress } from './ademe-dpe-directory';
 import { clearLocalSearchCache } from './search-cache';
 
 function filter(over: Partial<DpeSearchFilter> = {}): DpeSearchFilter {
@@ -137,6 +137,7 @@ describe('ademeDpeDirectory.search', () => {
       buildingComplement: null,
       establishedOn: '2026-01-07',
       geocodingScore: 0.62,
+      point: null,
     });
   });
 
@@ -387,5 +388,126 @@ describe('ademeDpeDirectory.search — cache', () => {
       filter({ inseeCode: '69007' }),
     );
     expect(retried.isOk()).toBe(true);
+  });
+});
+
+describe('isGeocodedToAddress', () => {
+  it('accepts the label ADEME actually sends', () => {
+    expect(isGeocodedToAddress("adresse géocodée ban à l'adresse")).toBe(true);
+  });
+
+  it('accepts it back after mojibake repair', () => {
+    const doubleEncoded = Array.from(
+      new TextEncoder().encode("adresse géocodée ban à l'adresse"),
+      (byte) => String.fromCharCode(byte),
+    ).join('');
+    expect(doubleEncoded).toContain('Ã');
+    expect(isGeocodedToAddress(doubleEncoded)).toBe(true);
+  });
+
+  it('accepts a curly apostrophe and a narrow no-break space', () => {
+    const narrowNoBreakSpace = String.fromCharCode(0x202f);
+    const rightSingleQuote = String.fromCharCode(0x2019);
+    expect(narrowNoBreakSpace).not.toBe(' ');
+    expect(rightSingleQuote).not.toBe("'");
+    const label = `adresse géocodée${narrowNoBreakSpace}ban à l${rightSingleQuote}adresse`;
+    expect(isGeocodedToAddress(label)).toBe(true);
+  });
+
+  it('refuses the not-geocoded label', () => {
+    expect(
+      isGeocodedToAddress(
+        'adresse non géocodée ban car aucune correspondance trouvée',
+      ),
+    ).toBe(false);
+  });
+
+  it('refuses an absent or unknown label', () => {
+    expect(isGeocodedToAddress(null)).toBe(false);
+    expect(isGeocodedToAddress(undefined)).toBe(false);
+    expect(isGeocodedToAddress('adresse géocodée ban à la commune')).toBe(
+      false,
+    );
+  });
+});
+
+describe('ademeDpeDirectory.search — mappable point', () => {
+  it('keeps the point when ADEME geocoded the row to its address', async () => {
+    mockFetchOnce({
+      total: 1,
+      results: [
+        {
+          ...ROW,
+          statut_geocodage: "adresse géocodée ban à l'adresse",
+          _geopoint: '45.75220201674031,4.8841949928587045',
+        },
+      ],
+    });
+
+    const found = await ademeDpeDirectory.search(filter());
+    expect(found.isOk()).toBe(true);
+    expect(found._unsafeUnwrap().records[0]?.point).toEqual({
+      latitude: 45.75220201674031,
+      longitude: 4.8841949928587045,
+    });
+  });
+
+  it('drops the point when ADEME failed to geocode the row', async () => {
+    mockFetchOnce({
+      total: 1,
+      results: [
+        {
+          ...ROW,
+          statut_geocodage:
+            'adresse non géocodée ban car aucune correspondance trouvée',
+          _geopoint: '45.75220201674031,4.8841949928587045',
+        },
+      ],
+    });
+
+    const found = await ademeDpeDirectory.search(filter());
+    expect(found._unsafeUnwrap().records[0]?.point).toBeNull();
+  });
+
+  it('drops the Atlantic sentinel ADEME reports as geocoded', async () => {
+    mockFetchOnce({
+      total: 1,
+      results: [
+        {
+          ...ROW,
+          statut_geocodage: "adresse géocodée ban à l'adresse",
+          _geopoint: '-5.98385630920877,-1.363081210117898',
+        },
+      ],
+    });
+
+    const found = await ademeDpeDirectory.search(filter());
+    expect(found._unsafeUnwrap().records[0]?.point).toBeNull();
+  });
+
+  it('drops an overseas row whose coordinate ADEME reprojected wrongly', async () => {
+    mockFetchOnce({
+      total: 1,
+      results: [
+        {
+          ...ROW,
+          code_postal_ban: '97400',
+          statut_geocodage: "adresse géocodée ban à l'adresse",
+          _geopoint: '56.130898281525894,-2.6603627902420315',
+        },
+      ],
+    });
+
+    const found = await ademeDpeDirectory.search(filter());
+    expect(found._unsafeUnwrap().records[0]?.point).toBeNull();
+  });
+
+  it('asks ADEME for the geocoding columns', async () => {
+    const spy = mockFetchOnce({ total: 0, results: [] });
+    await ademeDpeDirectory.search(filter());
+
+    const select = calledUrl(spy).searchParams.get('select') ?? '';
+    expect(select).toContain('statut_geocodage');
+    expect(select).toContain('_geopoint');
   });
 });

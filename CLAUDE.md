@@ -90,6 +90,17 @@ Verified against the live `dpe03existant` dataset (15 604 436 rows) and geo.api.
 - **1266 of Lyon 3e's 35 311 apartment rows carry no street number** (559 of 3198 in Saint-Genis-Laval). They match every other criterion and rank at 100%, so they are excluded at the query.
 - **Some ADEME rows are stored double-encoded** — `58 Rue de l<mojibake>Abondance` beside a clean `70 Rue de l'Abondance` on the same street.
 - `size` on `/lines` accepts up to **10000**; 10001 returns 400.
+
+### Measured facts — ADEME coordinates (2026-09-23)
+
+Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`, `59350`, `2A004`, `31555`, plus the DOM communes.
+
+- **`_geopoint` is always populated — 7000/7000 — and that is the trap.** It is a `"lat,lon"` WGS84 string, so Mapbox needs it reversed to `[lon, lat]`. It is present even when the row was never geocoded.
+- **`statut_geocodage` is the only usable gate.** 23.4% of rows say `adresse non géocodée ban car aucune correspondance trouvée` while still carrying a coordinate. Only two distinct values were observed in 5000 rows, but anything other than the exact `adresse géocodée ban à l'adresse` must be refused — fail closed.
+- **`score_ban` cannot gate anything.** Geocoded rows span `0.00–0.99`, non-geocoded rows span `0.17–0.99`. The distributions overlap; no threshold separates them.
+- **Overseas coordinates are systematically wrong while claiming success.** ADEME stores DOM coordinates in the local projection (UTM 40S for Réunion) and unprojects them as Lambert-93, so `97411` lands at `56.13,-2.66` in the North Sea with `statut_geocodage` reporting success. Martinique, Guyane and Mayotte land in the Gulf of Guinea.
+- **Métropole has sentinels too.** 24 Lyon rows sit at `-5.98,-1.36` (Atlantic off Ghana) with `adresse_ban = null` and `score_ban = 0.88`. 0.5% of all rows fall outside France.
+- The gate that follows lives in `core/geo/resolve-mappable-point.ts`: status, then overseas postal code, then a métropole bounding box. **No pin beats a wrong pin.**
 - **A signal already used as a hard search filter discriminates nothing.** Surface is a range filter, so rows differ on it; the DPE letter is an equality filter, so every returned row carries the same one. Neither may count as evidence that an answer is supported. The GES letter is never filtered on, so it does.
 - **BDNB (CSTB) joins to ADEME exactly.** Its `cle_interop_adr` is the same BAN key ADEME publishes as `identifiant_ban`. Two hops: `rel_batiment_groupe_adresse` maps the key to a `batiment_groupe_id`, `batiment_groupe_complet` carries the values. Free Open API, no key, at `api.bdnb.io/v1/bdnb/donnees/...`. Measured at Lyon 3e: it resolves **32%** of addresses, and on those it supplies `annee_construction` and `nb_niveau` every time — against 58% coverage for ADEME's own `annee_construction`.
 - **The cadastre is reachable through BDNB, not separately.** `l_parcelle_id` is the DGFiP identifier; `apicarto.ign.fr/api/cadastre/parcelle` returns its `contenance` given `code_insee` + `section` + `numero` split out of the 14-character id. Verified: `69204000AD0022` → 1261 m². Only usable when a building sits on exactly one parcel, and only for houses.
@@ -301,6 +312,7 @@ Rules the checker enforces:
 - **No new infra / SaaS subscriptions.** Stick to the existing stack: OpenAI, ZeroEntropy, Supabase, Upstash, Vercel, PostHog. If you think you need something else, raise it explicitly first.
   - **Approved additions (raised and accepted 2026-09-17), scoped to the `listing` domain:**
     - **Firecrawl** — scraping des annonces immobilières. Retenu après mesure : il passe DataDome sur leboncoin là où un `fetch` direct ne passe pas. Appelé en REST via `fetch`, aucun paquet npm ajouté.
+    - **Mapbox GL JS** — carte 3D qui montre l'adresse trouvée (demandé explicitement le 2026-09-23). Paquet npm `mapbox-gl`, jeton public `pk.` restreint par URL dans `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`. Facturé au chargement de carte : 50 000/mois offerts, puis 5 $/1000 — d'où une seule `new mapboxgl.Map()` par session, déplacée ensuite par `flyTo`. Jeton absent = carte absente, le reste du produit continue.
     - **Groq** — hébergeur d'inférence pour l'extraction de champs depuis le markdown d'annonce. Le modèle reste un modèle OpenAI (`openai/gpt-oss-120b`), donc la règle « OpenAI-only » tient sur le fond ; seul l'hôte d'inférence change. API compatible OpenAI, donc `@ai-sdk/openai` avec un `baseURL` — aucun paquet npm ajouté, et le repli vers OpenAI est un changement de config.
     - Rationale et mesures : `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md` §3 et §4.1.
 - **Cron is only for retry / stuck-state cleanup.** Primary work runs in-request (or via `waitUntil`).
