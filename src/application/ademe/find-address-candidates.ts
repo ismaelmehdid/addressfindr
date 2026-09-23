@@ -6,11 +6,13 @@ import { resolveCommune } from '@/application/commune/resolve-commune';
 import { buildDpeSearch } from '@/core/ademe/build-search';
 import { enrichRecords } from '@/core/ademe/enrich-records';
 import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
+import type { IParcelDirectory } from '@/core/ademe/ports/parcel-directory.port';
 import { rankCandidates, rankedBanIds } from '@/core/ademe/score-candidates';
 import type { AddressMatch } from '@/core/ademe/types';
 import { MAX_BUILDING_LOOKUPS } from '@/core/building/types';
 import { type AppError, parseInput, validation } from '@/core/errors';
 import { ademeDpeDirectory } from '@/infra/external-apis/ademe/ademe-dpe-directory';
+import { cadastreParcelDirectory } from '@/infra/external-apis/cadastre/cadastre-parcel-directory';
 import { log } from '@/shared/logger';
 import {
   type FindAddressCandidatesInput,
@@ -27,6 +29,7 @@ export async function findAddressCandidates(
   deps: {
     dpeDirectory?: IDpeDirectory;
     getBuildingFacts?: typeof getBuildingFacts;
+    parcelDirectory?: IParcelDirectory;
     resolveCommune?: typeof resolveCommune;
   } = {},
 ): Promise<Result<AddressMatch, AppError>> {
@@ -83,11 +86,33 @@ export async function findAddressCandidates(
     });
   }
 
+  // why: le terrain ne concerne que les maisons — la parcelle d'un immeuble
+  // porte tous les lots. Inutile donc d'interroger le cadastre autrement, et
+  // inutile aussi si l'annonce ne chiffre aucun terrain a comparer.
+  const buildingFacts = facts.isOk() ? facts.value : [];
+  const parcelIds =
+    fields.propertyType === 'house' && fields.landSurfaceM2 !== null
+      ? buildingFacts.flatMap((fact) => [...fact.parcelIds])
+      : [];
+  const parcels =
+    parcelIds.length > 0
+      ? await (deps.parcelDirectory ?? cadastreParcelDirectory).areasFor({
+          parcelIds,
+        })
+      : null;
+  if (parcels?.isErr()) {
+    log.warn('ademe.match.parcels_failed', {
+      portal: fields.portal,
+      code: parcels.error.code,
+    });
+  }
+
   const match = rankCandidates({
     values: fields,
     records: enrichRecords({
       records: found.value.records,
-      facts: facts.isOk() ? facts.value : [],
+      facts: buildingFacts,
+      parcelAreas: parcels?.isOk() ? parcels.value : [],
     }),
     truncated: found.value.total > search.filter.limit,
   });
@@ -99,7 +124,8 @@ export async function findAddressCandidates(
     returned: match.candidates.length,
     truncated: match.truncated,
     refusedFor: match.refusedFor,
-    enriched: facts.isOk() ? facts.value.length : 0,
+    enriched: buildingFacts.length,
+    parcels: parcels?.isOk() ? parcels.value.length : 0,
     best: match.candidates[0]?.confidence ?? 0,
   });
 

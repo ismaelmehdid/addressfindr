@@ -20,6 +20,7 @@ const MatchSignalSchema = v.picklist([
   'heatingEnergy',
   'yearBuilt',
   'buildingFloors',
+  'landSurfaceM2',
   'floor',
 ]);
 
@@ -42,6 +43,7 @@ const DpeRecordSchema = v.object({
   heatingEnergy: v.nullable(v.picklist(HEATING_ENERGIES)),
   yearBuilt: v.nullable(v.number()),
   buildingFloors: v.nullable(v.number()),
+  landSurfaceM2: v.nullable(v.number()),
   floor: v.nullable(v.number()),
   buildingComplement: v.nullable(v.string()),
   establishedOn: v.nullable(v.string()),

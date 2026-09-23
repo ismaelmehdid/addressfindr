@@ -35,6 +35,40 @@ export function parseSurfaceM2(raw: string): number | null {
   return parseFrenchNumber(match[1]);
 }
 
+// why: une annonce de maison chiffre son terrain, et l'ADEME n'a pas cette
+// donnee — le cadastre si. Mais surface habitable et surface de terrain se
+// ressemblent dans un texte : confondre les deux ferait comparer un salon a
+// une parcelle. Le libelle doit donc nommer la parcelle, et ne nommer ni
+// l'habitable, ni un jardin, ni une terrasse, qui ne sont pas le terrain.
+const LAND_SUBJECT = /terrain|parcelle/i;
+const LAND_EXCLUSIONS =
+  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine/i;
+const LAND_M2_PATTERN = /(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:m²|m2|M²|M2)/;
+const LAND_ARE_PATTERN = /(\d{1,5}(?:[.,]\d{1,2})?)\s*ares?\b/i;
+const LAND_HECTARE_PATTERN = /(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:hectares?|ha)\b/i;
+
+const SQUARE_METRES_PER_ARE = 100;
+const SQUARE_METRES_PER_HECTARE = 10_000;
+
+export function parseLandSurfaceM2(raw: string): number | null {
+  if (!LAND_SUBJECT.test(raw)) return null;
+  if (LAND_EXCLUSIONS.test(raw)) return null;
+
+  const text = joinDigitGroups(raw);
+  for (const [pattern, factor] of [
+    [LAND_HECTARE_PATTERN, SQUARE_METRES_PER_HECTARE],
+    [LAND_ARE_PATTERN, SQUARE_METRES_PER_ARE],
+    [LAND_M2_PATTERN, 1],
+  ] as const) {
+    const match = pattern.exec(text);
+    if (!match?.[1]) continue;
+    const value = parseFrenchNumber(match[1]);
+    if (value === null) continue;
+    return Math.round(value * factor);
+  }
+  return null;
+}
+
 const DPE_CONTEXT = /\bdpe\b|consommation|[ée]nerg/i;
 const GES_CONTEXT = /\bges\b|effet de serre|[ée]mission/i;
 const STANDALONE_LETTER = /(?<![\p{L}])([A-Ga-g])(?![\p{L}])/gu;

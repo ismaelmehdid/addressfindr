@@ -22,6 +22,7 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     heatingEnergy: null,
     yearBuilt: null,
     buildingFloors: null,
+    landSurfaceM2: null,
     floor: 0,
     buildingComplement: null,
     establishedOn: null,
@@ -35,6 +36,7 @@ function facts(over: Partial<BuildingFacts> = {}): BuildingFacts {
     banId: '69383_4180_00016',
     yearBuilt: 1880,
     floors: 6,
+    parcelIds: [],
     ...over,
   };
 }
@@ -116,5 +118,37 @@ describe('enrichRecords', () => {
   it('returns the records unchanged when there are no facts', () => {
     const input = [record({ dpeNumber: 'a' })];
     expect(enrichRecords({ records: input, facts: [] })).toEqual(input);
+  });
+});
+
+describe('enrichRecords — surface de terrain', () => {
+  it('fills the plot area when the building sits on one parcel', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022'] })],
+      parcelAreas: [{ parcelId: '69204000AD0022', areaM2: 1261 }],
+    });
+    expect(enriched?.landSurfaceM2).toBe(1261);
+  });
+
+  it('leaves the plot area absent when the building spans several parcels', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022', '69204000AD0023'] })],
+      parcelAreas: [
+        { parcelId: '69204000AD0022', areaM2: 600 },
+        { parcelId: '69204000AD0023', areaM2: 700 },
+      ],
+    });
+    expect(enriched?.landSurfaceM2).toBeNull();
+  });
+
+  it('leaves the plot area absent when the cadastre did not answer', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022'] })],
+      parcelAreas: [],
+    });
+    expect(enriched?.landSurfaceM2).toBeNull();
   });
 });

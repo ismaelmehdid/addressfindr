@@ -26,6 +26,7 @@ export type DpeRecord = {
   heatingEnergy: HeatingEnergy | null;
   yearBuilt: number | null;
   buildingFloors: number | null;
+  landSurfaceM2: number | null;
   floor: number | null;
   buildingComplement: string | null;
   establishedOn: string | null;
@@ -50,6 +51,7 @@ export type MatchSignal =
   | 'heatingEnergy'
   | 'yearBuilt'
   | 'buildingFloors'
+  | 'landSurfaceM2'
   | 'floor';
 
 export type AddressCandidate = {

@@ -8,6 +8,7 @@ import {
   parseGesEmissionValue,
   parseHeatingEnergy,
   parseInseeCode,
+  parseLandSurfaceM2,
   parsePostalCode,
   parsePriceEur,
   parsePropertyType,
@@ -37,6 +38,7 @@ type FieldParser = (raw: string) => string | number | null;
 
 const PARSERS: Partial<Record<ExtractedFieldName, FieldParser>> = {
   surfaceM2: parseSurfaceM2,
+  landSurfaceM2: parseLandSurfaceM2,
   rooms: parseRoomCount,
   bedrooms: parseBedroomCount,
   floor: parseCount,

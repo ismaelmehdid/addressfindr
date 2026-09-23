@@ -5,6 +5,7 @@ export type BuildingFacts = {
   banId: string;
   yearBuilt: number | null;
   floors: number | null;
+  parcelIds: readonly string[];
 };
 
 export const MAX_BUILDING_LOOKUPS = 25;

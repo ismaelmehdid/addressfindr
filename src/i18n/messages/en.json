@@ -128,6 +128,7 @@
     "signalHeating": "heating",
     "addressInsufficientEvidence": "This listing does not show its energy label, so nothing separates the buildings that fit. Rather than name a street at random, no address is given.",
     "addressSupport": "{count} DPE record(s) at this address",
-    "signalBuildingFloors": "building floors"
+    "signalBuildingFloors": "building floors",
+    "signalLandSurface": "plot area"
   }
 }

@@ -126,6 +126,7 @@ export const DOMAINS = [
       'src/core/ademe',
       'src/application/ademe',
       'src/infra/external-apis/ademe',
+      'src/infra/external-apis/cadastre',
       'src/app/api/listings/match',
     ],
     schemas: [],

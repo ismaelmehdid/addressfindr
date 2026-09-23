@@ -132,6 +132,7 @@ describe('ademeDpeDirectory.search', () => {
       heatingEnergy: 'gas',
       yearBuilt: 1989,
       buildingFloors: 5,
+      landSurfaceM2: null,
       floor: 0,
       buildingComplement: null,
       establishedOn: '2026-01-07',

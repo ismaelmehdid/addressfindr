@@ -33,6 +33,7 @@ const BuildingSchema = v.object({
   batiment_groupe_id: v.string(),
   annee_construction: v.optional(v.nullable(v.number())),
   nb_niveau: v.optional(v.nullable(v.number())),
+  l_parcelle_id: v.optional(v.nullable(v.array(v.string()))),
 });
 
 const RelationListSchema = v.array(RelationSchema);
@@ -129,7 +130,7 @@ async function factsForAddresses(input: {
         BUILDING_TABLE,
         'batiment_groupe_id',
         buildingIds,
-        'batiment_groupe_id,annee_construction,nb_niveau',
+        'batiment_groupe_id,annee_construction,nb_niveau,l_parcelle_id',
       ),
       BuildingListSchema,
     );
@@ -150,6 +151,7 @@ async function factsForAddresses(input: {
         banId: relation.cle_interop_adr,
         yearBuilt: numeric(building.annee_construction),
         floors: numeric(building.nb_niveau),
+        parcelIds: building.l_parcelle_id ?? [],
       });
     }
 

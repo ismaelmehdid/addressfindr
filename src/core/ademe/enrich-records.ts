@@ -1,4 +1,5 @@
 import type { BuildingFacts } from '@/core/building/types';
+import { type ParcelArea, totalLandSurface } from './land-surface';
 import type { DpeRecord } from './types';
 
 // why: completer, jamais ecraser. L'ADEME decrit le logement diagnostique sur
@@ -8,20 +9,29 @@ import type { DpeRecord } from './types';
 export function enrichRecords(input: {
   records: readonly DpeRecord[];
   facts: readonly BuildingFacts[];
+  parcelAreas?: readonly ParcelArea[];
 }): DpeRecord[] {
   if (input.facts.length === 0) return [...input.records];
 
   const byBanId = new Map(input.facts.map((fact) => [fact.banId, fact]));
+  const areaByParcel = new Map(
+    (input.parcelAreas ?? []).map((area) => [area.parcelId, area]),
+  );
 
   return input.records.map((record) => {
     if (record.banId === null) return record;
     const fact = byBanId.get(record.banId);
     if (fact === undefined) return record;
 
+    const parcels = fact.parcelIds
+      .map((parcelId) => areaByParcel.get(parcelId))
+      .filter((area): area is ParcelArea => area !== undefined);
+
     return {
       ...record,
       yearBuilt: record.yearBuilt ?? fact.yearBuilt,
       buildingFloors: record.buildingFloors ?? fact.floors,
+      landSurfaceM2: record.landSurfaceM2 ?? totalLandSurface(parcels),
     };
   });
 }

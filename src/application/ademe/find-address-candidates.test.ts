@@ -71,6 +71,7 @@ function record(over: Partial<DpeRecord> = {}): DpeRecord {
     gesKgCo2M2Year: 40,
     heatingEnergy: null,
     yearBuilt: null,
+    landSurfaceM2: null,
     buildingFloors: null,
     floor: 0,
     buildingComplement: null,
@@ -266,7 +267,7 @@ describe('findAddressCandidates — enrichissement batiment', () => {
       record({ dpeNumber: 'a', banId: '69383_4180_00016', yearBuilt: null }),
     ]);
     const building = buildingFactsReturning([
-      { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6 },
+      { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6, parcelIds: [] },
     ]);
 
     const result = await findAddressCandidates(
@@ -376,7 +377,12 @@ describe('findAddressCandidates — enrichissement batiment', () => {
       {
         dpeDirectory: directoryReturning(records).directory,
         getBuildingFacts: buildingFactsReturning([
-          { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6 },
+          {
+            banId: '69383_4180_00016',
+            yearBuilt: 1880,
+            floors: 6,
+            parcelIds: [],
+          },
         ]).lookup,
         resolveCommune: communeResolving({
           kind: 'resolved',

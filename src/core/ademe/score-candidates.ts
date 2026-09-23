@@ -97,6 +97,17 @@ function gradeSignal(
       2,
     );
   }
+  // why: un terrain annonce et une contenance cadastrale ne coincident jamais
+  // au metre — l'annonce arrondit, la parcelle inclut les acces. Une fenetre
+  // large credite, un ecart franc penalise.
+  if (signal === 'landSurfaceM2') {
+    const ratio = delta / Math.max(listed, found);
+    return ratio <= 0.05
+      ? { award: 3, weight: 3 }
+      : ratio <= 0.15
+        ? { award: 2, weight: 3 }
+        : { award: -2, weight: 3 };
+  }
   if (signal === 'yearBuilt') {
     return gradeNumber(
       delta,
@@ -128,6 +139,7 @@ const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
   'heatingEnergy',
   'yearBuilt',
   'buildingFloors',
+  'landSurfaceM2',
   'floor',
 ];
 
@@ -140,13 +152,17 @@ const SIGNALS: readonly MatchSignal[] = [
   'heatingEnergy',
   'yearBuilt',
   'buildingFloors',
+  'landSurfaceM2',
   'floor',
 ];
 
 // why: numero_etage_appartement vaut 0 sur 85 des 89 lignes renseignees du
 // releve du 2026-09-22. C'est une valeur par defaut, pas un rez-de-chaussee.
 // La comparer ecarterait la bonne ligne sur une donnee que l'ADEME n'a pas.
+// why: un appartement n'a pas de terrain — la parcelle porte tout l'immeuble,
+// donc la comparer a ce qu'annonce un lot serait une erreur garantie.
 function isComparable(signal: MatchSignal, record: DpeRecord): boolean {
+  if (signal === 'landSurfaceM2') return record.propertyType === 'house';
   return signal !== 'floor' || (record.floor !== null && record.floor !== 0);
 }
 

@@ -150,6 +150,9 @@ function toRecord(row: Row, dataset: DpeRegister): DpeRecord | null {
     heatingEnergy: toHeatingEnergy(row.type_energie_principale_chauffage),
     yearBuilt: numeric(row.annee_construction),
     buildingFloors: numeric(row.nombre_niveau_immeuble),
+    // why: l'ADEME n'a pas la surface du terrain. Elle vient du cadastre, via
+    // l'identifiant de parcelle que la BDNB rattache a l'adresse.
+    landSurfaceM2: null,
     floor: numeric(row.numero_etage_appartement),
     buildingComplement: text(row.complement_adresse_batiment),
     establishedOn: text(row.date_etablissement_dpe),

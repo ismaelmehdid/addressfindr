@@ -35,6 +35,8 @@ const FIELD_HINTS: Record<ExtractedFieldName, string> = {
   transactionType: 'vente ou location',
   propertyType: 'appartement ou maison',
   surfaceM2: 'surface habitable ou Carrez, pas le terrain ni une pièce',
+  landSurfaceM2:
+    'surface du terrain ou de la parcelle, jamais la surface habitable ni un jardin',
   rooms: 'nombre de pièces',
   bedrooms: 'nombre de chambres',
   floor: 'étage du logement',

@@ -43,6 +43,7 @@ export type ExtractedValues = {
   transactionType: TransactionType | null;
   propertyType: PropertyType | null;
   surfaceM2: number | null;
+  landSurfaceM2: number | null;
   rooms: number | null;
   bedrooms: number | null;
   floor: number | null;
@@ -66,6 +67,7 @@ export const EXTRACTED_FIELD_NAMES = [
   'transactionType',
   'propertyType',
   'surfaceM2',
+  'landSurfaceM2',
   'rooms',
   'bedrooms',
   'floor',
@@ -119,6 +121,7 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   transactionType: null,
   propertyType: null,
   surfaceM2: null,
+  landSurfaceM2: null,
   rooms: null,
   bedrooms: null,
   floor: null,

@@ -59,6 +59,7 @@ const SIGNAL_KEY = {
   heatingEnergy: 'signalHeating',
   yearBuilt: 'signalYearBuilt',
   buildingFloors: 'signalBuildingFloors',
+  landSurfaceM2: 'signalLandSurface',
   floor: 'signalFloor',
 } as const satisfies Record<MatchSignal, string>;
 

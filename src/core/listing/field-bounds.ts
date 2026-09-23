@@ -4,6 +4,7 @@ type NumericBound = { min: number; max: number };
 
 const STATIC_BOUNDS: Partial<Record<ExtractedFieldName, NumericBound>> = {
   surfaceM2: { min: 5, max: 2000 },
+  landSurfaceM2: { min: 10, max: 1_000_000 },
   rooms: { min: 1, max: 20 },
   bedrooms: { min: 0, max: 15 },
   floor: { min: -2, max: 60 },

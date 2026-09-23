@@ -57,7 +57,12 @@ describe('bdnbBuildingDirectory.factsForAddresses', () => {
     expect(result.isOk()).toBe(true);
     if (!result.isOk()) return;
     expect(result.value).toEqual([
-      { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6 },
+      {
+        banId: '69383_4180_00016',
+        yearBuilt: 1880,
+        floors: 6,
+        parcelIds: [],
+      },
     ]);
   });
 
@@ -134,7 +139,31 @@ describe('bdnbBuildingDirectory.factsForAddresses', () => {
       banId: '69383_4180_00016',
       yearBuilt: null,
       floors: 6,
+      parcelIds: [],
     });
+  });
+
+  // why: l'identifiant de parcelle est le seul pont vers le cadastre, donc
+  // vers la surface de terrain qu'une annonce de maison affiche.
+  it('carries the cadastral parcel identifiers through', async () => {
+    mockTwoHops(
+      [{ cle_interop_adr: '69204_0290_00052', batiment_groupe_id: 'bg' }],
+      [
+        {
+          batiment_groupe_id: 'bg',
+          annee_construction: 1975,
+          nb_niveau: 2,
+          l_parcelle_id: ['69204000AD0022'],
+        },
+      ],
+    );
+
+    const result = await bdnbBuildingDirectory.factsForAddresses({
+      banIds: ['69204_0290_00052'],
+    });
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value[0]?.parcelIds).toEqual(['69204000AD0022']);
   });
 
   // why: l'enrichissement est un bonus. Une panne BDNB ne doit jamais faire

@@ -120,6 +120,17 @@ const EnvSchema = v.object({
     v.minValue(1000),
   ),
 
+  CADASTRE_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://apicarto.ign.fr',
+  ),
+  CADASTRE_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '10000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
   SUPABASE_URL: v.pipe(v.string(), v.url()),
   SUPABASE_SECRET_KEY: v.pipe(
     v.string(),

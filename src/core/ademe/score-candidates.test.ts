@@ -21,6 +21,7 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     gesKgCo2M2Year: 40,
     heatingEnergy: null,
     yearBuilt: 1989,
+    landSurfaceM2: null,
     buildingFloors: null,
     floor: 0,
     buildingComplement: null,
@@ -717,5 +718,70 @@ describe('rankCandidates — defauts trouves en revue adversariale', () => {
 
     expect(ranked.candidates[0]?.record.address).toBe('2 Rue Nette 69003 Lyon');
     expect(ranked.candidates[0]?.supportingRecords).toBe(2);
+  });
+});
+
+describe('scoreCandidate — surface de terrain', () => {
+  const HOUSE = {
+    ...EMPTY_EXTRACTED_VALUES,
+    propertyType: 'house' as const,
+    surfaceM2: 120,
+    gesClass: 'D' as const,
+    landSurfaceM2: 1200,
+  };
+
+  it('credits a plot area both sides agree on', () => {
+    const scored = scoreCandidate({
+      values: HOUSE,
+      record: record({
+        dpeNumber: 'a',
+        propertyType: 'house',
+        surfaceM2: 120,
+        landSurfaceM2: 1230,
+      }),
+    });
+    expect(scored.matched).toContain('landSurfaceM2');
+  });
+
+  it('penalises a plot area that is plainly different', () => {
+    const scored = scoreCandidate({
+      values: HOUSE,
+      record: record({
+        dpeNumber: 'a',
+        propertyType: 'house',
+        surfaceM2: 120,
+        landSurfaceM2: 300,
+      }),
+    });
+    expect(scored.diverged).toContain('landSurfaceM2');
+  });
+
+  // why: un appartement n'a pas de terrain. La parcelle porte tout l'immeuble,
+  // donc la comparer a ce qu'annonce un lot serait une erreur garantie.
+  it('never compares a plot area on an apartment', () => {
+    const scored = scoreCandidate({
+      values: { ...HOUSE, propertyType: 'apartment' },
+      record: record({
+        dpeNumber: 'a',
+        propertyType: 'apartment',
+        landSurfaceM2: 300,
+      }),
+    });
+    expect(scored.matched).not.toContain('landSurfaceM2');
+    expect(scored.diverged).not.toContain('landSurfaceM2');
+  });
+
+  it('ignores the signal when the cadastre gave nothing', () => {
+    const scored = scoreCandidate({
+      values: HOUSE,
+      record: record({
+        dpeNumber: 'a',
+        propertyType: 'house',
+        surfaceM2: 120,
+        landSurfaceM2: null,
+      }),
+    });
+    expect(scored.matched).not.toContain('landSurfaceM2');
+    expect(scored.diverged).not.toContain('landSurfaceM2');
   });
 });
