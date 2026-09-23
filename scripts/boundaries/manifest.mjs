@@ -136,6 +136,19 @@ export const DOMAINS = [
     ],
   },
   {
+    name: 'building',
+    dirs: [
+      'src/core/building',
+      'src/application/building',
+      'src/infra/external-apis/bdnb',
+    ],
+    schemas: [],
+    public: [
+      'src/application/building/get-building-facts',
+      'src/core/building/types',
+    ],
+  },
+  {
     name: 'commune',
     dirs: [
       'src/core/commune',
@@ -214,6 +227,8 @@ export const ALLOWED_EDGES = [
   // de sa commune pour interroger la base DPE.
   ['ademe', 'listing'],
   ['ademe', 'commune'],
+  // ademe complete ses lignes avec le batiment quand l'ADEME est muette.
+  ['ademe', 'building'],
   // le retour : le formulaire d'annonce enchaine l'extraction sur la recherche
   // d'adresse et affiche ses candidats. Couplage bidirectionnel assume, sur le
   // modele de files <-> indexing : aucun cycle d'import au niveau des modules,

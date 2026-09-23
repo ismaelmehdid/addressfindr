@@ -26,6 +26,7 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     gesKgCo2M2Year: 40,
     heatingEnergy: null,
     yearBuilt: null,
+    buildingFloors: null,
     floor: 0,
     buildingComplement: null,
     establishedOn: null,

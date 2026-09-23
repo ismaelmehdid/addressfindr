@@ -127,6 +127,7 @@
     "signalFloor": "etage",
     "signalHeating": "chauffage",
     "addressInsufficientEvidence": "Cette annonce n'affiche pas son étiquette énergie : rien ne distingue les immeubles qui correspondent. Plutôt que de désigner une rue au hasard, aucune adresse n'est proposée.",
-    "addressSupport": "{count} DPE à cette adresse"
+    "addressSupport": "{count} DPE à cette adresse",
+    "signalBuildingFloors": "étages de l'immeuble"
   }
 }

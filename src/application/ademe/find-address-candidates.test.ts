@@ -1,13 +1,16 @@
-import { ok } from 'neverthrow';
+import { err, ok } from 'neverthrow';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/shared/env', () => ({
   env: () => ({ NODE_ENV: 'test', VERCEL_ENV: 'development' }),
 }));
 
+import type { getBuildingFacts } from '@/application/building/get-building-facts';
 import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
 import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
+import type { BuildingFacts } from '@/core/building/types';
 import type { Commune, CommuneResolution } from '@/core/commune/types';
+import { externalApi } from '@/core/errors';
 import {
   EMPTY_EXTRACTED_VALUES,
   EXTRACTED_FIELD_NAMES,
@@ -68,6 +71,7 @@ function record(over: Partial<DpeRecord> = {}): DpeRecord {
     gesKgCo2M2Year: 40,
     heatingEnergy: null,
     yearBuilt: null,
+    buildingFloors: null,
     floor: 0,
     buildingComplement: null,
     establishedOn: '2026-01-07',
@@ -230,5 +234,159 @@ describe('listing fixture', () => {
     for (const name of EXTRACTED_FIELD_NAMES satisfies readonly ExtractedFieldName[]) {
       expect(fields).toHaveProperty(name);
     }
+  });
+});
+
+describe('findAddressCandidates — enrichissement batiment', () => {
+  function buildingFactsReturning(facts: BuildingFacts[]): {
+    lookup: typeof getBuildingFacts;
+    asked: string[][];
+  } {
+    const asked: string[][] = [];
+    return {
+      asked,
+      lookup: async ({ banIds }) => {
+        asked.push([...banIds]);
+        return ok(facts);
+      },
+    };
+  }
+
+  const bare = listing({
+    dpeClass: null,
+    gesClass: null,
+    dpeKwhM2Year: null,
+    gesKgCo2M2Year: null,
+  });
+
+  // why: sans annee cote ADEME — 42% des adresses de Lyon 3e — la BDNB est le
+  // seul moyen de comparer l'annee que l'annonce affiche.
+  it('fills a missing year from the building register and scores on it', async () => {
+    const { directory } = directoryReturning([
+      record({ dpeNumber: 'a', banId: '69383_4180_00016', yearBuilt: null }),
+    ]);
+    const building = buildingFactsReturning([
+      { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6 },
+    ]);
+
+    const result = await findAddressCandidates(
+      { listing: listing({ yearBuilt: 1880 }) },
+      {
+        dpeDirectory: directory,
+        getBuildingFacts: building.lookup,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.candidates[0]?.record.yearBuilt).toBe(1880);
+    expect(result.value.candidates[0]?.matched).toContain('yearBuilt');
+  });
+
+  it('asks the building register only about the addresses it might return', async () => {
+    const { directory } = directoryReturning(
+      Array.from({ length: 60 }, (_, i) =>
+        record({
+          dpeNumber: `d-${i}`,
+          banId: `69383_0000_${String(i).padStart(5, '0')}`,
+          address: `${i} Rue Longue 69003 Lyon`,
+        }),
+      ),
+    );
+    const building = buildingFactsReturning([]);
+
+    await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        getBuildingFacts: building.lookup,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+
+    expect(building.asked).toHaveLength(1);
+    expect(building.asked[0]?.length).toBeLessThanOrEqual(25);
+    expect(building.asked[0]?.length).toBeGreaterThan(0);
+  });
+
+  // why: l'enrichissement est un bonus. Une panne BDNB ne doit pas faire
+  // echouer une recherche qui aboutissait sans elle.
+  it('still answers when the building register fails', async () => {
+    const { directory } = directoryReturning([record({ dpeNumber: 'a' })]);
+    const failing: typeof getBuildingFacts = async () =>
+      err(externalApi('bdnb', 'down'));
+
+    const result = await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        getBuildingFacts: failing,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.candidates).toHaveLength(1);
+  });
+
+  // why: la porte anti-preuve-mince se decide APRES enrichissement, sinon une
+  // annonce sans DPE mais avec une annee serait refusee alors que la BDNB
+  // vient justement de rendre l'annee comparable.
+  it('lets the building register unlock an answer the bare registers refused', async () => {
+    const records = [
+      record({
+        dpeNumber: 'a',
+        banId: '69383_4180_00016',
+        yearBuilt: null,
+        dpeClass: null,
+        gesClass: null,
+        dpeKwhM2Year: null,
+        gesKgCo2M2Year: null,
+      }),
+    ];
+
+    const withoutBuilding = await findAddressCandidates(
+      { listing: { ...bare, fields: { ...bare.fields, yearBuilt: 1880 } } },
+      {
+        dpeDirectory: directoryReturning(records).directory,
+        getBuildingFacts: buildingFactsReturning([]).lookup,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(withoutBuilding.isOk()).toBe(true);
+    if (!withoutBuilding.isOk()) return;
+    expect(withoutBuilding.value.refusedFor).toBe('insufficient-evidence');
+
+    const withBuilding = await findAddressCandidates(
+      { listing: { ...bare, fields: { ...bare.fields, yearBuilt: 1880 } } },
+      {
+        dpeDirectory: directoryReturning(records).directory,
+        getBuildingFacts: buildingFactsReturning([
+          { banId: '69383_4180_00016', yearBuilt: 1880, floors: 6 },
+        ]).lookup,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(withBuilding.isOk()).toBe(true);
+    if (!withBuilding.isOk()) return;
+    expect(withBuilding.value.refusedFor).toBeNull();
+    expect(withBuilding.value.candidates).toHaveLength(1);
   });
 });

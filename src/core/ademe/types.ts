@@ -25,6 +25,7 @@ export type DpeRecord = {
   gesKgCo2M2Year: number | null;
   heatingEnergy: HeatingEnergy | null;
   yearBuilt: number | null;
+  buildingFloors: number | null;
   floor: number | null;
   buildingComplement: string | null;
   establishedOn: string | null;
@@ -48,6 +49,7 @@ export type MatchSignal =
   | 'gesKgCo2M2Year'
   | 'heatingEnergy'
   | 'yearBuilt'
+  | 'buildingFloors'
   | 'floor';
 
 export type AddressCandidate = {

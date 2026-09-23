@@ -83,6 +83,20 @@ function gradeSignal(
       3,
     );
   }
+  // why: le nombre d'etages de l'immeuble se lit souvent dans l'annonce et la
+  // BDNB le donne sur les adresses qu'elle rattache. Un ecart d'un niveau est
+  // courant — rez-de-chaussee compte ou non — donc il reste credite.
+  if (signal === 'buildingFloors') {
+    return gradeNumber(
+      delta,
+      [
+        [0, 2],
+        [1, 1],
+      ],
+      -1,
+      2,
+    );
+  }
   if (signal === 'yearBuilt') {
     return gradeNumber(
       delta,
@@ -113,6 +127,7 @@ const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
   'gesKgCo2M2Year',
   'heatingEnergy',
   'yearBuilt',
+  'buildingFloors',
   'floor',
 ];
 
@@ -124,6 +139,7 @@ const SIGNALS: readonly MatchSignal[] = [
   'gesKgCo2M2Year',
   'heatingEnergy',
   'yearBuilt',
+  'buildingFloors',
   'floor',
 ];
 
@@ -239,19 +255,19 @@ function supports(candidate: AddressCandidate): boolean {
   return candidate.diverged.length === 0 && candidate.matched.length > 0;
 }
 
-export function rankCandidates(input: {
-  values: ExtractedValues;
-  records: readonly DpeRecord[];
-  truncated: boolean;
-}): AddressMatch {
-  const scored = input.records.map((record) =>
-    scoreCandidate({ values: input.values, record }),
-  );
+// why: le classement sert deux fois — une premiere passe pour savoir quelles
+// adresses valent un aller-retour vers la BDNB, une seconde sur les lignes
+// enrichies. Meme ordre dans les deux cas, donc meme fonction.
+function rankAll(
+  values: ExtractedValues,
+  records: readonly DpeRecord[],
+): AddressCandidate[] {
+  const scored = records.map((record) => scoreCandidate({ values, record }));
 
   // why: le nombre de lignes d'appui n'est pas calibre contre une verite
   // terrain, donc il departage seulement. Il ne remonte jamais une adresse
   // moins bien notee au-dessus d'une mieux notee.
-  const candidates = groupByAddress(scored).sort((a, b) => {
+  return groupByAddress(scored).sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     if (b.supportingRecords !== a.supportingRecords) {
       return b.supportingRecords - a.supportingRecords;
@@ -261,6 +277,29 @@ export function rankCandidates(input: {
     if (scoreGap !== 0) return scoreGap;
     return a.record.dpeNumber.localeCompare(b.record.dpeNumber);
   });
+}
+
+export function rankedBanIds(input: {
+  values: ExtractedValues;
+  records: readonly DpeRecord[];
+  limit: number;
+}): string[] {
+  const seen: string[] = [];
+  for (const candidate of rankAll(input.values, input.records)) {
+    const banId = candidate.record.banId;
+    if (banId === null || seen.includes(banId)) continue;
+    seen.push(banId);
+    if (seen.length >= input.limit) break;
+  }
+  return seen;
+}
+
+export function rankCandidates(input: {
+  values: ExtractedValues;
+  records: readonly DpeRecord[];
+  truncated: boolean;
+}): AddressMatch {
+  const candidates = rankAll(input.values, input.records);
 
   // why: la porte se decidait sur toute la population avant la coupe. Une
   // seule ligne enfouie loin dans le classement debloquait donc une liste
