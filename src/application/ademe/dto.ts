@@ -58,6 +58,7 @@ export const AddressMatchSchema = v.object({
   ),
   inspected: v.number(),
   truncated: v.boolean(),
+  refusedFor: v.nullable(v.picklist(['insufficient-evidence'])),
 }) satisfies v.GenericSchema<unknown, AddressMatch>;
 
 export type AddressMatchDto = AddressMatch;

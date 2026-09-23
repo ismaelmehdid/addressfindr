@@ -125,6 +125,8 @@
     "signalGesValue": "GES value",
     "signalYearBuilt": "year built",
     "signalFloor": "floor",
-    "signalHeating": "heating"
+    "signalHeating": "heating",
+    "addressInsufficientEvidence": "This listing does not show its energy label, so nothing separates the buildings that fit. Rather than name a street at random, no address is given.",
+    "addressSupport": "{count} DPE record(s) at this address"
   }
 }

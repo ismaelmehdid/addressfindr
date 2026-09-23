@@ -466,3 +466,96 @@ describe('scoreCandidate — qualite du geocodage', () => {
     expect(scored.confidence).toBeGreaterThan(0.5);
   });
 });
+
+describe('rankCandidates — refus faute de preuve', () => {
+  // why: mesure du 2026-09-22. Sur pap.fr, l'extraction ne rend que commune,
+  // type et surface : le portail n'affiche pas le DPE. Le filtre laisse alors
+  // des milliers de lignes, chacune ne se comparant que sur la surface, donc
+  // chacune sortant a 100%. Dix adresses affichees comme certaines alors que
+  // rien ne les distingue, c'est exactement l'erreur que le produit interdit.
+  const SURFACE_ONLY = {
+    ...EMPTY_EXTRACTED_VALUES,
+    propertyType: 'apartment' as const,
+    surfaceM2: 63,
+  };
+
+  it('returns nothing when the surface is the only comparable signal', () => {
+    const ranked = rankCandidates({
+      values: SURFACE_ONLY,
+      records: [
+        record({ dpeNumber: 'a', address: '1 Rue A 69003 Lyon' }),
+        record({ dpeNumber: 'b', address: '2 Rue B 69003 Lyon' }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBe('insufficient-evidence');
+    expect(ranked.inspected).toBe(2);
+  });
+
+  it('answers as soon as one discriminating signal is comparable', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, dpeClass: 'D' },
+      records: [record({ dpeNumber: 'a', address: '1 Rue A 69003 Lyon' })],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toHaveLength(1);
+    expect(ranked.refusedFor).toBeNull();
+  });
+
+  it('counts the heating energy as discriminating', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, heatingEnergy: 'gas' },
+      records: [
+        record({
+          dpeNumber: 'a',
+          address: '1 Rue A 69003 Lyon',
+          heatingEnergy: 'gas',
+        }),
+      ],
+      truncated: false,
+    });
+    expect(ranked.refusedFor).toBeNull();
+  });
+
+  // why: un signal que l'annonce porte mais que la ligne ADEME n'a pas n'est
+  // pas une preuve. Sinon il suffirait qu'une annonce mentionne son etage pour
+  // debloquer une reponse que rien ne soutient cote registre.
+  it('does not count a signal the ADEME row cannot answer', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, yearBuilt: 1970 },
+      records: [
+        record({
+          dpeNumber: 'a',
+          address: '1 Rue A 69003 Lyon',
+          yearBuilt: null,
+        }),
+      ],
+      truncated: false,
+    });
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBe('insufficient-evidence');
+  });
+
+  it('still reports how much it looked at when it refuses', () => {
+    const ranked = rankCandidates({
+      values: SURFACE_ONLY,
+      records: [record({ dpeNumber: 'a' })],
+      truncated: true,
+    });
+    expect(ranked.inspected).toBe(1);
+    expect(ranked.truncated).toBe(true);
+  });
+
+  it('refuses on an empty record set without inventing a reason', () => {
+    const ranked = rankCandidates({
+      values: { ...SURFACE_ONLY, dpeClass: 'D' },
+      records: [],
+      truncated: false,
+    });
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBeNull();
+  });
+});

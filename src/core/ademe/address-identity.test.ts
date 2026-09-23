@@ -3,6 +3,8 @@ import {
   addressGroupKey,
   normalizeAddressForComparison,
   rankOfTrueAddress,
+  rankOfTrueStreet,
+  streetOfAddress,
 } from './address-identity';
 import type { AddressCandidate, DpeRecord } from './types';
 
@@ -163,5 +165,64 @@ describe('rankOfTrueAddress', () => {
       rank: null,
       total: 0,
     });
+  });
+});
+
+describe('streetOfAddress', () => {
+  it('drops the house number and the postal suffix', () => {
+    expect(streetOfAddress('16 Rue Lavoisier 69003 Lyon')).toBe(
+      streetOfAddress('Rue Lavoisier'),
+    );
+  });
+
+  it('keeps two different streets apart', () => {
+    expect(streetOfAddress('16 Rue Lavoisier 69003 Lyon')).not.toBe(
+      streetOfAddress('16 Rue Mazenod 69003 Lyon'),
+    );
+  });
+
+  it('handles a bis or ter suffix on the number', () => {
+    expect(streetOfAddress('16 bis Rue Lavoisier 69003 Lyon')).toBe(
+      streetOfAddress('Rue Lavoisier'),
+    );
+  });
+
+  it('survives an address that carries no number at all', () => {
+    expect(streetOfAddress('Rue Brancion')).toBe(
+      streetOfAddress('Rue Brancion'),
+    );
+    expect(streetOfAddress('Rue Brancion').length).toBeGreaterThan(0);
+  });
+
+  it('normalises abbreviations like the address comparison does', () => {
+    expect(streetOfAddress('12 Av. de la Gare 69003 Lyon')).toBe(
+      streetOfAddress('Avenue de la Gare'),
+    );
+  });
+});
+
+describe('rankOfTrueStreet', () => {
+  const candidates = [
+    candidate('10 Rue Mazenod 69003 Lyon'),
+    candidate('16 Rue Lavoisier 69003 Lyon'),
+    candidate('22 Rue Lavoisier 69003 Lyon'),
+  ];
+
+  it('finds the first candidate standing on the true street', () => {
+    expect(
+      rankOfTrueStreet({ candidates, trueAddress: 'Rue Lavoisier 69003 Lyon' }),
+    ).toEqual({ rank: 2, total: 3 });
+  });
+
+  it('matches a street-only truth against numbered candidates', () => {
+    expect(
+      rankOfTrueStreet({ candidates, trueAddress: 'Rue Mazenod' }),
+    ).toEqual({ rank: 1, total: 3 });
+  });
+
+  it('reports a null rank when no candidate stands on that street', () => {
+    expect(
+      rankOfTrueStreet({ candidates, trueAddress: 'Rue Inexistante' }),
+    ).toEqual({ rank: null, total: 3 });
   });
 });

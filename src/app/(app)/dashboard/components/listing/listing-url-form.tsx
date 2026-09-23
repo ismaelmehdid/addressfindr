@@ -313,6 +313,14 @@ function AddressSection({ state }: { state: MatchState }) {
 function AddressList({ match }: { match: AddressMatch }) {
   const t = useTranslations('Listing');
 
+  if (match.refusedFor === 'insufficient-evidence') {
+    return (
+      <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
+        {t('addressInsufficientEvidence')}
+      </p>
+    );
+  }
+
   if (match.candidates.length === 0) {
     return (
       <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
@@ -340,6 +348,10 @@ function AddressList({ match }: { match: AddressMatch }) {
               </span>
             </div>
             <p className="mt-1 text-[12px] leading-[1.6] tracking-[-0.08px] text-slate-neutral">
+              {t('addressSupport', {
+                count: candidate.supportingRecords,
+              })}
+              {' · '}
               {t('addressMatchedOn', {
                 signals: candidate.matched
                   .map((signal) => t(SIGNAL_KEY[signal]))

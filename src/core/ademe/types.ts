@@ -58,10 +58,13 @@ export type AddressCandidate = {
   supportingRecords: number;
 };
 
+export type MatchRefusal = 'insufficient-evidence';
+
 export type AddressMatch = {
   candidates: readonly AddressCandidate[];
   inspected: number;
   truncated: boolean;
+  refusedFor: MatchRefusal | null;
 };
 
 // why: l'API data-fair accepte size jusqu'a 10000 (10001 rend un 400). Lyon 3e,

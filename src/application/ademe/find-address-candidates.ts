@@ -73,6 +73,7 @@ export async function findAddressCandidates(
     inspected: match.inspected,
     returned: match.candidates.length,
     truncated: match.truncated,
+    refusedFor: match.refusedFor,
     best: match.candidates[0]?.confidence ?? 0,
   });
 

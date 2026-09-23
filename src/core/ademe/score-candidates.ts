@@ -5,6 +5,7 @@ import {
   type AddressMatch,
   type DpeRecord,
   MAX_CANDIDATES_RETURNED,
+  type MatchRefusal,
   type MatchSignal,
 } from './types';
 
@@ -95,6 +96,22 @@ function gradeSignal(
   }
   return delta === 0 ? { award: 1.5, weight: 1.5 } : { award: -1, weight: 1.5 };
 }
+
+// why: la surface est deja un filtre dur de la recherche, donc tout candidat
+// qui revient s'accorde dessus. Elle ne distingue rien. Mesure du 2026-09-22 :
+// sur pap.fr, qui n'affiche aucun DPE, l'extraction ne rend que commune, type
+// et surface — le classement sortait alors dix adresses a 100% que rien ne
+// separait. Sans au moins un signal discriminant reellement comparable des
+// deux cotes, il vaut mieux ne rien rendre.
+const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
+  'dpeClass',
+  'gesClass',
+  'dpeKwhM2Year',
+  'gesKgCo2M2Year',
+  'heatingEnergy',
+  'yearBuilt',
+  'floor',
+];
 
 const SIGNALS: readonly MatchSignal[] = [
   'surfaceM2',
@@ -198,6 +215,16 @@ function groupByAddress(
   return [...groups.values()];
 }
 
+function hasDiscriminatingEvidence(
+  candidates: readonly AddressCandidate[],
+): boolean {
+  return candidates.some((candidate) =>
+    [...candidate.matched, ...candidate.diverged].some((signal) =>
+      DISCRIMINATING_SIGNALS.includes(signal),
+    ),
+  );
+}
+
 export function rankCandidates(input: {
   values: ExtractedValues;
   records: readonly DpeRecord[];
@@ -221,9 +248,16 @@ export function rankCandidates(input: {
     return a.record.dpeNumber.localeCompare(b.record.dpeNumber);
   });
 
+  const refusedFor: MatchRefusal | null =
+    candidates.length > 0 && !hasDiscriminatingEvidence(candidates)
+      ? 'insufficient-evidence'
+      : null;
+
   return {
-    candidates: candidates.slice(0, MAX_CANDIDATES_RETURNED),
+    candidates:
+      refusedFor === null ? candidates.slice(0, MAX_CANDIDATES_RETURNED) : [],
     inspected: input.records.length,
     truncated: input.truncated,
+    refusedFor,
   };
 }

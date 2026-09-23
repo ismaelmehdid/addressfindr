@@ -67,3 +67,31 @@ export function rankOfTrueAddress(input: {
   );
   return { rank: index === -1 ? null : index + 1, total };
 }
+
+// why: la verite terrain gratuite du projet est au niveau rue, pas adresse.
+// Mesure du 2026-09-22 sur 6 annonces pap.fr : le streetAddress publie en
+// JSON-LD vaut "Rue Tholoze 75018 Paris" ou "Rue Brancion" — le portail donne
+// la voie et retient le numero, ce qui est precisement ce que le produit
+// cherche. La bonne rue reste donc la seule chose mesurable a peu de frais.
+const LEADING_HOUSE_NUMBER = /^\d+\s*(bis|ter|quater)?\s+/;
+const TRAILING_POSTAL_SUFFIX = /\s\d{5}(\s.*)?$/;
+
+export function streetOfAddress(raw: string): string {
+  const withoutSuffix = raw.replace(TRAILING_POSTAL_SUFFIX, '');
+  const normalized = normalizeAddressForComparison(withoutSuffix);
+  return normalized.replace(LEADING_HOUSE_NUMBER, '').trim();
+}
+
+export function rankOfTrueStreet(input: {
+  candidates: readonly AddressCandidate[];
+  trueAddress: string;
+}): { rank: number | null; total: number } {
+  const wanted = streetOfAddress(input.trueAddress);
+  const total = input.candidates.length;
+  if (wanted.length === 0) return { rank: null, total };
+
+  const index = input.candidates.findIndex(
+    (candidate) => streetOfAddress(candidate.record.address) === wanted,
+  );
+  return { rank: index === -1 ? null : index + 1, total };
+}

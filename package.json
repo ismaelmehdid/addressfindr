@@ -23,7 +23,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
-    "validate": "pnpm type-check && pnpm check && pnpm lint && pnpm check:boundaries && pnpm test"
+    "validate": "pnpm type-check && pnpm check && pnpm lint && pnpm check:boundaries && pnpm test",
+    "eval:address": "vitest run --config vitest.eval.config.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

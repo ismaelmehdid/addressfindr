@@ -5,7 +5,10 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['**/*.test.ts', '**/*.test.tsx'],
-    exclude: ['node_modules', '.next', 'dist', '.claude'],
+    // why: les tests `.live.` tapent Firecrawl, Groq et les API publiques
+    // pour de vrai. Ils consomment des credits et dependent du reseau, donc
+    // ils restent hors de `pnpm test` et de la CI — `pnpm eval:address`.
+    exclude: ['node_modules', '.next', 'dist', '.claude', '**/*.live.test.ts'],
   },
   resolve: {
     alias: {
