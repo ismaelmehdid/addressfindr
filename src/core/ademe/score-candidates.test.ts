@@ -5,6 +5,7 @@ import type { DpeRecord } from './types';
 
 function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
   return {
+    dataset: 'existing',
     banId: null,
     address: '16 Rue Lavoisier 69003 Lyon',
     streetNumber: '16',

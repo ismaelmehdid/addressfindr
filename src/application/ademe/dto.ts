@@ -1,6 +1,6 @@
 import * as v from 'valibot';
 import { ExtractedListingSchema } from '@/application/listing/dto';
-import type { AddressMatch } from '@/core/ademe/types';
+import { type AddressMatch, DPE_REGISTERS } from '@/core/ademe/types';
 
 export const FindAddressCandidatesInputSchema = v.object({
   listing: ExtractedListingSchema,
@@ -22,6 +22,7 @@ const MatchSignalSchema = v.picklist([
 
 const DpeRecordSchema = v.object({
   dpeNumber: v.string(),
+  dataset: v.picklist(DPE_REGISTERS),
   banId: v.nullable(v.string()),
   address: v.string(),
   streetNumber: v.nullable(v.string()),

@@ -90,7 +90,20 @@ describe('ademeDpeDirectory.search', () => {
   });
 
   it('maps a row onto the domain record', async () => {
-    mockFetchOnce({ total: 1, results: [ROW] });
+    // why: deux registres sont interroges — seul celui des existants porte la
+    // ligne ici, pour que l'assertion vaille sur une ligne et une seule.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) =>
+        url.pathname.includes('dpe03existant')
+          ? new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+              status: 200,
+            })
+          : new Response(JSON.stringify({ total: 0, results: [] }), {
+              status: 200,
+            }),
+      ),
+    );
     const result = await ademeDpeDirectory.search(filter());
 
     expect(result.isOk()).toBe(true);
@@ -98,6 +111,7 @@ describe('ademeDpeDirectory.search', () => {
     expect(result.value.total).toBe(1);
     expect(result.value.records[0]).toEqual({
       dpeNumber: '2269E0123456X',
+      dataset: 'existing',
       banId: '69383_4180_00016',
       address: '16 Rue Lavoisier 69003 Lyon',
       streetNumber: '16',
@@ -173,6 +187,116 @@ describe('ademeDpeDirectory.search', () => {
 
   it('returns an external_api error on a server failure', async () => {
     mockFetchOnce({}, 502);
+    const result = await ademeDpeDirectory.search(filter());
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+});
+
+describe('ademeDpeDirectory.search — logements neufs', () => {
+  function mockFetchSequence(bodies: unknown[]) {
+    let call = 0;
+    const spy = vi.fn(async () => {
+      const body = bodies[Math.min(call, bodies.length - 1)];
+      call += 1;
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  function datasetsHit(spy: ReturnType<typeof mockFetchSequence>): string[] {
+    return spy.mock.calls.map((call) => {
+      const url = (call as unknown as [URL])[0];
+      return url.pathname.split('/datasets/')[1]?.split('/')[0] ?? '';
+    });
+  }
+
+  it('queries the existing-dwelling and new-dwelling datasets', async () => {
+    const spy = mockFetchSequence([{ total: 0, results: [] }]);
+    await ademeDpeDirectory.search(filter());
+
+    const hit = datasetsHit(spy);
+    expect(hit).toHaveLength(2);
+    expect(hit).toContain('dpe03existant');
+    expect(hit).toContain('g3cgx7jb3cmys5voxz1mrm22');
+  });
+
+  it('marks which register each record came from', async () => {
+    mockFetchSequence([
+      { total: 1, results: [ROW] },
+      { total: 1, results: [{ ...ROW, numero_dpe: 'NEUF-1' }] },
+    ]);
+    const result = await ademeDpeDirectory.search(filter());
+
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    const byNumber = new Map(
+      result.value.records.map((r) => [r.dpeNumber, r.dataset]),
+    );
+    expect(byNumber.get('2269E0123456X')).toBe('existing');
+    expect(byNumber.get('NEUF-1')).toBe('new');
+  });
+
+  it('sums the totals of both registers', async () => {
+    mockFetchSequence([
+      { total: 40, results: [ROW] },
+      { total: 2, results: [{ ...ROW, numero_dpe: 'NEUF-1' }] },
+    ]);
+    const result = await ademeDpeDirectory.search(filter());
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.total).toBe(42);
+  });
+
+  it('drops a DPE number returned by both registers', async () => {
+    mockFetchSequence([
+      { total: 1, results: [ROW] },
+      { total: 1, results: [ROW] },
+    ]);
+    const result = await ademeDpeDirectory.search(filter());
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.records).toHaveLength(1);
+  });
+
+  // why: le registre des neufs est un complement. S'il tombe, une annonce de
+  // logement ancien doit continuer a matcher plutot que de ne rien rendre.
+  it('still answers from the existing register when the new one fails', async () => {
+    let call = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => {
+        call += 1;
+        const isNew = url.pathname.includes('g3cgx7jb3cmys5voxz1mrm22');
+        return isNew
+          ? new Response('{}', { status: 500 })
+          : new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+              status: 200,
+            });
+      }),
+    );
+
+    const result = await ademeDpeDirectory.search(filter());
+    expect(call).toBe(2);
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.records).toHaveLength(1);
+  });
+
+  it('fails when the existing register fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => {
+        const isNew = url.pathname.includes('g3cgx7jb3cmys5voxz1mrm22');
+        return isNew
+          ? new Response(JSON.stringify({ total: 0, results: [] }), {
+              status: 200,
+            })
+          : new Response('{}', { status: 503 });
+      }),
+    );
+
     const result = await ademeDpeDirectory.search(filter());
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');

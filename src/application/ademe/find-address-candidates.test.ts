@@ -52,6 +52,7 @@ function listing(
 function record(over: Partial<DpeRecord> = {}): DpeRecord {
   return {
     dpeNumber: '2269E0123456X',
+    dataset: 'existing',
     banId: '69383_4180_00016',
     address: '16 Rue Lavoisier 69003 Lyon',
     streetNumber: '16',

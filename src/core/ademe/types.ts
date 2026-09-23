@@ -1,7 +1,11 @@
 import type { EnergyClass, PropertyType } from '@/core/listing/types';
 
+export const DPE_REGISTERS = ['existing', 'new'] as const;
+export type DpeRegister = (typeof DPE_REGISTERS)[number];
+
 export type DpeRecord = {
   dpeNumber: string;
+  dataset: DpeRegister;
   banId: string | null;
   address: string;
   streetNumber: string | null;

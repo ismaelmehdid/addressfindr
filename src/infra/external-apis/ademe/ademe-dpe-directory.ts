@@ -4,7 +4,11 @@ import { err, ok, type Result } from 'neverthrow';
 import * as v from 'valibot';
 import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
 import { repairMojibake } from '@/core/ademe/repair-mojibake';
-import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
+import type {
+  DpeRecord,
+  DpeRegister,
+  DpeSearchFilter,
+} from '@/core/ademe/types';
 import { isInseeCode } from '@/core/commune/types';
 import { type AppError, externalApi, validation } from '@/core/errors';
 import {
@@ -16,7 +20,15 @@ import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
 
 const PROVIDER = 'ademe';
-const DATASET = 'dpe03existant';
+
+// why: un logement neuf n'est pas dans le registre des logements existants.
+// 1 429 026 lignes vivent dans le registre des neufs, dont le slug lisible
+// n'existe pas — seul cet identifiant repond. Les deux registres partagent
+// exactement le meme schema de champs, verifie le 2026-09-22.
+const REGISTERS = [
+  { dataset: 'dpe03existant', origin: 'existing' },
+  { dataset: 'g3cgx7jb3cmys5voxz1mrm22', origin: 'new' },
+] as const satisfies readonly { dataset: string; origin: DpeRegister }[];
 
 const SELECTED_FIELDS = [
   'numero_dpe',
@@ -97,7 +109,7 @@ function numeric(raw: number | null | undefined): number | null {
   return typeof raw === 'number' && Number.isFinite(raw) ? raw : null;
 }
 
-function toRecord(row: Row): DpeRecord | null {
+function toRecord(row: Row, dataset: DpeRegister): DpeRecord | null {
   const dpeNumber = text(row.numero_dpe);
   const inseeCode = text(row.code_insee_ban);
   const address = text(row.adresse_ban);
@@ -115,6 +127,7 @@ function toRecord(row: Row): DpeRecord | null {
 
   return {
     dpeNumber,
+    dataset,
     banId: text(row.identifiant_ban),
     address,
     streetNumber,
@@ -160,27 +173,16 @@ function buildQueryString(filter: DpeSearchFilter): string {
   return clauses.join(' AND ');
 }
 
-async function search(
+async function searchRegister(
+  register: (typeof REGISTERS)[number],
   filter: DpeSearchFilter,
 ): Promise<Result<{ records: DpeRecord[]; total: number }, AppError>> {
-  // why: la valeur part dans une requete Lucene. Elle vient d'une commune
-  // resolue, mais on ne la prend pas sur parole avant de l'interpoler.
-  if (!isInseeCode(filter.inseeCode)) {
-    return err(validation('Invalid INSEE code', 'inseeCode'));
-  }
-
   const url = new URL(
-    `${env().ADEME_BASE_URL}/data-fair/api/v1/datasets/${DATASET}/lines`,
+    `${env().ADEME_BASE_URL}/data-fair/api/v1/datasets/${register.dataset}/lines`,
   );
   url.searchParams.set('qs', buildQueryString(filter));
   url.searchParams.set('select', SELECTED_FIELDS);
   url.searchParams.set('size', String(filter.limit));
-
-  log.info('ademe.search.start', {
-    inseeCode: filter.inseeCode,
-    hasDpeClass: filter.dpeClass !== null,
-    limit: filter.limit,
-  });
 
   try {
     const response = await fetch(url, {
@@ -192,6 +194,7 @@ async function search(
     if (!response.ok) {
       const body = await response.text().catch(() => '');
       log.warn('ademe.search.http_failure', {
+        register: register.origin,
         status: response.status,
         body: body.slice(0, 200),
       });
@@ -208,27 +211,77 @@ async function search(
     const parsed = v.safeParse(ResponseSchema, json);
     if (!parsed.success) {
       log.warn('ademe.search.parse_failure', {
+        register: register.origin,
         issues: parsed.issues.map((i) => i.message).slice(0, 3),
       });
       return err(externalApi(PROVIDER, 'Unexpected response shape'));
     }
 
     const records = parsed.output.results
-      .map(toRecord)
+      .map((row) => toRecord(row, register.origin))
       .filter((record): record is DpeRecord => record !== null);
 
-    log.info('ademe.search.success', {
-      total: parsed.output.total,
-      returned: records.length,
-    });
     return ok({ records, total: parsed.output.total });
   } catch (e) {
     if (e instanceof Error && e.name === 'TimeoutError') {
       return err(externalApi(PROVIDER, 'Request timed out'));
     }
-    log.error('ademe.search.exception', e);
+    log.error('ademe.search.exception', e, { register: register.origin });
     return err(externalApi(PROVIDER, 'Network or parser failure'));
   }
+}
+
+async function search(
+  filter: DpeSearchFilter,
+): Promise<Result<{ records: DpeRecord[]; total: number }, AppError>> {
+  // why: la valeur part dans une requete Lucene. Elle vient d'une commune
+  // resolue, mais on ne la prend pas sur parole avant de l'interpoler.
+  if (!isInseeCode(filter.inseeCode)) {
+    return err(validation('Invalid INSEE code', 'inseeCode'));
+  }
+
+  log.info('ademe.search.start', {
+    inseeCode: filter.inseeCode,
+    hasDpeClass: filter.dpeClass !== null,
+    limit: filter.limit,
+  });
+
+  const outcomes = await Promise.all(
+    REGISTERS.map((register) => searchRegister(register, filter)),
+  );
+
+  const [existing] = outcomes;
+  // why: le registre des existants porte l'essentiel du volume. S'il tombe,
+  // la reponse serait silencieusement amputee — mieux vaut echouer. Celui des
+  // neufs est un complement : sa panne ne doit pas casser une annonce d'ancien.
+  if (existing === undefined || existing.isErr()) {
+    return err(
+      existing?.isErr()
+        ? existing.error
+        : externalApi(PROVIDER, 'No register answered'),
+    );
+  }
+
+  const seen = new Set<string>();
+  const records: DpeRecord[] = [];
+  let total = 0;
+
+  for (const outcome of outcomes) {
+    if (outcome.isErr()) continue;
+    total += outcome.value.total;
+    for (const record of outcome.value.records) {
+      if (seen.has(record.dpeNumber)) continue;
+      seen.add(record.dpeNumber);
+      records.push(record);
+    }
+  }
+
+  log.info('ademe.search.success', {
+    total,
+    returned: records.length,
+    registersAnswered: outcomes.filter((o) => o.isOk()).length,
+  });
+  return ok({ records, total });
 }
 
 export const ademeDpeDirectory: IDpeDirectory = { search };
