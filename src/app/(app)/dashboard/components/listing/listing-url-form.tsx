@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
 import * as v from 'valibot';
@@ -8,6 +9,7 @@ import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { candidateOnMap } from '@/core/ademe/candidate-on-map';
 import type {
   AddressCandidate,
   AddressMatch,
@@ -21,7 +23,18 @@ import {
   type ListingUrlRejection,
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
-import { AddressMap } from './address-map';
+
+// why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
+// premier affichage d'une carte, pas a chaque visite du tableau de bord.
+const AddressMap = dynamic(
+  () => import('./address-map').then((module) => module.AddressMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-2 h-[320px] w-full rounded-lg border border-border bg-card" />
+    ),
+  },
+);
 
 const REJECTION_KEY = {
   empty: 'errorEmpty',
@@ -339,16 +352,16 @@ function MapPanel({
   candidate,
   mapboxAccessToken,
 }: {
-  candidate: AddressCandidate | null;
+  candidate: AddressCandidate;
   mapboxAccessToken: string;
 }) {
   const t = useTranslations('Listing');
-  const point = candidate?.record.point ?? null;
+  const { address, point } = candidate.record;
 
   if (point === null) {
     return (
       <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {t('mapNoTrustedPoint')}
+        {t('mapNoTrustedPoint', { address })}
       </p>
     );
   }
@@ -361,7 +374,14 @@ function MapPanel({
     );
   }
 
-  return <AddressMap point={point} accessToken={mapboxAccessToken} />;
+  return (
+    <>
+      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {t('mapPinned', { address })}
+      </p>
+      <AddressMap point={point} accessToken={mapboxAccessToken} />
+    </>
+  );
 }
 
 function AddressList({
@@ -392,19 +412,13 @@ function AddressList({
     );
   }
 
-  const mappable = match.candidates.filter(
-    (candidate) => candidate.record.point !== null,
-  );
-  const shown =
-    mappable.find(
-      (candidate) => candidate.record.dpeNumber === selectedDpeNumber,
-    ) ??
-    mappable[0] ??
-    null;
+  const shown = candidateOnMap(match.candidates, selectedDpeNumber);
 
   return (
     <>
-      <MapPanel candidate={shown} mapboxAccessToken={mapboxAccessToken} />
+      {shown !== null && (
+        <MapPanel candidate={shown} mapboxAccessToken={mapboxAccessToken} />
+      )}
       <ol className="mt-2 flex flex-col gap-2">
         {match.candidates.map((candidate) => (
           <li

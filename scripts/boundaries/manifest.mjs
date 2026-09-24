@@ -134,6 +134,7 @@ export const DOMAINS = [
       'src/application/ademe/find-address-candidates',
       'src/application/ademe/dto',
       'src/core/ademe/types',
+      'src/core/ademe/candidate-on-map',
     ],
   },
   {
