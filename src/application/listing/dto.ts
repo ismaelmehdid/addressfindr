@@ -1,5 +1,9 @@
 import * as v from 'valibot';
 import {
+  LAND_SURFACE_BOUNDS,
+  SURFACE_BOUNDS,
+} from '@/core/listing/field-bounds';
+import {
   ENERGY_CLASSES,
   type ExtractedListing,
   FIELD_SOURCES,
@@ -23,8 +27,20 @@ const ListingFieldsSchema = v.object({
   listingId: v.nullable(v.string()),
   transactionType: v.nullable(v.picklist(TRANSACTION_TYPES)),
   propertyType: v.nullable(v.picklist(PROPERTY_TYPES)),
-  surfaceM2: v.nullable(v.number()),
-  landSurfaceM2: v.nullable(v.number()),
+  surfaceM2: v.nullable(
+    v.pipe(
+      v.number(),
+      v.minValue(SURFACE_BOUNDS.min),
+      v.maxValue(SURFACE_BOUNDS.max),
+    ),
+  ),
+  landSurfaceM2: v.nullable(
+    v.pipe(
+      v.number(),
+      v.minValue(LAND_SURFACE_BOUNDS.min),
+      v.maxValue(LAND_SURFACE_BOUNDS.max),
+    ),
+  ),
   rooms: v.nullable(v.number()),
   bedrooms: v.nullable(v.number()),
   floor: v.nullable(v.number()),

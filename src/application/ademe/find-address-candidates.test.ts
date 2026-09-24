@@ -85,6 +85,7 @@ function record(over: Partial<DpeRecord> = {}): DpeRecord {
 function directoryReturning(
   records: DpeRecord[],
   total = records.length,
+  truncated = false,
 ): { directory: IDpeDirectory; filters: DpeSearchFilter[] } {
   const filters: DpeSearchFilter[] = [];
   return {
@@ -92,7 +93,7 @@ function directoryReturning(
     directory: {
       search: async (filter) => {
         filters.push(filter);
-        return ok({ records, total });
+        return ok({ records, total, truncated });
       },
     },
   };
@@ -162,7 +163,7 @@ describe('findAddressCandidates', () => {
   });
 
   it('reports truncation when the register holds more than it returned', async () => {
-    const { directory } = directoryReturning([record()], 5000);
+    const { directory } = directoryReturning([record()], 5000, true);
 
     const result = await findAddressCandidates(
       { listing: listing() },

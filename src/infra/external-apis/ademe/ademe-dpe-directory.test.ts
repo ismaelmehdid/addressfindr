@@ -511,3 +511,97 @@ describe('ademeDpeDirectory.search — mappable point', () => {
     expect(select).toContain('_geopoint');
   });
 });
+
+describe('ademeDpeDirectory.search — troncature', () => {
+  function mockRegisters(existing: unknown, fresh: unknown) {
+    const spy = vi.fn(async (url: URL) =>
+      url.pathname.includes('dpe03existant')
+        ? new Response(JSON.stringify(existing), { status: 200 })
+        : new Response(JSON.stringify(fresh), { status: 200 }),
+    );
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  // why: chaque registre applique `size` pour lui seul, donc additionner les
+  // deux totaux et comparer la somme au plafond compare deux echelles
+  // differentes. Deux registres qui rendent tout leur contenu se faisaient
+  // signaler comme tronques, et l'interface conseillait de preciser l'annonce
+  // alors que rien n'avait ete coupe.
+  it('is not truncated when both registers returned everything they had', async () => {
+    mockRegisters(
+      { total: 3, results: [ROW, ROW, ROW] },
+      { total: 2, results: [ROW, ROW] },
+    );
+    const result = await ademeDpeDirectory.search(filter({ limit: 4 }));
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.truncated).toBe(false);
+  });
+
+  it('is truncated when one register held more than the cap', async () => {
+    mockRegisters(
+      { total: 9000, results: [ROW] },
+      { total: 1, results: [ROW] },
+    );
+    const result = await ademeDpeDirectory.search(filter({ limit: 2000 }));
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.truncated).toBe(true);
+  });
+
+  it('is truncated when the other register held more than the cap', async () => {
+    mockRegisters(
+      { total: 1, results: [ROW] },
+      { total: 9000, results: [ROW] },
+    );
+    const result = await ademeDpeDirectory.search(filter({ limit: 2000 }));
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.truncated).toBe(true);
+  });
+});
+
+describe('ademeDpeDirectory.search — le cache ne fige pas une reponse partielle', () => {
+  // why: si le registre des neufs tombe une minute, la reponse rendue est
+  // amputee. La figer six heures prolongerait la panne bien au-dela d'elle :
+  // toutes les recherches suivantes de la meme commune liraient la liste
+  // incomplete, y compris apres retablissement.
+  it('does not cache a search one register failed to answer', async () => {
+    let newRegisterDown = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => {
+        if (url.pathname.includes('dpe03existant')) {
+          return new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+            status: 200,
+          });
+        }
+        return newRegisterDown
+          ? new Response('{}', { status: 500 })
+          : new Response(
+              JSON.stringify({
+                total: 1,
+                results: [{ ...ROW, numero_dpe: 'NEUF-1' }],
+              }),
+              { status: 200 },
+            );
+      }),
+    );
+
+    const partial = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69011' }),
+    );
+    expect(partial.isOk()).toBe(true);
+    if (!partial.isOk()) return;
+    expect(partial.value.records).toHaveLength(1);
+
+    newRegisterDown = false;
+    const recovered = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69011' }),
+    );
+    expect(recovered.isOk()).toBe(true);
+    if (!recovered.isOk()) return;
+    expect(recovered.value.records).toHaveLength(2);
+  });
+});

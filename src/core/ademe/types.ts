@@ -95,5 +95,12 @@ export function surfaceWindow(surfaceM2: number): {
     SURFACE_TOLERANCE_MIN_M2,
     surfaceM2 * SURFACE_TOLERANCE_RATIO,
   );
-  return { min: surfaceM2 - tolerance, max: surfaceM2 + tolerance };
+  // why: une borne basse negative part telle quelle dans la requete Lucene, et
+  // l'ADEME la rejette — `surface_habitable_logement:[-1.00 TO 3.00]` rend un
+  // HTTP 400 sur le signe moins, que l'utilisateur lit comme une panne du
+  // registre. Une surface negative n'a de toute facon aucun sens.
+  return {
+    min: Math.max(0, surfaceM2 - tolerance),
+    max: surfaceM2 + tolerance,
+  };
 }

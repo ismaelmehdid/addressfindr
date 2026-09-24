@@ -171,10 +171,25 @@ describe('rankOfTrueAddress', () => {
   });
 });
 
+// why: cette suite ne comparait que streetOfAddress(x) a streetOfAddress(y),
+// ce qui tient pour n'importe quelle implementation — y compris une qui
+// couperait le premier mot de chaque adresse. Sous cette mutation "16 Rue
+// Lavoisier" et "Avenue Lavoisier" tombaient sur la meme valeur, et le harnais
+// de verite terrain surestimait son taux de bonnes rues. Les assertions
+// portent donc sur des litteraux.
 describe('streetOfAddress', () => {
   it('drops the house number and the postal suffix', () => {
     expect(streetOfAddress('16 Rue Lavoisier 69003 Lyon')).toBe(
-      streetOfAddress('Rue Lavoisier'),
+      'rue lavoisier',
+    );
+  });
+
+  it('keeps the street type, which tells two streets of one name apart', () => {
+    expect(streetOfAddress('3 Rue de la Gare 69003 Lyon')).toBe(
+      'rue de la gare',
+    );
+    expect(streetOfAddress('3 Avenue de la Gare 69003 Lyon')).toBe(
+      'avenue de la gare',
     );
   });
 
@@ -186,20 +201,17 @@ describe('streetOfAddress', () => {
 
   it('handles a bis or ter suffix on the number', () => {
     expect(streetOfAddress('16 bis Rue Lavoisier 69003 Lyon')).toBe(
-      streetOfAddress('Rue Lavoisier'),
+      'rue lavoisier',
     );
   });
 
   it('survives an address that carries no number at all', () => {
-    expect(streetOfAddress('Rue Brancion')).toBe(
-      streetOfAddress('Rue Brancion'),
-    );
-    expect(streetOfAddress('Rue Brancion').length).toBeGreaterThan(0);
+    expect(streetOfAddress('Rue Brancion')).toBe('rue brancion');
   });
 
   it('normalises abbreviations like the address comparison does', () => {
     expect(streetOfAddress('12 Av. de la Gare 69003 Lyon')).toBe(
-      streetOfAddress('Avenue de la Gare'),
+      'avenue de la gare',
     );
   });
 });
