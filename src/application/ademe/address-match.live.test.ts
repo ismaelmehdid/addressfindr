@@ -183,7 +183,10 @@ describe('verite terrain pap.fr', () => {
     // why: selon le reporter, vitest avale la sortie console. Le rapport est
     // le produit du harnais, il doit survivre a ca.
     writeFileSync(REPORT_PATH, report, 'utf8');
-    // biome-ignore lint/suspicious/noConsole: le harnais existe pour ce rapport
+    // why: ce harnais n'existe que pour produire ce rapport, et il s'invoque a
+    // la main. Le fichier en garde une copie, la sortie terminal sert a le
+    // lire sans ouvrir quoi que ce soit.
+    // eslint-disable-next-line no-console
     console.log(report);
 
     expect(

@@ -155,6 +155,12 @@ const eslintConfig = defineConfig([
     'next-env.d.ts',
     'drizzle/**',
     'public/**',
+    // why: .gitignore exclut deja .claude/worktrees, mais eslint ne lit pas
+    // .gitignore. Un worktree porte sa propre copie du depot et son propre
+    // node_modules, donc sans cette ligne `pnpm lint` les parcourt : deux
+    // worktrees presents rendaient 85 210 problemes et cassaient
+    // `pnpm validate` en local. La CI clone a blanc et ne le voyait pas.
+    '.claude/**',
   ]),
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
