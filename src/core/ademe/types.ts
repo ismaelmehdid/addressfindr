@@ -1,3 +1,4 @@
+import type { GeoPoint } from '@/core/geo/types';
 import type {
   EnergyClass,
   HeatingEnergy,
@@ -31,6 +32,7 @@ export type DpeRecord = {
   buildingComplement: string | null;
   establishedOn: string | null;
   geocodingScore: number | null;
+  point: GeoPoint | null;
 };
 
 export type DpeSearchFilter = {

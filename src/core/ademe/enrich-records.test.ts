@@ -27,6 +27,7 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     buildingComplement: null,
     establishedOn: null,
     geocodingScore: 0.7,
+    point: null,
     ...over,
   };
 }

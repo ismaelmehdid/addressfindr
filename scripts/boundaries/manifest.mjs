@@ -134,6 +134,7 @@ export const DOMAINS = [
       'src/application/ademe/find-address-candidates',
       'src/application/ademe/dto',
       'src/core/ademe/types',
+      'src/core/ademe/candidate-on-map',
     ],
   },
   {
@@ -148,6 +149,14 @@ export const DOMAINS = [
       'src/application/building/get-building-facts',
       'src/core/building/types',
     ],
+  },
+  {
+    // Coordonnees et confiance geographique, sans dependance a une source.
+    // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
+    name: 'geo',
+    dirs: ['src/core/geo', 'src/application/geo'],
+    schemas: [],
+    public: ['src/core/geo/types', 'src/core/geo/resolve-mappable-point'],
   },
   {
     name: 'commune',
@@ -235,6 +244,10 @@ export const ALLOWED_EDGES = [
   // modele de files <-> indexing : aucun cycle d'import au niveau des modules,
   // ademe ne depend que de core/listing, listing que de l'API publique d'ademe.
   ['listing', 'ademe'],
+  // ademe filtre la coordonnee d'une ligne DPE avant de l'exposer, et le
+  // formulaire d'annonce lit ce point pour placer la carte.
+  ['ademe', 'geo'],
+  ['listing', 'geo'],
 ];
 
 export const SHARED_PREFIXES = [

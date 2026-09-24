@@ -24,6 +24,11 @@ const EnvSchema = v.object({
     v.pipe(v.string(), v.url()),
     'https://eu.i.posthog.com',
   ),
+  // why: jeton public Mapbox, lu au build et servi au navigateur. Le prefixe
+  // pk. est verifie ici pour qu'un jeton secret sk. ne parte jamais au client.
+  NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: v.optional(
+    v.pipe(v.string(), v.minLength(1), v.startsWith('pk.')),
+  ),
 
   DATABASE_URL: v.pipe(v.string(), v.minLength(1)),
   DATABASE_SSL: v.optional(v.picklist(['allow', 'require']), 'allow'),

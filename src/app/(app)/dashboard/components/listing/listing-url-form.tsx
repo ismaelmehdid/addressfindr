@@ -1,6 +1,7 @@
 'use client';
 
 import { ArrowRight } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { type FormEvent, useState } from 'react';
 import * as v from 'valibot';
@@ -8,7 +9,12 @@ import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import type { AddressMatch, MatchSignal } from '@/core/ademe/types';
+import { candidateOnMap } from '@/core/ademe/candidate-on-map';
+import type {
+  AddressCandidate,
+  AddressMatch,
+  MatchSignal,
+} from '@/core/ademe/types';
 import {
   EXTRACTED_FIELD_NAMES,
   type ExtractedListing,
@@ -17,6 +23,18 @@ import {
   type ListingUrlRejection,
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
+
+// why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
+// premier affichage d'une carte, pas a chaque visite du tableau de bord.
+const AddressMap = dynamic(
+  () => import('./address-map').then((module) => module.AddressMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="mt-2 h-[320px] w-full rounded-lg border border-border bg-card" />
+    ),
+  },
+);
 
 const REJECTION_KEY = {
   empty: 'errorEmpty',
@@ -167,7 +185,11 @@ function formatExtraction(listing: ExtractedListing): string {
   return [...header, '', ...rows].join('\n');
 }
 
-export function ListingUrlForm() {
+export function ListingUrlForm({
+  mapboxAccessToken,
+}: {
+  mapboxAccessToken: string;
+}) {
   const t = useTranslations('Listing');
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
@@ -273,7 +295,10 @@ export function ListingUrlForm() {
         )}
         {status.kind === 'extracted' && (
           <>
-            <AddressSection state={status.match} />
+            <AddressSection
+              state={status.match}
+              mapboxAccessToken={mapboxAccessToken}
+            />
             <section aria-live="polite" className="mt-6">
               <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
                 {t('resultHeading')}
@@ -289,7 +314,13 @@ export function ListingUrlForm() {
   );
 }
 
-function AddressSection({ state }: { state: MatchState }) {
+function AddressSection({
+  state,
+  mapboxAccessToken,
+}: {
+  state: MatchState;
+  mapboxAccessToken: string;
+}) {
   const t = useTranslations('Listing');
 
   return (
@@ -307,13 +338,63 @@ function AddressSection({ state }: { state: MatchState }) {
           {t(MATCH_FAILURE_KEY[state.failure])}
         </p>
       )}
-      {state.kind === 'found' && <AddressList match={state.match} />}
+      {state.kind === 'found' && (
+        <AddressList
+          match={state.match}
+          mapboxAccessToken={mapboxAccessToken}
+        />
+      )}
     </section>
   );
 }
 
-function AddressList({ match }: { match: AddressMatch }) {
+function MapPanel({
+  candidate,
+  mapboxAccessToken,
+}: {
+  candidate: AddressCandidate;
+  mapboxAccessToken: string;
+}) {
   const t = useTranslations('Listing');
+  const { address, point } = candidate.record;
+
+  if (point === null) {
+    return (
+      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {t('mapNoTrustedPoint', { address })}
+      </p>
+    );
+  }
+
+  if (mapboxAccessToken.length === 0) {
+    return (
+      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {t('mapUnavailable')}
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {t('mapPinned', { address })}
+      </p>
+      <AddressMap point={point} accessToken={mapboxAccessToken} />
+    </>
+  );
+}
+
+function AddressList({
+  match,
+  mapboxAccessToken,
+}: {
+  match: AddressMatch;
+  mapboxAccessToken: string;
+}) {
+  const t = useTranslations('Listing');
+  const [selectedDpeNumber, setSelectedDpeNumber] = useState<string | null>(
+    null,
+  );
 
   if (match.refusedFor === 'insufficient-evidence') {
     return (
@@ -331,13 +412,23 @@ function AddressList({ match }: { match: AddressMatch }) {
     );
   }
 
+  const shown = candidateOnMap(match.candidates, selectedDpeNumber);
+
   return (
     <>
+      {shown !== null && (
+        <MapPanel candidate={shown} mapboxAccessToken={mapboxAccessToken} />
+      )}
       <ol className="mt-2 flex flex-col gap-2">
         {match.candidates.map((candidate) => (
           <li
             key={candidate.record.dpeNumber}
-            className="rounded-lg border border-border bg-card p-3"
+            aria-current={
+              candidate.record.dpeNumber === shown?.record.dpeNumber
+                ? 'true'
+                : undefined
+            }
+            className="rounded-lg border border-border bg-card p-3 aria-[current]:border-ink"
           >
             <div className="flex items-baseline justify-between gap-3">
               <span className="text-[14px] font-medium tracking-[-0.08px] text-ink">
@@ -369,6 +460,18 @@ function AddressList({ match }: { match: AddressMatch }) {
                 })}
               </p>
             )}
+            {candidate.record.point !== null &&
+              candidate.record.dpeNumber !== shown?.record.dpeNumber && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDpeNumber(candidate.record.dpeNumber);
+                  }}
+                  className="mt-1.5 text-[12px] tracking-[-0.08px] text-slate-neutral underline underline-offset-2 hover:text-ink"
+                >
+                  {t('addressShowOnMap')}
+                </button>
+              )}
           </li>
         ))}
       </ol>

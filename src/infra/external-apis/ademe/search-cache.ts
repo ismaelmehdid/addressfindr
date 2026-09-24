@@ -11,7 +11,11 @@ export type CachedSearch = {
   truncated: boolean;
 };
 
-const REDIS_KEY_PREFIX = 'app:ademe-search';
+// why: une entree vit six heures, donc elle survit a un deploiement. Une
+// entree ecrite avant un changement de forme de DpeRecord ou de CachedSearch
+// serait relue telle quelle et rejetee par le client : changer la forme
+// impose d'incrementer cette version.
+const REDIS_KEY_PREFIX = 'app:ademe-search:v2';
 const TTL_SECONDS = 6 * 60 * 60;
 
 // why: sans Redis — en local, ou si Upstash n'est pas configure — un repli en
