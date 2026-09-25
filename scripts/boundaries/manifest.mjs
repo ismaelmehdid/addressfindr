@@ -135,6 +135,8 @@ export const DOMAINS = [
       'src/application/ademe/dto',
       'src/core/ademe/types',
       'src/core/ademe/candidate-on-map',
+      'src/core/ademe/needs-verification',
+      'src/core/ademe/record-facts',
     ],
   },
   {
