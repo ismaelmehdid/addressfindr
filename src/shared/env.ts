@@ -125,6 +125,20 @@ const EnvSchema = v.object({
     v.minValue(1000),
   ),
 
+  // why: server key, never served to the browser; images go through
+  // /api/street-view. Without it, address cards show no photo.
+  GOOGLE_MAPS_API_KEY: v.optional(v.pipe(v.string(), v.minLength(1))),
+  GOOGLE_STREET_VIEW_BASE_URL: v.optional(
+    v.pipe(v.string(), v.url()),
+    'https://maps.googleapis.com/maps/api/streetview',
+  ),
+  GOOGLE_STREET_VIEW_TIMEOUT_MS: v.pipe(
+    v.optional(v.string(), '8000'),
+    v.transform((s) => Number.parseInt(s, 10)),
+    v.number(),
+    v.minValue(1000),
+  ),
+
   CADASTRE_BASE_URL: v.optional(
     v.pipe(v.string(), v.url()),
     'https://apicarto.ign.fr',

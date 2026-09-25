@@ -151,6 +151,20 @@ export const DOMAINS = [
     ],
   },
   {
+    // Street photo of a candidate address (Google Street View Static API).
+    // The UI imports it to build the photo URL (/api/street-view) and the
+    // outbound link to the Google Maps panorama.
+    name: 'street-view',
+    dirs: [
+      'src/core/street-view',
+      'src/application/street-view',
+      'src/infra/external-apis/google-street-view',
+      'src/app/api/street-view',
+    ],
+    schemas: [],
+    public: ['src/core/street-view/links'],
+  },
+  {
     // Coordonnees et confiance geographique, sans dependance a une source.
     // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
     name: 'geo',
@@ -256,6 +270,10 @@ export const ALLOWED_EDGES = [
   // formulaire d'annonce lit ce point pour placer la carte.
   ['ademe', 'geo'],
   ['listing', 'geo'],
+  // street-view refuses a point outside geo's metropolitan bounding box, and
+  // the listing form builds each candidate's photo URL.
+  ['street-view', 'geo'],
+  ['listing', 'street-view'],
 ];
 
 export const SHARED_PREFIXES = [

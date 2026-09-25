@@ -16,6 +16,20 @@ vi.mock('@/infra/external-apis/redis/client', () => ({
   getRedisClient: vi.fn(() => null),
 }));
 
+const limiters = vi.hoisted(() => ({ prefixes: [] as string[] }));
+
+vi.mock('@upstash/ratelimit', () => ({
+  Ratelimit: class {
+    static slidingWindow = () => 'sliding-window';
+    constructor(options: { prefix: string }) {
+      limiters.prefixes.push(options.prefix);
+    }
+    async limit() {
+      return { success: true, remaining: 1, reset: 0 };
+    }
+  },
+}));
+
 import { getRedisClient } from '@/infra/external-apis/redis/client';
 import { applyRateLimit } from './apply-rate-limit';
 
@@ -24,6 +38,9 @@ beforeEach(() => {
   envMock.NODE_ENV = 'development';
   (globalThis as Record<string, unknown>).defaultRatelimit = undefined;
   (globalThis as Record<string, unknown>).uploadRatelimit = undefined;
+  (globalThis as Record<string, unknown>).listingExtractRatelimit = undefined;
+  (globalThis as Record<string, unknown>).streetViewRatelimit = undefined;
+  limiters.prefixes = [];
 });
 
 describe('applyRateLimit', () => {
@@ -39,5 +56,22 @@ describe('applyRateLimit', () => {
     vi.mocked(getRedisClient).mockReturnValue(null);
     const r = await applyRateLimit({ identifier: 'u', limit: 'upload' });
     expect(r.success).toBe(true);
+  });
+
+  // why: a shared prefix made every bucket share one Upstash counter; Street
+  // View photos used up the extraction quota.
+  it('keys every bucket on its own counter', async () => {
+    envMock.NODE_ENV = 'production';
+    vi.mocked(getRedisClient).mockReturnValue(
+      {} as ReturnType<typeof getRedisClient>,
+    );
+
+    await applyRateLimit({ identifier: 'u', limit: 'listing-extract' });
+    await applyRateLimit({ identifier: 'u', limit: 'street-view' });
+
+    expect(limiters.prefixes).toEqual([
+      'app:ratelimit:listing-extract',
+      'app:ratelimit:street-view',
+    ]);
   });
 });
