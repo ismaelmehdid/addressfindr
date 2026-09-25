@@ -1,44 +1,24 @@
 'use client';
 
-import { ArrowUpRight, MapPinOff } from 'lucide-react';
+import { MapPinOff } from 'lucide-react';
 import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
 import {
   Card,
   CardAction,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AddressCandidate, MatchSignal } from '@/core/ademe/types';
-import {
-  streetViewImagePath,
-  streetViewPanoramaUrl,
-} from '@/core/street-view/links';
+import { streetLine } from '@/core/ademe/record-facts';
+import type { AddressCandidate } from '@/core/ademe/types';
+import { streetViewImagePath } from '@/core/street-view/links';
 import { cn } from '@/lib/utils';
-
-const SIGNAL_KEY = {
-  surfaceM2: 'signalSurface',
-  dpeClass: 'signalDpeClass',
-  gesClass: 'signalGesClass',
-  dpeKwhM2Year: 'signalDpeValue',
-  gesKgCo2M2Year: 'signalGesValue',
-  heatingEnergy: 'signalHeating',
-  yearBuilt: 'signalYearBuilt',
-  buildingFloors: 'signalBuildingFloors',
-  landSurfaceM2: 'signalLandSurface',
-  floor: 'signalFloor',
-  annualEnergyCost: 'signalEnergyCost',
-  dpeDate: 'signalDpeDate',
-  pinDistance: 'signalPin',
-} as const satisfies Record<MatchSignal, string>;
 
 type CardOptions = {
   shownDpeNumber: string | null;
@@ -110,7 +90,6 @@ function CandidateCard({
   const emphasised = rank === 1 || isShown;
   const selectable = onSelect !== undefined;
   const score = Math.round(candidate.confidence * 100);
-
   const wasShown = useRef(isShown);
 
   // why: scroll only when the selection arrives on this card. On first render
@@ -123,17 +102,8 @@ function CandidateCard({
     wasShown.current = isShown;
   }, [isShown, selectable]);
 
-  const title =
-    record.street === null
-      ? record.address
-      : [record.streetNumber, record.street]
-          .filter((part) => part !== null)
-          .join(' ');
-  const place = [record.postalCode, record.city]
-    .filter((part) => part !== null)
-    .join(' ');
   const facts = [
-    place.length > 0 ? place : null,
+    record.city,
     record.propertyType === 'apartment'
       ? t('addressPropertyApartment')
       : record.propertyType === 'house'
@@ -159,7 +129,7 @@ function CandidateCard({
           <Image
             unoptimized
             fill
-            sizes="400px"
+            sizes="360px"
             src={streetViewImagePath(record.point)}
             alt={t('streetViewAlt', { address: record.address })}
             onError={() => {
@@ -175,7 +145,7 @@ function CandidateCard({
       <CardHeader className="pt-3">
         <CardTitle className="flex items-center gap-2 text-[15px] font-semibold">
           <Badge variant={emphasised ? 'default' : 'secondary'}>{rank}</Badge>
-          {title}
+          {streetLine(record)}
         </CardTitle>
         {facts.length > 0 && (
           <CardDescription>{facts.join(' · ')}</CardDescription>
@@ -193,24 +163,6 @@ function CandidateCard({
       </CardHeader>
       <CardContent className="flex flex-col gap-2 pb-3">
         <Progress value={score} aria-hidden />
-        <p className="text-[12px] leading-[1.5] text-muted-foreground">
-          {t('addressSupport', { count: candidate.supportingRecords })}
-          {' · '}
-          {t('addressMatchedOn', {
-            signals: candidate.matched
-              .map((signal) => t(SIGNAL_KEY[signal]))
-              .join(', '),
-          })}
-        </p>
-        {candidate.diverged.length > 0 && (
-          <p className="text-[12px] leading-[1.5] text-destructive">
-            {t('addressDivergedOn', {
-              signals: candidate.diverged
-                .map((signal) => t(SIGNAL_KEY[signal]))
-                .join(', '),
-            })}
-          </p>
-        )}
         {record.point === null && (
           <p className="flex items-center gap-1 text-[12px] text-muted-foreground">
             <MapPinOff className="size-3 shrink-0" aria-hidden />
@@ -240,20 +192,6 @@ function CandidateCard({
         >
           {body}
         </button>
-      )}
-      {isShown && record.point !== null && (
-        <CardFooter className="border-t-0 bg-transparent pt-0">
-          <a
-            href={streetViewPanoramaUrl(record.point)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={t('addressVerifyLabel', { address: record.address })}
-            className={buttonVariants({ size: 'lg', className: 'w-full' })}
-          >
-            {t('addressVerify')}
-            <ArrowUpRight aria-hidden />
-          </a>
-        </CardFooter>
       )}
     </Card>
   );
