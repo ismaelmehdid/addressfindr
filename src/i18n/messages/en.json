@@ -118,6 +118,7 @@
     "mapNoTrustedPoint": "No coordinate reliable enough to pin {address}, so no pin is shown.",
     "mapPinned": "On the map: {address}",
     "mapUnavailable": "The map is not configured.",
+    "mapFailed": "The map could not be displayed.",
     "errorMatchNotEnoughSignal": "Not enough from this listing to search the register. A commune and a surface are both required.",
     "errorMatchRateLimited": "Too many searches. Wait a moment and try again.",
     "errorMatchUnavailable": "The public DPE register did not answer. Try again in a moment.",
@@ -150,7 +151,6 @@
     "addressPager": "{index} / {total}",
     "addressFoundAnnouncement": "{count, plural, one {# likely location found} other {# likely locations found}}. Most likely: {address}.",
     "streetViewBadge": "Street View",
-    "streetViewAlt": "Street View toward {address}",
-    "mapFailed": "The map cannot be displayed in this browser."
+    "streetViewAlt": "Street View toward {address}"
   }
 }

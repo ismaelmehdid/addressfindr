@@ -118,6 +118,7 @@
     "mapNoTrustedPoint": "Aucune coordonnée assez fiable pour placer {address}, donc aucun point n'est affiché.",
     "mapPinned": "Sur la carte : {address}",
     "mapUnavailable": "La carte n'est pas configuree.",
+    "mapFailed": "La carte n'a pas pu être affichée.",
     "errorMatchNotEnoughSignal": "Cette annonce ne donne pas assez d'elements pour interroger la base. Une commune et une surface sont necessaires.",
     "errorMatchRateLimited": "Trop de recherches. Patientez un instant puis reessayez.",
     "errorMatchUnavailable": "La base publique des DPE n'a pas repondu. Reessayez dans un instant.",
@@ -150,7 +151,6 @@
     "addressPager": "{index} / {total}",
     "addressFoundAnnouncement": "{count, plural, one {# emplacement probable trouvé} other {# emplacements probables trouvés}}. Le plus probable : {address}.",
     "streetViewBadge": "Street View",
-    "streetViewAlt": "Street View vers {address}",
-    "mapFailed": "La carte ne peut pas s'afficher dans ce navigateur."
+    "streetViewAlt": "Street View vers {address}"
   }
 }

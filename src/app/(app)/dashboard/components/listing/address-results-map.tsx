@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import type { AddressCandidate, AddressMatch } from '@/core/ademe/types';
 import type { GeoPoint } from '@/core/geo/types';
 import { AddressCandidateList } from './address-candidate-list';
+import { MapErrorBoundary } from './map-error-boundary';
 
 // why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
 // premier affichage d'une carte, pas a chaque visite du tableau de bord.
@@ -95,14 +96,15 @@ export function AddressResultsMap({
     <>
       <div className="relative min-h-0 flex-1 md:absolute md:inset-0">
         <div className="absolute inset-0">
-          <AddressMap
-            point={shown.record.point}
-            overview={overview}
-            focusRequest={focusRequest}
-            padding={overMap ? PANEL_CLEARANCE : NO_CLEARANCE}
-            accessToken={accessToken}
-            onFailure={onMapFailure}
-          />
+          <MapErrorBoundary fallback={null} onError={onMapFailure}>
+            <AddressMap
+              point={shown.record.point}
+              overview={overview}
+              focusRequest={focusRequest}
+              padding={overMap ? PANEL_CLEARANCE : NO_CLEARANCE}
+              accessToken={accessToken}
+            />
+          </MapErrorBoundary>
         </div>
       </div>
 

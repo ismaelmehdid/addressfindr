@@ -71,25 +71,18 @@ export function AddressMap({
   focusRequest,
   padding,
   accessToken,
-  onFailure,
 }: {
   point: GeoPoint | null;
   overview: GeoPoint;
   focusRequest: number;
   padding: PaddingOptions;
   accessToken: string;
-  onFailure: () => void;
 }) {
   const t = useTranslations('Listing');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const initialCameraRef = useRef(cameraFor(point, overview));
-  const onFailureRef = useRef(onFailure);
-
-  useEffect(() => {
-    onFailureRef.current = onFailure;
-  });
 
   // why: chaque `new mapboxgl.Map()` est un chargement facture. La carte est
   // donc construite une fois et deplacee ensuite, jamais recreee par adresse.
@@ -97,22 +90,14 @@ export function AddressMap({
     const container = containerRef.current;
     if (container === null) return;
 
-    let map: mapboxgl.Map;
-    try {
-      map = new mapboxgl.Map({
-        accessToken,
-        container,
-        style: MAP_STYLE,
-        ...initialCameraRef.current,
-        antialias: true,
-        attributionControl: false,
-      });
-    } catch {
-      // why: sans WebGL le constructeur leve. L'exception remonterait a la
-      // frontiere d'erreur de la route et effacerait les adresses trouvees.
-      onFailureRef.current();
-      return;
-    }
+    const map = new mapboxgl.Map({
+      accessToken,
+      container,
+      style: MAP_STYLE,
+      ...initialCameraRef.current,
+      antialias: true,
+      attributionControl: false,
+    });
     mapRef.current = map;
     markerRef.current = new mapboxgl.Marker();
 
