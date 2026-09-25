@@ -35,8 +35,8 @@ describe('getStreetViewImage', () => {
     });
   });
 
-  // why: chaque image est facturee ; un point que l'UI ne peut pas avoir
-  // envoye ne doit jamais atteindre Google.
+  // why: every image is billed; a point the UI cannot have sent must never
+  // reach Google.
   it('refuses a point outside metropolitan France without calling out', async () => {
     const fake = imagery();
 

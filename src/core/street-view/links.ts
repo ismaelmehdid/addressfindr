@@ -2,8 +2,8 @@ import type { GeoPoint } from '@/core/geo/types';
 
 export const STREET_VIEW_IMAGE_ROUTE = '/api/street-view';
 
-// why: six decimales situent un point a 10 cm pres ; au-dela, deux URL pour
-// le meme batiment ne partageraient plus le cache du navigateur.
+// why: six decimals place a point within 10 cm; beyond that, two URLs for
+// the same building would no longer share the browser cache.
 function coordinate(value: number): string {
   return value.toFixed(6);
 }

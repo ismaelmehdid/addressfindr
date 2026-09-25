@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseAnnualEnergyCostRange,
   parseBedroomCount,
   parseCity,
   parseCount,
+  parseDpeDate,
   parseDpeEnergyValue,
   parseEnergyClass,
   parseFrenchNumber,
@@ -261,6 +263,20 @@ describe('parseDpeEnergyValue', () => {
     expect(parseDpeEnergyValue('40 kg CO₂/m²/an')).toBeNull();
   });
 
+  // why: ADEME's conso_5_usages_par_m2_ep is primary energy. Leboncoin
+  // descriptions print both lines, and the final-energy one was quoted.
+  it('refuses a final-energy figure', () => {
+    expect(
+      parseDpeEnergyValue('Consommation énergie finale : 104.00 kWh/m²/an'),
+    ).toBeNull();
+  });
+
+  it('reads a primary-energy figure', () => {
+    expect(
+      parseDpeEnergyValue('Consommation énergie primaire : 240 kWh/m²/an'),
+    ).toBe(240);
+  });
+
   it('reads only the energy figure from a combined label', () => {
     expect(parseDpeEnergyValue('199 kWh/m²/an et 40 kg CO₂/m²/an')).toBe(199);
   });
@@ -285,5 +301,81 @@ describe('parseGesEmissionValue', () => {
 
   it('reads only the emission figure from a combined label', () => {
     expect(parseGesEmissionValue('199 kWh/m²/an et 40 kg CO₂/m²/an')).toBe(40);
+  });
+});
+
+describe('parseDpeDate', () => {
+  it('reads the leboncoin diagnostic line', () => {
+    expect(
+      parseDpeDate(
+        'Date de réalisation du diagnostic énergétique : 14/04/2022',
+      ),
+    ).toBe('2022-04-14');
+  });
+
+  it('accepts dotted and dashed day-first dates', () => {
+    expect(parseDpeDate('DPE réalisé le 14.04.2022')).toBe('2022-04-14');
+    expect(parseDpeDate('DPE réalisé le 14-04-2022')).toBe('2022-04-14');
+  });
+
+  it('accepts an iso date', () => {
+    expect(parseDpeDate('Date du DPE : 2022-04-14')).toBe('2022-04-14');
+  });
+
+  it('accepts a spelled-out month', () => {
+    expect(parseDpeDate('Diagnostic réalisé le 3 août 2025')).toBe(
+      '2025-08-03',
+    );
+  });
+
+  it('refuses a date that does not exist', () => {
+    expect(parseDpeDate('DPE réalisé le 31/02/2022')).toBeNull();
+  });
+
+  it('refuses a quote that does not name the diagnostic', () => {
+    expect(parseDpeDate('Annonce mise en ligne le 14/04/2022')).toBeNull();
+  });
+
+  it('refuses a quote carrying two different dates', () => {
+    expect(
+      parseDpeDate('DPE réalisé le 14/04/2022, valable jusqu’au 13/04/2032'),
+    ).toBeNull();
+  });
+
+  it('refuses a date in the future', () => {
+    const nextYear = new Date().getFullYear() + 1;
+    expect(parseDpeDate(`DPE réalisé le 01/01/${nextYear}`)).toBeNull();
+  });
+});
+
+describe('parseAnnualEnergyCostRange', () => {
+  it('reads the range of the standard label sentence', () => {
+    expect(
+      parseAnnualEnergyCostRange(
+        "Montant estimé des dépenses annuelles d'énergie pour un usage standard : entre 1 290 € et 1 790 € par an. Prix moyens des énergies indexés sur l'année 2021",
+      ),
+    ).toEqual({ min: 1290, max: 1790 });
+  });
+
+  it('reads the leboncoin summary without a currency after the lower bound', () => {
+    expect(parseAnnualEnergyCostRange('entre 1290 et 1 790 € par an')).toEqual({
+      min: 1290,
+      max: 1790,
+    });
+  });
+
+  it('joins digit groups split by a narrow no-break space', () => {
+    const narrow = String.fromCharCode(0x202f);
+    const quote = `entre 1${narrow}290 € et 1${narrow}790 € par an`;
+    expect(quote.includes(narrow)).toBe(true);
+    expect(parseAnnualEnergyCostRange(quote)).toEqual({ min: 1290, max: 1790 });
+  });
+
+  it('refuses a single amount', () => {
+    expect(parseAnnualEnergyCostRange('1 790 € par an')).toBeNull();
+  });
+
+  it('refuses an inverted range', () => {
+    expect(parseAnnualEnergyCostRange('entre 1 790 € et 1 290 €')).toBeNull();
   });
 });

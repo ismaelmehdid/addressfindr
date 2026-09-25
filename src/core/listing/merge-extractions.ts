@@ -4,6 +4,7 @@ import {
   type ExtractedFieldName,
   type ExtractedValues,
   type FieldSource,
+  MATCHING_EVIDENCE_FIELDS,
   REQUIRED_FIELDS,
 } from './types';
 
@@ -49,6 +50,12 @@ export function missingRequiredFields(
   values: ExtractedValues,
 ): ExtractedFieldName[] {
   return REQUIRED_FIELDS.filter((field) => values[field] === null);
+}
+
+export function missingEvidenceFields(
+  values: ExtractedValues,
+): ExtractedFieldName[] {
+  return MATCHING_EVIDENCE_FIELDS.filter((field) => values[field] === null);
 }
 
 export function unfilledFields(values: ExtractedValues): ExtractedFieldName[] {

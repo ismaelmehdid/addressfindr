@@ -49,8 +49,9 @@ This is why, throughout the `listing` domain:
 ### Current state
 
 - **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring over both DPE registers, via data.ademe.fr), and the dashboard UI that chains extract → match.
-- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area). All free, public, keyless. Display only: Mapbox (map) and Google Street View (card photos), both keyed and billed. The BAN is consumed through ADEME's `*_ban` columns rather than called directly.
-- **Ground truth:** `pnpm eval:address` runs the pipeline over live pap.fr listings, hides their published street and reports at what rank it comes back. It hits Firecrawl, Groq and the public APIs for real, so it is excluded from `pnpm test` and from CI. Last run: 6/6 correctly refused for lack of a discriminating signal.
+- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area), the BAN geocoder of the IGN Géoplateforme (`data.geopf.fr/geocodage`, to verify addresses ADEME never geocoded). All free, public, keyless. Display only: Mapbox (map) and Google Street View (card photos), both keyed and billed. Otherwise the BAN is consumed through ADEME's `*_ban` columns.
+- **Ground truth:** `pnpm eval:address` runs the pipeline over live pap.fr listings, hides their published street and reports at what rank it comes back. It hits Firecrawl, Groq and the public APIs for real, so it is excluded from `pnpm test` and from CI. Last run: 6/6 correctly refused for lack of a discriminating signal — **but that run predates the Groq schema fix below, so the model never answered; re-measure it.**
+- **Market benchmark:** `pnpm eval:precisement` runs the listings in `test/fixtures/precisement-benchmark-urls.txt` through our pipeline and through precisement.fr's public search API, and reports whether both return the same first address. Scraped pages and their answers are cached in `.benchmark/` (gitignored), so reruns cost no Firecrawl credit and send them no request. Manual only, never in CI. Model quotes are cached there too, so a rerun spends Groq tokens only on sources it has not read. Last complete run (2026-09-24, 25 leboncoin listings): **21/25 same #1**, up from 6/25 — with 6 extractions lost to the Groq schema failure below, since retried. Later runs that day were invalidated by a data.ademe.fr outage and then by the exhausted Groq daily quota.
 - **Not started:** the `__NUXT__` mapping for the two lefigaro portals. Needs one real listing URL to inspect — Firecrawl only ever returns lefigaro's search page as nav chrome, so the payload paths cannot be mapped without one.
 - Spec: `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md`
 - Plan: `docs/superpowers/plans/2026-09-17-listing-ingestion-extraction.md`
@@ -117,7 +118,28 @@ Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`,
 
 ---
 
+### Measured facts — precisement.fr benchmark on leboncoin (2026-09-24)
+
+Measured on 25 live leboncoin listings (Lyon, Bordeaux, Nantes, houses around Toulouse and Rennes), taking precisement.fr's first answer as the reference. Their frontend calls `POST https://api.precisement.fr/search` with `{ "url": … }`.
+
+- **The DPE date is the strongest single signal, and it lives only in the description.** 18/22 leboncoin descriptions carry `Date de réalisation du diagnostic énergétique : 14/04/2022`; ADEME's `date_etablissement_dpe` or `date_visite_diagnostiqueur` equals it to the day. Firecrawl's markdown cuts the description at "Voir plus", so the full text is read from `__NEXT_DATA__` `ad.body`.
+- **leboncoin's `annual_energy_budget_min/max` pins ADEME's `cout_total_5_usages`.** The label prints a range rounded to ten euros around the cost; the midpoint lands within 0.5 % on every row checked (1540 vs 1536.4, 720 vs 719.5, 1760 vs 1763.3, 3900 vs 3897.7). Structured, no model needed.
+- **A 3 % surface window missed 6 of their 25 answers.** ADEME's surface sat at 0.89–1.08 × the listed one (133.8 m² for 150, 110 for 123, 193.8 for 210): listings count annexes. The window is 12 %; at that width Paris 15e (40 m², DPE D) returns 3936 rows in 3.6 s, hence the 5000-row limit.
+- **Before any fix, 17/25 answers were a wrong address at 100 %**, on surface and two letters that hundreds of rows share. Confidence now never exceeds `awarded / max(available, 12)`.
+- **A listing can name the wrong commune.** One "Rennes" listing describes a house in Melesse. Department + exact DPE date + type + letter leaves 8 rows in Ille-et-Vilaine, so the department is searched on the date when no row of the commune carries it.
+- **leboncoin's pin is precise only when `location.source === 'address'` and `is_shape === false`.** Their answer sat 3 m, 13 m, 94 m and 393 m from such a pin, and 1 km on a listing they flag as ambiguous. A `source: 'city'` pin is the town centre.
+- **`heating_mode` values seen: `gas`, `electric`, `other`.** `other` covers heat pumps and wood alike, so it maps to nothing.
+- **Rows ADEME never geocoded carry no `code_insee_ban`** — only `adresse_brut`, `code_postal_brut` (stored as a number: `01500` arrives as `1500`), `nom_commune_brut`. They are invisible to a commune query: 1.1–2.7 % of rows in Lyon, Nantes, Bordeaux and Paris, **10.8 % in Rennes**. They are now searched on the commune's postal codes, and the ones that would reach the shortlist are sent to the BAN geocoder.
+- **The geocoder score cannot verify an address.** On 60 raw rows it was wrong at 0.51–0.59 (`19 rue du Champs de la Vigne` → `19 Rue de la Poterie`, `2 rue Monseigneur Vincent` → `2 Rue Monseigneur Duchesne`) and right at 0.37–0.50 when the raw text carried a building name or a floor. `core/geo/verify-geocoded-address.ts` checks word by word instead: one numbered line, same house number, same commune, same street type, every significant raw word present in the answer. A row that fails is dropped, never shown with its typed address.
+- **Divergences left after the fixes:** the listing's DPE (2026-09-23) is newer than the register, and they flag it themselves; their answer contradicts the listing's own DPE date and cost and has no house number; they flag the ranking as ambiguous.
+
 ### Traps that have already bitten us
+
+- **Groq's strict structured output rejects a JSON schema whose `required` does not list every property.** The listing extractor sent `required: []`, so every quote extraction failed on every portal, and the failure only reached a `log.warn`. Absent fields are now `null`, never missing keys.
+- **data.ademe.fr has outages, and a 5000-row read is heavy.** On 2026-09-24 it timed out and then reset every connection for about 17 minutes; the same searches answered normally afterwards. One 5000-row read is 4.6 MB and takes 7–9 s. Transient failures (timeout, network, 429, 5xx) get one retry; a malformed query never does.
+- **Even with strict mode, `openai/gpt-oss-120b` on Groq sometimes omits a required key** ("Generated JSON does not match the expected schema … missing properties"): 6 calls out of 25 on 2026-09-24, each succeeding when replayed. A failed call loses every quote, the DPE date included, so the extractor makes up to 3 attempts. A call uses about 1 800 tokens.
+- **Groq's `on_demand` tier allows 200 000 tokens per day — about 110 listing extractions at ~1 800 tokens each — and 8000 tokens per minute.** Past the daily quota every extraction fails until tokens age out, and a failed extraction loses the DPE date: the match quietly degrades. A 429 is never retried by the extractor (the SDK already did). Production traffic needs the paid tier.
+- **The per-minute limit also bites on long pages.** A 20 000-character French page is about 7000 tokens, so one long page fails the call outright. Portals whose hydration carries the description send only that; the others still send up to `MAX_MARKDOWN_CHARS` and need either a paid tier or a smaller window.
 
 - Invisible Unicode spaces (U+00A0, U+202F, U+2009, U+2007) are everywhere in French listings, especially in prices. A `\uXXXX` escape written into a TypeScript string literal has been flattened to an ordinary space **three times** in this repo, twice producing a test that passed while asserting nothing. **Build these characters with `String.fromCharCode` and assert their presence before using them.**
 - `parsePostalCode` grabs the first standalone 5-digit run. A price under €100 000 in a listing title (`89000 € Lyon (69001)`) looks exactly like a postal code. Free-text heuristics must run *after* structured fields, never before.
@@ -137,6 +159,7 @@ Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`,
 - `pnpm check:boundaries` — domain-isolation checker (`scripts/check-domain-boundaries.mjs`)
 - `pnpm validate` — `type-check && check && lint && check:boundaries && test`
 - `pnpm eval:address` — ground-truth harness against live pap.fr listings. **Costs Firecrawl and Groq credits, hits the public APIs, never runs in CI.**
+- `pnpm eval:precisement` — benchmark against precisement.fr on the listings in `test/fixtures/precisement-benchmark-urls.txt`. Same costs; pages and their answers are cached in `.benchmark/`. **Never runs in CI.**
 - `pnpm drizzle:generate` / `migrate` / `push` / `pull` / `drop` — Drizzle migrations
 
 **Done-gate before claiming work complete:** `pnpm validate`.
@@ -216,6 +239,7 @@ src/instrumentation-client.ts   PostHog client init
 - Create circular dependencies
 - Use barrel files (`index.ts` re-exports) — import modules directly
 - Write code comments — self-documenting names instead. (One short `// why` line is OK when the why is non-obvious — a hidden constraint, subtle invariant, or workaround.)
+- Write a code comment in French. **Comments are English only**, including `// why` lines, test comments and test names. Existing French comments are debt: translate one when you touch it, never add a new one.
 - Hard-code user-facing strings — `next-intl` (`useTranslations` / `getTranslations`)
 - Read `process.env.X` outside `shared/env.ts` and `instrumentation.ts`
 - Expose `unknown` from any layer — validate at the boundary, return strictly-typed `Result`. `any` is forbidden by lint; `unknown` is allowed only as a narrow boundary input that gets immediately validated.

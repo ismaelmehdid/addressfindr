@@ -1,10 +1,9 @@
 import type { GeoPoint } from '@/core/geo/types';
 import type { AddressCandidate } from './types';
 
-// why: la carte parle pour la premiere adresse du classement, ou pour celle que
-// l'utilisateur a choisie. Si celle-ci n'a pas de point fiable, aucune epingle
-// n'est posee : en montrer une autre afficherait une autre adresse que celle
-// nommee au-dessus de la carte.
+// why: the map speaks for the top-ranked address, or for the one the user
+// picked. If that one has no trusted point, no pin is placed: showing another
+// would put a different address on the map than the one named above it.
 export function candidateOnMap(
   candidates: readonly AddressCandidate[],
   chosenDpeNumber: string | null,
@@ -15,9 +14,9 @@ export function candidateOnMap(
   return chosen ?? candidates[0] ?? null;
 }
 
-// why: ou poser la carte quand l'adresse affichee n'a pas de point. Tous les
-// candidats sont dans la meme commune, donc le centre de leurs points fiables
-// situe la commune sans designer un batiment ; null s'il n'y en a aucun.
+// why: where the map rests when the address shown has no point. Every
+// candidate is in the same commune, so the centre of their trusted points
+// locates the commune without designating a building; null if there is none.
 export function mapOverview(
   candidates: readonly AddressCandidate[],
 ): GeoPoint | null {

@@ -22,6 +22,9 @@ const MatchSignalSchema = v.picklist([
   'buildingFloors',
   'landSurfaceM2',
   'floor',
+  'annualEnergyCost',
+  'dpeDate',
+  'pinDistance',
 ]);
 
 const DpeRecordSchema = v.object({
@@ -47,6 +50,8 @@ const DpeRecordSchema = v.object({
   floor: v.nullable(v.number()),
   buildingComplement: v.nullable(v.string()),
   establishedOn: v.nullable(v.string()),
+  visitedOn: v.nullable(v.string()),
+  annualEnergyCostEur: v.nullable(v.number()),
   geocodingScore: v.nullable(v.number()),
   point: v.nullable(
     v.object({

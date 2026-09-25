@@ -32,8 +32,8 @@ export async function GET(req: Request): Promise<Response> {
     return jsonError(notFound('No Street View imagery near this point'));
   }
 
-  // why: les conditions Google interdisent de stocker l'imagerie cote
-  // serveur ; seul le navigateur la garde, le temps d'une session.
+  // why: Google's terms forbid storing the imagery server-side; only the
+  // browser keeps it, for the length of a session.
   return new Response(result.value.bytes, {
     headers: {
       'content-type': result.value.contentType,

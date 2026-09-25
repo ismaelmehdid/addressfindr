@@ -19,9 +19,9 @@ function redactedAttributes(
   });
 }
 
-// why: place en tete des processeurs, il nettoie le span avant que le
-// processeur d'export ne le mette en file. onEnd couvre les attributs poses
-// apres le demarrage, que l'API ne permet plus de modifier.
+// why: placed first among the processors, it cleans the span before the
+// export processor queues it. onEnd covers attributes set after start,
+// which the API no longer lets us change.
 const redactUrlSecretsProcessor: SpanProcessor = {
   onStart(span) {
     const name = redactUrlSecrets(span.name);

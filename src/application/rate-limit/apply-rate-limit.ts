@@ -20,9 +20,9 @@ const globalForRateLimit = globalThis as unknown as {
   streetViewRatelimit: Ratelimit | null | undefined;
 };
 
-// why: Upstash cle un compteur sur prefixe + identifiant + fenetre. Avec un
-// prefixe commun, toutes les familles incrementaient le meme compteur : les
-// photos d'une recherche epuisaient le quota d'extraction de la suivante.
+// why: Upstash keys a counter on prefix + identifier + window. With a shared
+// prefix every bucket incremented the same counter: one search's photos
+// exhausted the next search's extraction quota.
 function buildRatelimit(
   bucket: RateLimitBucket,
   tokens: number,
@@ -83,8 +83,8 @@ function getListingMatchRatelimit(): Ratelimit | null {
   return limiter;
 }
 
-// why: une recherche affiche jusqu'a 10 adresses, donc 10 photos. 60 par
-// minute laisse six recherches par minute sans ouvrir la cle facturee au pillage.
+// why: a search shows up to 10 addresses, so 10 photos. 60 a minute leaves
+// six searches a minute without opening the billed key to abuse.
 function getStreetViewRatelimit(): Ratelimit | null {
   if (globalForRateLimit.streetViewRatelimit !== undefined) {
     return globalForRateLimit.streetViewRatelimit;

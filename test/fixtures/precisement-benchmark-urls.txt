@@ -1,0 +1,27 @@
+# Leboncoin listings benchmarked against precisement.fr on 2026-09-24.
+# Listings expire: refresh from a leboncoin search page when most stop resolving.
+https://www.leboncoin.fr/ad/ventes_immobilieres/3132785420
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276128637
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276128625
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276110574
+https://www.leboncoin.fr/ad/ventes_immobilieres/3262416483
+https://www.leboncoin.fr/ad/ventes_immobilieres/3210695086
+https://www.leboncoin.fr/ad/ventes_immobilieres/3262079643
+https://www.leboncoin.fr/ad/ventes_immobilieres/3257786608
+https://www.leboncoin.fr/ad/ventes_immobilieres/3067294313
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276129377
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276129088
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276128948
+https://www.leboncoin.fr/ad/ventes_immobilieres/3164128442
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276134523
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276134521
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276098604
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276088871
+https://www.leboncoin.fr/ad/ventes_immobilieres/3146473866
+https://www.leboncoin.fr/ad/ventes_immobilieres/3265106310
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276129380
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276129191
+https://www.leboncoin.fr/ad/ventes_immobilieres/3213928923
+https://www.leboncoin.fr/ad/ventes_immobilieres/3265856387
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276134431
+https://www.leboncoin.fr/ad/ventes_immobilieres/3276134433

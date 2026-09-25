@@ -57,8 +57,8 @@ describe('googleStreetViewImagery.imageToward', () => {
     expect(imageUrl?.searchParams.get('heading')).toBeNull();
   });
 
-  // why: la metadonnee est gratuite, l'image facturee. Sans panorama, aucune
-  // image ne doit etre demandee.
+  // why: metadata is free, the image is billed. Without a panorama, no image
+  // may be requested.
   it('asks for no image when no panorama exists', async () => {
     const spy = vi.fn(async () => metadata('ZERO_RESULTS'));
     vi.stubGlobal('fetch', spy);

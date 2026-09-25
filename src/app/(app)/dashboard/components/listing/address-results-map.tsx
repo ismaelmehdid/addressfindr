@@ -18,8 +18,8 @@ import type { GeoPoint } from '@/core/geo/types';
 import { AddressCandidateList } from './address-candidate-list';
 import { MapErrorBoundary } from './map-error-boundary';
 
-// why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
-// premier affichage d'une carte, pas a chaque visite du tableau de bord.
+// why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
+// first time a map is shown, not on every dashboard visit.
 const AddressMap = dynamic(
   () => import('./address-map').then((module) => module.AddressMap),
   {
@@ -28,14 +28,14 @@ const AddressMap = dynamic(
   },
 );
 
-// why: meme seuil que le `md:` de Tailwind (48rem), qui pose le panneau sur la
-// carte. Un seuil en px divergerait des qu'un utilisateur agrandit la police
-// par defaut de son navigateur, et l'epingle serait decentree.
+// why: same threshold as Tailwind's `md:` (48rem), which places the panel
+// over the map. A px threshold would diverge as soon as a user enlarges the
+// browser's default font size, and the pin would be off-centre.
 const PANEL_OVER_MAP_QUERY = '(min-width: 48rem)';
 
-// why: le panneau (400px + 12px de marge de chaque cote) recouvre la droite de
-// la carte ; l'epingle est centree dans ce qui reste visible. Toutes les
-// marges sont explicites car Mapbox conserve celles qu'on omet.
+// why: the panel (400px plus a 12px margin on each side) covers the right of
+// the map; the pin is centred in what stays visible. Every side is explicit
+// because Mapbox keeps the ones left out.
 const PANEL_CLEARANCE = { top: 0, right: 424, bottom: 0, left: 0 };
 const NO_CLEARANCE = { top: 0, right: 0, bottom: 0, left: 0 };
 

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_EXTRACTED_VALUES } from '@/core/listing/types';
-import { rankCandidates, scoreCandidate } from './score-candidates';
+import {
+  admitsOutsideCommune,
+  rankCandidates,
+  scoreCandidate,
+} from './score-candidates';
 import type { DpeRecord } from './types';
 
 function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
@@ -26,6 +30,8 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     floor: 0,
     buildingComplement: null,
     establishedOn: '2026-01-07',
+    visitedOn: '2026-01-06',
+    annualEnergyCostEur: null,
     geocodingScore: 0.7,
     point: null,
     ...over,
@@ -860,5 +866,293 @@ describe('rankCandidates — le departage par geocodage est bien celui qui joue'
       ranked.candidates[1]?.confidence,
     );
     expect(ranked.candidates[0]?.record.dpeNumber).toBe('zzz-bien-geocode');
+  });
+});
+
+describe('scoreCandidate — annual energy cost and DPE date', () => {
+  // why: measured 2026-09-24 against precisement.fr on leboncoin listings.
+  // The midpoint of the cost range printed on the label lands within 0.5 % of
+  // ADEME's cout_total_5_usages on the four rows they designate (1540 against
+  // 1536.4, 720 against 719.5), and the DPE date the listing quotes is ADEME's
+  // to the day.
+  const WITH_EVIDENCE = {
+    ...LISTING,
+    annualEnergyCostMinEur: 1290,
+    annualEnergyCostMaxEur: 1790,
+    dpeDate: '2022-04-14',
+  };
+
+  it('credits an energy cost the label range is centred on', () => {
+    const scored = scoreCandidate({
+      values: WITH_EVIDENCE,
+      record: record({ dpeNumber: 'A', annualEnergyCostEur: 1536.4 }),
+    });
+    expect(scored.matched).toContain('annualEnergyCost');
+  });
+
+  it('penalises an energy cost far from the label range', () => {
+    const scored = scoreCandidate({
+      values: WITH_EVIDENCE,
+      record: record({ dpeNumber: 'A', annualEnergyCostEur: 1000 }),
+    });
+    expect(scored.diverged).toContain('annualEnergyCost');
+  });
+
+  it('never compares an energy cost from a single bound', () => {
+    const scored = scoreCandidate({
+      values: { ...WITH_EVIDENCE, annualEnergyCostMaxEur: null },
+      record: record({ dpeNumber: 'A', annualEnergyCostEur: 1000 }),
+    });
+    expect(scored.matched).not.toContain('annualEnergyCost');
+    expect(scored.diverged).not.toContain('annualEnergyCost');
+  });
+
+  it('credits a DPE date equal to the establishment date', () => {
+    const scored = scoreCandidate({
+      values: WITH_EVIDENCE,
+      record: record({ dpeNumber: 'A', establishedOn: '2022-04-14' }),
+    });
+    expect(scored.matched).toContain('dpeDate');
+  });
+
+  it('credits a DPE date equal to the visit date', () => {
+    const scored = scoreCandidate({
+      values: WITH_EVIDENCE,
+      record: record({
+        dpeNumber: 'A',
+        visitedOn: '2022-04-14',
+        establishedOn: '2022-04-15',
+      }),
+    });
+    expect(scored.matched).toContain('dpeDate');
+  });
+
+  it('penalises a DPE issued on another day', () => {
+    const scored = scoreCandidate({
+      values: WITH_EVIDENCE,
+      record: record({
+        dpeNumber: 'A',
+        visitedOn: '2023-11-02',
+        establishedOn: '2023-11-02',
+      }),
+    });
+    expect(scored.diverged).toContain('dpeDate');
+  });
+
+  // why: the DPE registers start on 2021-07-01. A listing quoting an older
+  // diagnostic (measured 2026-09-24: "05/09/2018" on a Nantes listing) points
+  // at a DPE no row can carry, so the date says nothing about any row.
+  it('never compares a DPE date older than the registers', () => {
+    const scored = scoreCandidate({
+      values: { ...WITH_EVIDENCE, dpeDate: '2018-09-05' },
+      record: record({ dpeNumber: 'A' }),
+    });
+    expect(scored.matched).not.toContain('dpeDate');
+    expect(scored.diverged).not.toContain('dpeDate');
+  });
+
+  it('ranks the row the date and the cost designate above a closer surface', () => {
+    const ranked = rankCandidates({
+      values: { ...WITH_EVIDENCE, surfaceM2: 150, dpeKwhM2Year: null },
+      records: [
+        record({
+          dpeNumber: 'closer-surface',
+          address: '22 Rue Antoine Dumont 69008 Lyon',
+          surfaceM2: 148,
+          annualEnergyCostEur: 1210,
+          establishedOn: '2023-02-01',
+          visitedOn: '2023-02-01',
+        }),
+        record({
+          dpeNumber: 'designated',
+          address: '47 Rue Victor et Roger Thomas 69008 Lyon',
+          surfaceM2: 133.8,
+          annualEnergyCostEur: 1536.4,
+          establishedOn: '2022-04-14',
+          visitedOn: '2022-04-14',
+        }),
+      ],
+      truncated: false,
+    });
+    expect(ranked.candidates[0]?.record.dpeNumber).toBe('designated');
+  });
+
+  it('answers on the DPE date alone', () => {
+    const ranked = rankCandidates({
+      values: {
+        ...EMPTY_EXTRACTED_VALUES,
+        propertyType: 'apartment',
+        surfaceM2: 63,
+        dpeClass: 'D',
+        dpeDate: '2026-01-06',
+      },
+      records: [record({ dpeNumber: 'A', gesClass: null })],
+      truncated: false,
+    });
+    expect(ranked.refusedFor).toBeNull();
+    expect(ranked.candidates[0]?.matched).toContain('dpeDate');
+  });
+});
+
+describe('scoreCandidate — minimum evidence', () => {
+  // why: measured 2026-09-24, 17 leboncoin listings out of 25 returned an
+  // address at 100 % on the surface and both letters alone, which hundreds of
+  // rows share. Full agreement on so little must not read as certainty.
+  it('never reads full confidence on the surface and the letters alone', () => {
+    const scored = scoreCandidate({
+      values: {
+        ...EMPTY_EXTRACTED_VALUES,
+        propertyType: 'apartment',
+        surfaceM2: 63,
+        dpeClass: 'D',
+        gesClass: 'D',
+      },
+      record: record({ dpeNumber: 'A' }),
+    });
+    expect(scored.diverged).toEqual([]);
+    expect(scored.confidence).toBeLessThan(0.6);
+  });
+});
+
+describe('scoreCandidate — surface inside the widened window', () => {
+  // why: measured 2026-09-24, the row precisement.fr designates sits up to
+  // 11 % away from the listed surface (133.8 for 150 m2, 110 for 123): the
+  // listing counts annexes ADEME leaves out of the living area.
+  it('credits a surface 11 % away weakly, never as a divergence', () => {
+    const far = scoreCandidate({
+      values: { ...LISTING, surfaceM2: 150 },
+      record: record({ dpeNumber: 'a', surfaceM2: 133.8 }),
+    });
+    const near = scoreCandidate({
+      values: { ...LISTING, surfaceM2: 150 },
+      record: record({ dpeNumber: 'b', surfaceM2: 148 }),
+    });
+    expect(far.matched).toContain('surfaceM2');
+    expect(far.confidence).toBeLessThan(near.confidence);
+  });
+});
+
+describe('admitsOutsideCommune', () => {
+  // why: measured 2026-09-24, a leboncoin listing labelled "Rennes" describes
+  // a house in Melesse; precisement.fr found it outside the stated commune.
+  // A row from another commune has none of the commune's implicit support,
+  // so it must carry the exact DPE date and a printed label number, and
+  // contradict nothing.
+  const LISTED = {
+    ...LISTING,
+    dpeDate: '2026-09-17',
+    annualEnergyCostMinEur: 1070,
+    annualEnergyCostMaxEur: 1490,
+  };
+
+  it('admits a row that matches the date and a label number', () => {
+    expect(
+      admitsOutsideCommune({
+        values: LISTED,
+        record: record({
+          dpeNumber: 'A',
+          establishedOn: '2026-09-17',
+          annualEnergyCostEur: 1278.2,
+        }),
+      }),
+    ).toBe(true);
+  });
+
+  it('refuses a row whose DPE date is only near the listed one', () => {
+    expect(
+      admitsOutsideCommune({
+        values: LISTED,
+        record: record({
+          dpeNumber: 'A',
+          establishedOn: '2026-09-16',
+          visitedOn: '2026-09-16',
+          annualEnergyCostEur: 1278.2,
+        }),
+      }),
+    ).toBe(false);
+  });
+
+  it('refuses a row that matches the date alone', () => {
+    expect(
+      admitsOutsideCommune({
+        values: { ...LISTED, dpeKwhM2Year: null, gesKgCo2M2Year: null },
+        record: record({ dpeNumber: 'A', establishedOn: '2026-09-17' }),
+      }),
+    ).toBe(false);
+  });
+
+  it('refuses a row that contradicts any signal', () => {
+    expect(
+      admitsOutsideCommune({
+        values: LISTED,
+        record: record({
+          dpeNumber: 'A',
+          establishedOn: '2026-09-17',
+          annualEnergyCostEur: 1278.2,
+          yearBuilt: 1950,
+        }),
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('scoreCandidate — listing map pin', () => {
+  // why: measured 2026-09-24 on leboncoin, a pin placed from a typed address
+  // sat 3 m, 13 m and 94 m from the row precisement.fr designates, and up to
+  // 1 km on an ambiguous listing. Close is strong evidence, far is weak doubt.
+  const PINNED = {
+    ...LISTING,
+    pin: { latitude: 47.21559, longitude: -1.55507 },
+  };
+
+  it('credits a row a few metres from the pin', () => {
+    const scored = scoreCandidate({
+      values: PINNED,
+      record: record({
+        dpeNumber: 'A',
+        point: { latitude: 47.21561, longitude: -1.55509 },
+      }),
+    });
+    expect(scored.matched).toContain('pinDistance');
+  });
+
+  it('doubts a row far from the pin', () => {
+    const scored = scoreCandidate({
+      values: PINNED,
+      record: record({
+        dpeNumber: 'A',
+        point: { latitude: 47.23, longitude: -1.58 },
+      }),
+    });
+    expect(scored.diverged).toContain('pinDistance');
+  });
+
+  it('ignores the pin when the row has no trusted point', () => {
+    const scored = scoreCandidate({
+      values: PINNED,
+      record: record({ dpeNumber: 'A', point: null }),
+    });
+    expect(scored.matched).not.toContain('pinDistance');
+    expect(scored.diverged).not.toContain('pinDistance');
+  });
+
+  it('ranks the row under the pin first when the label numbers tie', () => {
+    const ranked = rankCandidates({
+      values: PINNED,
+      records: [
+        record({
+          dpeNumber: 'aaa-far',
+          address: '9 Rue Racine 44000 Nantes',
+          point: { latitude: 47.2135, longitude: -1.5631 },
+        }),
+        record({
+          dpeNumber: 'zzz-under-pin',
+          address: '5 Place du Change 44000 Nantes',
+          point: { latitude: 47.21561, longitude: -1.55509 },
+        }),
+      ],
+      truncated: false,
+    });
+    expect(ranked.candidates[0]?.record.dpeNumber).toBe('zzz-under-pin');
   });
 });

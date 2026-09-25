@@ -8,9 +8,9 @@ const CoordinateSchema = v.pipe(
   v.number(),
 );
 
-// why: les points montres sur la carte ont deja passe la bbox metropole de
-// core/geo. Un point hors de cette bbox ne vient donc pas de l'UI, et ne doit
-// pas faire consommer d'images Street View facturees.
+// why: points shown on the map already passed core/geo's metropolitan
+// bounding box. A point outside it cannot come from the UI, and must not
+// spend billed Street View images.
 export const GetStreetViewImageInputSchema = v.pipe(
   v.object({ lat: CoordinateSchema, lon: CoordinateSchema }),
   v.transform(({ lat, lon }) => ({ latitude: lat, longitude: lon })),

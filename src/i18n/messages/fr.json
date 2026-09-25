@@ -151,6 +151,9 @@
     "addressPager": "{index} / {total}",
     "addressFoundAnnouncement": "{count, plural, one {# emplacement probable trouvé} other {# emplacements probables trouvés}}. Le plus probable : {address}.",
     "streetViewBadge": "Street View",
-    "streetViewAlt": "Street View vers {address}"
+    "streetViewAlt": "Street View vers {address}",
+    "signalEnergyCost": "coût énergétique",
+    "signalDpeDate": "date du DPE",
+    "signalPin": "repère de l’annonce"
   }
 }

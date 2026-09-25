@@ -5,6 +5,7 @@ import type { DpeSearchFilter } from './types';
 function filter(over: Partial<DpeSearchFilter> = {}): DpeSearchFilter {
   return {
     inseeCode: '69383',
+    postalCodes: ['69003'],
     propertyType: 'apartment',
     surfaceMin: 61,
     surfaceMax: 65,
@@ -22,6 +23,12 @@ describe('dpeSearchCacheKey', () => {
   it('changes with the commune', () => {
     expect(dpeSearchCacheKey(filter())).not.toBe(
       dpeSearchCacheKey(filter({ inseeCode: '69204' })),
+    );
+  });
+
+  it('changes with the postal codes the raw rows are searched on', () => {
+    expect(dpeSearchCacheKey(filter())).not.toBe(
+      dpeSearchCacheKey(filter({ postalCodes: ['69003', '69008'] })),
     );
   });
 

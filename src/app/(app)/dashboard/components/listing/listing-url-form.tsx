@@ -168,10 +168,9 @@ type MappedResult = {
   overview: GeoPoint;
 };
 
-// why: la carte plein ecran ne s'affiche que si elle peut montrer quelque
-// chose de fiable : un jeton Mapbox, une carte que ce navigateur sait
-// dessiner, des candidats, et au moins un point geocode parmi eux. Sinon la
-// liste reste seule, sans carte.
+// why: the fullscreen map only opens when it can show something reliable: a
+// Mapbox token, a map this browser can draw, candidates, and at least one
+// geocoded point among them. Otherwise the list shows alone, without a map.
 function mappedResult({
   status,
   mapboxAccessToken,
@@ -227,8 +226,8 @@ export function ListingUrlForm({
       return;
     }
 
-    // why: une recherche encore en cours peut repondre apres une plus recente.
-    // Sa reponse ne doit jamais remplacer le resultat de l'annonce affichee.
+    // why: a search still in flight can answer after a newer one. Its response
+    // must never replace the result of the listing on screen.
     latestSubmission.current += 1;
     const submission = latestSubmission.current;
     setRejection(null);
@@ -277,8 +276,8 @@ export function ListingUrlForm({
       : candidateOnMap(mapped.match.candidates, selection.dpeNumber);
   const onMap = mapped !== null && shown !== null;
 
-  // why: le formulaire garde la meme place dans l'arbre React dans les deux
-  // mises en page. Le remonter a chaque bascule ferait perdre le focus clavier.
+  // why: the form keeps the same place in the React tree in both layouts.
+  // Remounting it on each switch would lose keyboard focus.
   return (
     <div className={onMap ? MAP_LAYOUT_CLASS : COLUMN_LAYOUT_CLASS}>
       {onMap && (
@@ -332,8 +331,8 @@ export function ListingUrlForm({
                   onChange={(event) => {
                     setUrl(event.target.value);
                     setRejection(null);
-                    // why: taper une nouvelle adresse ne jette pas le resultat
-                    // affiche ; seul un nouvel envoi le remplace.
+                    // why: typing a new URL does not discard the result on screen;
+                    // only a new submission replaces it.
                     setStatus((current) =>
                       current.kind === 'failed' ? { kind: 'idle' } : current,
                     );

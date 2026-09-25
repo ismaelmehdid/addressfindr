@@ -151,9 +151,9 @@ export const DOMAINS = [
     ],
   },
   {
-    // Photo de rue d'une adresse candidate (Google Street View Static API).
-    // L'UI l'importe pour construire l'URL de la photo (/api/street-view) et le
-    // lien sortant vers le panorama Google Maps.
+    // Street photo of a candidate address (Google Street View Static API).
+    // The UI imports it to build the photo URL (/api/street-view) and the
+    // outbound link to the Google Maps panorama.
     name: 'street-view',
     dirs: [
       'src/core/street-view',
@@ -168,9 +168,17 @@ export const DOMAINS = [
     // Coordonnees et confiance geographique, sans dependance a une source.
     // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
     name: 'geo',
-    dirs: ['src/core/geo', 'src/application/geo'],
+    dirs: [
+      'src/core/geo',
+      'src/application/geo',
+      'src/infra/external-apis/ban-geocoder',
+    ],
     schemas: [],
-    public: ['src/core/geo/types', 'src/core/geo/resolve-mappable-point'],
+    public: [
+      'src/core/geo/types',
+      'src/core/geo/resolve-mappable-point',
+      'src/application/geo/verify-raw-address',
+    ],
   },
   {
     name: 'commune',
@@ -262,8 +270,8 @@ export const ALLOWED_EDGES = [
   // formulaire d'annonce lit ce point pour placer la carte.
   ['ademe', 'geo'],
   ['listing', 'geo'],
-  // street-view refuse un point hors de la bbox metropole de geo, et le
-  // formulaire d'annonce construit l'URL de la photo de chaque candidat.
+  // street-view refuses a point outside geo's metropolitan bounding box, and
+  // the listing form builds each candidate's photo URL.
   ['street-view', 'geo'],
   ['listing', 'street-view'],
 ];

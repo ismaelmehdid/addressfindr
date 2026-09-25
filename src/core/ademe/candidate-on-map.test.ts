@@ -28,6 +28,8 @@ function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
     floor: 0,
     buildingComplement: null,
     establishedOn: null,
+    visitedOn: null,
+    annualEnergyCostEur: null,
     geocodingScore: 0.7,
     point: null,
     ...over,
@@ -68,8 +70,8 @@ describe('candidateOnMap', () => {
     );
   });
 
-  // why: rester sur la premiere adresse quand l'utilisateur en choisit une
-  // autre sans point laisserait l'epingle sur une adresse qu'il n'a pas choisie.
+  // why: staying on the first address when the user picks another one without
+  // a point would leave the pin on an address they did not pick.
   it('moves to a chosen candidate even when it has no pin', () => {
     const shown = candidateOnMap([pinnedFirst, unpinnedSecond], 'second');
     expect(shown).toBe(unpinnedSecond);

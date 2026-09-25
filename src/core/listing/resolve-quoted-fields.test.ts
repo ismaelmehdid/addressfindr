@@ -158,4 +158,21 @@ describe('resolveQuotedFields', () => {
     expect(values.publishedAt).toBeUndefined();
     expect(values.surfaceM2).toBe(80);
   });
+
+  it('reads the DPE date and both energy cost bounds', () => {
+    const source =
+      "Date de réalisation du diagnostic énergétique : 14/04/2022\nMontant estimé des dépenses annuelles d'énergie : entre 1 290 € et 1 790 € par an.";
+    const costQuote = 'entre 1 290 € et 1 790 € par an';
+    const values = resolveQuotedFields({
+      source,
+      quotes: {
+        dpeDate: 'Date de réalisation du diagnostic énergétique : 14/04/2022',
+        annualEnergyCostMinEur: costQuote,
+        annualEnergyCostMaxEur: costQuote,
+      },
+    });
+    expect(values.dpeDate).toBe('2022-04-14');
+    expect(values.annualEnergyCostMinEur).toBe(1290);
+    expect(values.annualEnergyCostMaxEur).toBe(1790);
+  });
 });

@@ -17,8 +17,8 @@ const MetadataSchema = v.object({ status: v.string() });
 
 const NO_IMAGERY_STATUSES = new Set(['ZERO_RESULTS', 'NOT_FOUND']);
 
-// why: sans `heading`, Google oriente la camera du panorama le plus proche
-// vers `location`. La photo regarde donc le point fiable, pas la rue au hasard.
+// why: without `heading`, Google aims the nearest panorama's camera at
+// `location`. The photo faces the trusted point, not a random street.
 function endpoint(path: '' | '/metadata', point: GeoPoint, key: string): URL {
   const url = new URL(`${env().GOOGLE_STREET_VIEW_BASE_URL}${path}`);
   url.searchParams.set('location', `${point.latitude},${point.longitude}`);
@@ -35,8 +35,8 @@ async function get(url: URL): Promise<Response> {
   });
 }
 
-// why: la requete de metadonnees est gratuite, l'image est facturee. On ne
-// paie donc une image que si un panorama existe a moins de 50 m du point.
+// why: the metadata request is free, the image is billed. An image is only
+// paid for when a panorama exists within 50 m of the point.
 async function panoramaExists(
   point: GeoPoint,
   key: string,

@@ -9,9 +9,9 @@ import { useEffect, useRef } from 'react';
 import type { GeoPoint } from '@/core/geo/types';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
-// why: le style Standard de Mapbox v3 dessine deja ses batiments et n'expose
-// pas la source « composite », donc cette couche y est rejetee. light-v11 la
-// porte, et son fond clair suit la langue visuelle de DESIGN.md.
+// why: Mapbox v3's Standard style draws its own buildings and does not expose
+// the "composite" source, so this layer is rejected there. light-v11 carries
+// it, and its light background follows the visual language of DESIGN.md.
 const MAP_STYLE = 'mapbox://styles/mapbox/light-v11';
 
 const BUILDINGS_LAYER: FillExtrusionLayerSpecification = {
@@ -84,8 +84,8 @@ export function AddressMap({
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const initialCameraRef = useRef(cameraFor(point, overview));
 
-  // why: chaque `new mapboxgl.Map()` est un chargement facture. La carte est
-  // donc construite une fois et deplacee ensuite, jamais recreee par adresse.
+  // why: every `new mapboxgl.Map()` is a billed map load. The map is built once
+  // and moved afterwards, never recreated per address.
   useEffect(() => {
     const container = containerRef.current;
     if (container === null) return;
@@ -101,16 +101,16 @@ export function AddressMap({
     mapRef.current = map;
     markerRef.current = new mapboxgl.Marker();
 
-    // why: le panneau des adresses couvre le coin inferieur droit, ou Mapbox
-    // place son attribution par defaut ; elle doit rester visible.
+    // why: the address panel covers the bottom-right corner, where Mapbox puts
+    // its attribution by default; the attribution must stay visible.
     map.addControl(new mapboxgl.AttributionControl(), 'bottom-left');
 
     map.on('style.load', () => {
       map.addLayer(BUILDINGS_LAYER, firstLabelLayerId(map));
     });
 
-    // why: Mapbox ne suit que le redimensionnement de la fenetre ; la carte
-    // change aussi de taille quand le panneau voisin grandit.
+    // why: Mapbox only tracks window resizes; the map also changes size when
+    // the neighbouring panel grows.
     const resizeObserver = new ResizeObserver(() => {
       map.resize();
     });
@@ -128,8 +128,8 @@ export function AddressMap({
   const latitude = point?.latitude ?? null;
   const longitude = point?.longitude ?? null;
 
-  // why: la marge part avec chaque vol. `setPadding` seul arreterait un vol
-  // en cours a mi-chemin quand le panneau passe au-dessus de la carte.
+  // why: the padding travels with every flight. `setPadding` alone would stop
+  // a flight halfway when the panel moves over the map.
   // biome-ignore lint/correctness/useExhaustiveDependencies: focusRequest changes when the shown address is picked again, so the map recentres on it after the user panned away.
   useEffect(() => {
     const map = mapRef.current;

@@ -22,6 +22,7 @@ import { readCachedSearch, writeCachedSearch } from './search-cache';
 
 const FILTER: DpeSearchFilter = {
   inseeCode: '69383',
+  postalCodes: ['69003'],
   propertyType: 'apartment',
   surfaceMin: 61,
   surfaceMax: 65,
@@ -52,6 +53,8 @@ const RECORD: DpeRecord = {
   floor: 0,
   buildingComplement: null,
   establishedOn: '2026-01-07',
+  visitedOn: null,
+  annualEnergyCostEur: null,
   geocodingScore: 0.62,
   point: { latitude: 45.7522, longitude: 4.8842 },
 };
@@ -62,7 +65,12 @@ beforeEach(() => {
 
 describe('search cache', () => {
   it('reads back what it wrote', async () => {
-    const value = { records: [RECORD], total: 1, truncated: false };
+    const value = {
+      records: [RECORD],
+      unverified: [],
+      total: 1,
+      truncated: false,
+    };
     await writeCachedSearch(FILTER, value, 0);
     expect(await readCachedSearch(FILTER, 0)).toEqual(value);
   });

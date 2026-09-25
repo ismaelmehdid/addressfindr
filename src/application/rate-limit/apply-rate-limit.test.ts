@@ -58,8 +58,8 @@ describe('applyRateLimit', () => {
     expect(r.success).toBe(true);
   });
 
-  // why: un prefixe commun faisait partager un seul compteur Upstash a toutes
-  // les familles ; les photos Street View consommaient le quota d'extraction.
+  // why: a shared prefix made every bucket share one Upstash counter; Street
+  // View photos used up the extraction quota.
   it('keys every bucket on its own counter', async () => {
     envMock.NODE_ENV = 'production';
     vi.mocked(getRedisClient).mockReturnValue(

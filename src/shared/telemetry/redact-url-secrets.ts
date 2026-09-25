@@ -1,7 +1,7 @@
-// why: certaines API (Google Street View Static) n'acceptent la cle que dans
-// l'URL. Le fetch de Next et l'instrumentation undici recopient l'URL complete
-// dans le nom et les attributs des spans ; sans ce filtre, la cle partirait en
-// clair vers l'exporteur OTLP.
+// why: some APIs (Google Street View Static) only accept the key in the URL.
+// Next's fetch and the undici instrumentation copy the full URL into span
+// names and attributes; without this filter the key would reach the OTLP
+// exporter in plain text.
 const SECRET_QUERY_PARAM =
   /([?&](?:key|api_key|apikey|access_token|token)=)[^&#\s"]*/gi;
 

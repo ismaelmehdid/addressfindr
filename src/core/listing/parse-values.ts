@@ -100,7 +100,12 @@ const DPE_ENERGY_PATTERN =
 const GES_EMISSION_PATTERN =
   /(\d{1,4}(?:[.,]\d{1,2})?)\s*kg[^\d]{0,16}?co\s?[2\u2082][^\d]{0,12}?m\s?[2\u00B2]/i;
 
+// why: ADEME's conso_5_usages_par_m2_ep is primary energy; a final-energy
+// figure sits on the same label and would never match it.
+const FINAL_ENERGY = /[ée]nergie finale|\bef\b/i;
+
 export function parseDpeEnergyValue(raw: string): number | null {
+  if (FINAL_ENERGY.test(raw)) return null;
   const match = DPE_ENERGY_PATTERN.exec(joinDigitGroups(raw));
   return match?.[1] ? parseFrenchNumber(match[1]) : null;
 }
@@ -141,6 +146,88 @@ export function parseHeatingEnergy(raw: string): HeatingEnergy | null {
   if (found.size !== 1) return null;
   const [only] = [...found];
   return only ?? null;
+}
+
+// why: the DPE date is the establishment date ADEME publishes. Only its label
+// tells it apart from a listing publication date, hence the required context.
+// Two different dates in one quote — carried out on, valid until — make the
+// right one undecidable.
+const DPE_DATE_CONTEXT = /diagnostic|\bdpe\b|[ée]nerg/i;
+const FRENCH_MONTHS: Record<string, number> = {
+  janvier: 1,
+  fevrier: 2,
+  mars: 3,
+  avril: 4,
+  mai: 5,
+  juin: 6,
+  juillet: 7,
+  aout: 8,
+  septembre: 9,
+  octobre: 10,
+  novembre: 11,
+  decembre: 12,
+};
+const NUMERIC_DATE = /(?<!\d)(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})(?!\d)/g;
+const ISO_DATE = /(?<!\d)(\d{4})-(\d{2})-(\d{2})(?!\d)/g;
+const SPELLED_DATE = /(?<!\d)(\d{1,2})(?:er)?\s+([a-z]+)\s+(\d{4})(?!\d)/g;
+const FIRST_DPE_YEAR = 2006;
+
+function isoDate(year: number, month: number, day: number): string | null {
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  if (year < FIRST_DPE_YEAR || date.getTime() > Date.now()) return null;
+  return date.toISOString().slice(0, 10);
+}
+
+export function parseDpeDate(raw: string): string | null {
+  if (!DPE_DATE_CONTEXT.test(raw)) return null;
+  const folded = raw
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(SPACE_VARIANTS, ' ');
+
+  const found: (string | null)[] = [];
+  for (const [, day, month, year] of folded.matchAll(NUMERIC_DATE)) {
+    found.push(isoDate(Number(year), Number(month), Number(day)));
+  }
+  for (const [, year, month, day] of folded.matchAll(ISO_DATE)) {
+    found.push(isoDate(Number(year), Number(month), Number(day)));
+  }
+  for (const [, day, monthName, year] of folded.matchAll(SPELLED_DATE)) {
+    const month = FRENCH_MONTHS[monthName ?? ''];
+    if (month !== undefined) {
+      found.push(isoDate(Number(year), month, Number(day)));
+    }
+  }
+
+  const unique = new Set(found);
+  if (unique.size !== 1) return null;
+  const [only] = [...unique];
+  return only ?? null;
+}
+
+// why: the label prints an annual cost range, not a value. Both bounds must be
+// read in the same sentence: a lone amount can be a rent, service charges or a
+// price, and a year ("indexes sur l'annee 2021") often follows the range.
+const ENERGY_COST_RANGE =
+  /entre\s+(\d[\d ]*(?:[.,]\d+)?)\s*(?:€|euros?)?\s+et\s+(\d[\d ]*(?:[.,]\d+)?)\s*(?:€|euros?)/i;
+
+export function parseAnnualEnergyCostRange(
+  raw: string,
+): { min: number; max: number } | null {
+  const match = ENERGY_COST_RANGE.exec(joinDigitGroups(raw));
+  if (!match?.[1] || !match[2]) return null;
+  const min = parseFrenchNumber(match[1]);
+  const max = parseFrenchNumber(match[2]);
+  if (min === null || max === null || min >= max) return null;
+  return { min, max };
 }
 
 export function parseCount(raw: string): number | null {

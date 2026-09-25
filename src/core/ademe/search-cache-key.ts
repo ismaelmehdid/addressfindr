@@ -8,6 +8,7 @@ import type { DpeSearchFilter } from './types';
 export function dpeSearchCacheKey(filter: DpeSearchFilter): string {
   return [
     filter.inseeCode,
+    [...filter.postalCodes].sort().join(','),
     filter.propertyType ?? '-',
     filter.surfaceMin.toFixed(2),
     filter.surfaceMax.toFixed(2),

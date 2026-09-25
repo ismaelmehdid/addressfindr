@@ -16,6 +16,7 @@ import { clearLocalSearchCache } from './search-cache';
 function filter(over: Partial<DpeSearchFilter> = {}): DpeSearchFilter {
   return {
     inseeCode: '69383',
+    postalCodes: [],
     propertyType: 'apartment',
     surfaceMin: 61,
     surfaceMax: 65,
@@ -57,6 +58,8 @@ const ROW = {
   numero_etage_appartement: 0,
   complement_adresse_batiment: null,
   date_etablissement_dpe: '2026-01-07',
+  date_visite_diagnostiqueur: '2026-01-06',
+  cout_total_5_usages: 1536.4,
   score_ban: 0.62,
 };
 
@@ -136,6 +139,8 @@ describe('ademeDpeDirectory.search', () => {
       floor: 0,
       buildingComplement: null,
       establishedOn: '2026-01-07',
+      visitedOn: '2026-01-06',
+      annualEnergyCostEur: 1536.4,
       geocodingScore: 0.62,
       point: null,
     });
@@ -209,6 +214,53 @@ describe('ademeDpeDirectory.search', () => {
     const result = await ademeDpeDirectory.search(filter());
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('external_api');
+  });
+
+  // why: measured 2026-09-24, data.ademe.fr timed out then reset every
+  // connection for about 17 minutes during a benchmark run, and the same
+  // searches answered normally afterwards. One failed request used to fail
+  // the whole match.
+  it('retries a request that failed on the network', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        if (calls === 1) throw new TypeError('fetch failed');
+        return new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+          status: 200,
+        });
+      }),
+    );
+    const result = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69012' }),
+    );
+    expect(result._unsafeUnwrap().records).toHaveLength(1);
+  });
+
+  it('retries a request the server refused for load', async () => {
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        calls += 1;
+        return calls === 1
+          ? new Response('{}', { status: 503 })
+          : new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+              status: 200,
+            });
+      }),
+    );
+    const result = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69013' }),
+    );
+    expect(result._unsafeUnwrap().records).toHaveLength(1);
+  });
+
+  it('never retries a request the server rejected as malformed', async () => {
+    const spy = mockFetchOnce({}, 400);
+    await ademeDpeDirectory.search(filter({ inseeCode: '69014' }));
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -297,7 +349,8 @@ describe('ademeDpeDirectory.search — logements neufs', () => {
     );
 
     const result = await ademeDpeDirectory.search(filter());
-    expect(call).toBe(2);
+    // why: existing register once, new register twice — a 500 is retried.
+    expect(call).toBe(3);
     expect(result.isOk()).toBe(true);
     if (!result.isOk()) return;
     expect(result.value.records).toHaveLength(1);
@@ -603,5 +656,150 @@ describe('ademeDpeDirectory.search — le cache ne fige pas une reponse partiell
     expect(recovered.isOk()).toBe(true);
     if (!recovered.isOk()) return;
     expect(recovered.value.records).toHaveLength(2);
+  });
+});
+
+describe('ademeDpeDirectory.searchByDate', () => {
+  const DATE_FILTER = {
+    departmentCode: '35',
+    dpeDate: '2026-09-17',
+    propertyType: 'house' as const,
+    surfaceMin: 169,
+    surfaceMax: 215,
+    dpeClass: 'A' as const,
+    limit: 200,
+  };
+
+  it('searches the department on either DPE date', async () => {
+    const spy = mockFetchOnce({ total: 0, results: [] });
+    await ademeDpeDirectory.searchByDate(DATE_FILTER);
+
+    const qs = calledUrl(spy).searchParams.get('qs') ?? '';
+    expect(qs).toContain('code_departement_ban:"35"');
+    expect(qs).toContain(
+      '(date_etablissement_dpe:"2026-09-17" OR date_visite_diagnostiqueur:"2026-09-17")',
+    );
+    expect(qs).toContain('_exists_:numero_voie_ban');
+    expect(qs).toContain('type_batiment:"maison"');
+    expect(qs).toContain('surface_habitable_logement:[169.00 TO 215.00]');
+    expect(qs).toContain('etiquette_dpe:"A"');
+  });
+
+  it('refuses a malformed department or date without calling out', async () => {
+    const spy = mockFetchOnce({ total: 0, results: [] });
+    const badDepartment = await ademeDpeDirectory.searchByDate({
+      ...DATE_FILTER,
+      departmentCode: '35" OR *',
+    });
+    const badDate = await ademeDpeDirectory.searchByDate({
+      ...DATE_FILTER,
+      dpeDate: '2026-09-17" OR *',
+    });
+    expect(badDepartment.isErr()).toBe(true);
+    expect(badDate.isErr()).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+describe('ademeDpeDirectory.search — rows ADEME never geocoded', () => {
+  // why: measured 2026-09-24, 1.1 to 2.7 % of a city's rows (10.8 % in Rennes)
+  // carry no code_insee_ban, only the address the diagnostician typed. They
+  // are searched on the commune's postal codes and come back unverified.
+  const RAW_ROW = {
+    ...ROW,
+    numero_dpe: '2544E1624534Y',
+    code_insee_ban: null,
+    adresse_ban: null,
+    numero_voie_ban: null,
+    adresse_brut: '77 route de Vertou',
+    code_postal_brut: 44100,
+    nom_commune_brut: 'NANTES',
+  };
+
+  function routeByQuery(raw: unknown[], geocoded: unknown[] = []) {
+    const spy = vi.fn(async (url: URL) => {
+      const qs = url.searchParams.get('qs') ?? '';
+      const results = qs.includes('NOT _exists_:code_insee_ban')
+        ? raw
+        : geocoded;
+      return new Response(JSON.stringify({ total: results.length, results }), {
+        status: 200,
+      });
+    });
+    vi.stubGlobal('fetch', spy);
+    return spy;
+  }
+
+  function queries(spy: ReturnType<typeof routeByQuery>): string[] {
+    return spy.mock.calls.map(
+      (call) => (call as unknown as [URL])[0].searchParams.get('qs') ?? '',
+    );
+  }
+
+  it('searches the rows with no INSEE code on the commune postal codes', async () => {
+    const spy = routeByQuery([]);
+    await ademeDpeDirectory.search(
+      filter({ inseeCode: '44109', postalCodes: ['44000', '44100'] }),
+    );
+    const raw = queries(spy).filter((qs) =>
+      qs.includes('NOT _exists_:code_insee_ban'),
+    );
+    expect(raw).toHaveLength(2);
+    expect(raw[0]).toContain('code_postal_brut:("44000" OR "44100")');
+    expect(raw[0]).not.toContain('numero_voie_ban');
+    expect(raw[0]).toContain('etiquette_dpe:"D"');
+  });
+
+  it('returns such a row unverified, with its typed address', async () => {
+    routeByQuery([RAW_ROW]);
+    const result = await ademeDpeDirectory.search(
+      filter({ inseeCode: '44109', postalCodes: ['44100'] }),
+    );
+    const found = result._unsafeUnwrap();
+    expect(found.records).toHaveLength(0);
+    expect(found.unverified).toHaveLength(1);
+    expect(found.unverified[0]).toMatchObject({
+      dpeNumber: '2544E1624534Y',
+      rawStreet: '77 route de Vertou',
+      rawPostalCode: '44100',
+      rawCity: 'NANTES',
+      surfaceM2: 63,
+    });
+  });
+
+  it('restores the leading zero of a postal code stored as a number', async () => {
+    routeByQuery([{ ...RAW_ROW, code_postal_brut: 1500 }]);
+    const result = await ademeDpeDirectory.search(
+      filter({ inseeCode: '01004', postalCodes: ['01500'] }),
+    );
+    expect(result._unsafeUnwrap().unverified[0]?.rawPostalCode).toBe('01500');
+  });
+
+  it('never searches them without a postal code to anchor the commune', async () => {
+    const spy = routeByQuery([RAW_ROW]);
+    const result = await ademeDpeDirectory.search(filter({ postalCodes: [] }));
+    expect(
+      queries(spy).some((qs) => qs.includes('NOT _exists_:code_insee_ban')),
+    ).toBe(false);
+    expect(result._unsafeUnwrap().unverified).toEqual([]);
+  });
+
+  it('still answers the geocoded rows when that search fails', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: URL) => {
+        const qs = url.searchParams.get('qs') ?? '';
+        return qs.includes('NOT _exists_:code_insee_ban')
+          ? new Response('{}', { status: 500 })
+          : new Response(JSON.stringify({ total: 1, results: [ROW] }), {
+              status: 200,
+            });
+      }),
+    );
+    const result = await ademeDpeDirectory.search(
+      filter({ inseeCode: '69011', postalCodes: ['69003'] }),
+    );
+    expect(result._unsafeUnwrap().records).toHaveLength(1);
+    expect(result._unsafeUnwrap().unverified).toEqual([]);
   });
 });

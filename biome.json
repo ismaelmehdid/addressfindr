@@ -49,6 +49,7 @@
     "includes": [
       "**",
       "!.claude",
+      "!.benchmark",
       "!drizzle",
       "!.next",
       "!node_modules",

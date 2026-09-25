@@ -35,6 +35,9 @@ const SIGNAL_KEY = {
   buildingFloors: 'signalBuildingFloors',
   landSurfaceM2: 'signalLandSurface',
   floor: 'signalFloor',
+  annualEnergyCost: 'signalEnergyCost',
+  dpeDate: 'signalDpeDate',
+  pinDistance: 'signalPin',
 } as const satisfies Record<MatchSignal, string>;
 
 type CardOptions = {
@@ -110,9 +113,9 @@ function CandidateCard({
 
   const wasShown = useRef(isShown);
 
-  // why: ne defiler que quand la selection arrive sur cette fiche. Au premier
-  // rendu, la premiere fiche est deja en haut ; defiler masquerait le titre
-  // de section sur un telephone, ou la fiche depasse la hauteur du panneau.
+  // why: scroll only when the selection arrives on this card. On first render
+  // the top card is already at the top; scrolling would hide the section title
+  // on a phone, where a card is taller than the panel.
   useEffect(() => {
     if (isShown && !wasShown.current && selectable) {
       cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });

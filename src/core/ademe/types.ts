@@ -31,12 +31,49 @@ export type DpeRecord = {
   floor: number | null;
   buildingComplement: string | null;
   establishedOn: string | null;
+  visitedOn: string | null;
+  annualEnergyCostEur: number | null;
   geocodingScore: number | null;
   point: GeoPoint | null;
 };
 
+// why: a row ADEME never matched to the national address register carries
+// only the address the diagnostician typed. It is not an address the product
+// may show until the register recognises it, so it lives in its own type.
+export type UnverifiedDpeRecord = Omit<
+  DpeRecord,
+  | 'banId'
+  | 'address'
+  | 'streetNumber'
+  | 'street'
+  | 'postalCode'
+  | 'city'
+  | 'inseeCode'
+  | 'geocodingScore'
+  | 'point'
+> & {
+  rawStreet: string;
+  rawPostalCode: string | null;
+  rawCity: string | null;
+};
+
 export type DpeSearchFilter = {
   inseeCode: string;
+  postalCodes: readonly string[];
+  propertyType: PropertyType | null;
+  surfaceMin: number;
+  surfaceMax: number;
+  dpeClass: EnergyClass | null;
+  limit: number;
+};
+
+// why: both DPE registers hold diagnostics issued under the method in force
+// since 2021-07-01. An older date can match no row.
+export const FIRST_REGISTERED_DPE_DATE = '2021-07-01';
+
+export type DpeDateSearchFilter = {
+  departmentCode: string;
+  dpeDate: string;
   propertyType: PropertyType | null;
   surfaceMin: number;
   surfaceMax: number;
@@ -54,7 +91,10 @@ export type MatchSignal =
   | 'yearBuilt'
   | 'buildingFloors'
   | 'landSurfaceM2'
-  | 'floor';
+  | 'floor'
+  | 'annualEnergyCost'
+  | 'dpeDate'
+  | 'pinDistance';
 
 export type AddressCandidate = {
   record: DpeRecord;
@@ -73,18 +113,20 @@ export type AddressMatch = {
   refusedFor: MatchRefusal | null;
 };
 
-// why: l'API data-fair accepte size jusqu'a 10000 (10001 rend un 400). Lyon 3e,
-// l'arrondissement le plus dense mesure, rend 972 lignes pour un appartement
-// DPE D a 5% de tolerance de surface, donc 2000 couvre le pire cas observe
-// sans ramener un corpus entier.
-export const MAX_RECORDS_FETCHED = 2000;
+// why: the data-fair API accepts size up to 10000 (10001 returns a 400).
+// Measured 2026-09-24 at a 12 % surface tolerance: Paris 15e, 40 m2 apartment
+// with DPE D, returns 3936 rows from the existing register, read in 3.6 s;
+// Lyon 3e at 63 m2 returns 2069. 5000 covers the worst case observed.
+export const MAX_RECORDS_FETCHED = 5000;
 export const MAX_CANDIDATES_RETURNED = 10;
 
-// why: la surface de l'annonce est habitable ou Carrez, celle de l'ADEME est
-// habitable. Les deux divergent legerement, d'ou une fenetre plutot qu'une
-// egalite. Elle reste etroite : mesure du 2026-09-22, Lyon 3e appartement
-// DPE D, 60-66 m2 rend 972 lignes contre 149 pour 62,5-63,5.
-const SURFACE_TOLERANCE_RATIO = 0.03;
+// why: the listing surface is living, Carrez or total area; ADEME's is living
+// area. Measured 2026-09-24 against precisement.fr on 25 leboncoin listings:
+// the row they designate sits at 0.89 to 1.08 times the listed surface (133.8
+// m2 for 150, 110 for 123, 193.8 for 210). At 3 %, six of those rows were never
+// fetched. The window is therefore wide, and ranking — cost, date, DPE values —
+// decides.
+const SURFACE_TOLERANCE_RATIO = 0.12;
 const SURFACE_TOLERANCE_MIN_M2 = 2;
 
 export function surfaceWindow(surfaceM2: number): {
