@@ -1,4 +1,43 @@
 import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api';
+import type { Configuration } from '@vercel/otel';
+import { redactUrlSecrets } from '@/shared/telemetry/redact-url-secrets';
+
+type SpanProcessor = Exclude<
+  NonNullable<Configuration['spanProcessors']>[number],
+  'auto'
+>;
+type StartedSpan = Parameters<SpanProcessor['onStart']>[0];
+type EndedSpan = Parameters<SpanProcessor['onEnd']>[0];
+
+function redactedAttributes(
+  span: StartedSpan | EndedSpan,
+): Array<[string, string]> {
+  return Object.entries(span.attributes).flatMap(([key, value]) => {
+    if (typeof value !== 'string') return [];
+    const redacted = redactUrlSecrets(value);
+    return redacted === value ? [] : [[key, redacted]];
+  });
+}
+
+// why: place en tete des processeurs, il nettoie le span avant que le
+// processeur d'export ne le mette en file. onEnd couvre les attributs poses
+// apres le demarrage, que l'API ne permet plus de modifier.
+const redactUrlSecretsProcessor: SpanProcessor = {
+  onStart(span) {
+    const name = redactUrlSecrets(span.name);
+    if (name !== span.name) span.updateName(name);
+    for (const [key, value] of redactedAttributes(span)) {
+      span.setAttribute(key, value);
+    }
+  },
+  onEnd(span) {
+    for (const [key, value] of redactedAttributes(span)) {
+      span.attributes[key] = value;
+    }
+  },
+  forceFlush: async () => {},
+  shutdown: async () => {},
+};
 
 const isDebugEnabled = process.env.OTEL_LOG_LEVEL === 'debug';
 
@@ -58,6 +97,7 @@ export async function register(): Promise<void> {
         'service.version': process.env.OTEL_SERVICE_VERSION,
       },
       traceExporter,
+      spanProcessors: [redactUrlSecretsProcessor, 'auto'],
       logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
       metricReaders: [
         new PeriodicExportingMetricReader({
