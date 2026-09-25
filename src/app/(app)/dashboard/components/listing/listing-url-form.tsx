@@ -3,7 +3,7 @@
 import { ArrowRight } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useRef, useState } from 'react';
 import * as v from 'valibot';
 import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
@@ -23,6 +23,7 @@ import {
   type ListingUrlRejection,
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
+import { MapErrorBoundary } from './map-error-boundary';
 
 // why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
 // premier affichage d'une carte, pas a chaque visite du tableau de bord.
@@ -193,12 +194,20 @@ export function ListingUrlForm({
   const t = useTranslations('Listing');
   const [url, setUrl] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  // why: la recherche d'adresse d'une annonce peut repondre apres qu'une autre
+  // a ete soumise. Sans ce compteur, la reponse tardive afficherait l'adresse
+  // de la premiere annonce sous le lien de la seconde.
+  const latestSubmission = useRef(0);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
   ): Promise<void> {
     event.preventDefault();
     if (status.kind === 'pending') return;
+
+    latestSubmission.current += 1;
+    const submission = latestSubmission.current;
+    const isStale = () => submission !== latestSubmission.current;
 
     const validated = validateListingUrl(url);
     if (!validated.ok) {
@@ -208,6 +217,7 @@ export function ListingUrlForm({
 
     setStatus({ kind: 'pending' });
     const outcome = await requestExtraction(validated.canonicalUrl);
+    if (isStale()) return;
     if (!outcome.ok) {
       setStatus({ kind: 'failed', failure: outcome.failure });
       return;
@@ -220,6 +230,7 @@ export function ListingUrlForm({
     });
 
     const matched = await requestMatch(outcome.listing);
+    if (isStale()) return;
     setStatus({
       kind: 'extracted',
       listing: outcome.listing,
@@ -260,6 +271,7 @@ export function ListingUrlForm({
               value={url}
               onChange={(event) => {
                 setUrl(event.target.value);
+                latestSubmission.current += 1;
                 setStatus({ kind: 'idle' });
               }}
               placeholder={t('placeholder')}
@@ -375,12 +387,18 @@ function MapPanel({
   }
 
   return (
-    <>
+    <MapErrorBoundary
+      fallback={
+        <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+          {t('mapFailed')}
+        </p>
+      }
+    >
       <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
         {t('mapPinned', { address })}
       </p>
       <AddressMap point={point} accessToken={mapboxAccessToken} />
-    </>
+    </MapErrorBoundary>
   );
 }
 
