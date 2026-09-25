@@ -17,15 +17,23 @@ const globalForRateLimit = globalThis as unknown as {
   transcribeRatelimit: Ratelimit | null | undefined;
   listingExtractRatelimit: Ratelimit | null | undefined;
   listingMatchRatelimit: Ratelimit | null | undefined;
+  streetViewRatelimit: Ratelimit | null | undefined;
 };
 
-function buildRatelimit(tokens: number, window: '1 m'): Ratelimit | null {
+// why: Upstash cle un compteur sur prefixe + identifiant + fenetre. Avec un
+// prefixe commun, toutes les familles incrementaient le meme compteur : les
+// photos d'une recherche epuisaient le quota d'extraction de la suivante.
+function buildRatelimit(
+  bucket: RateLimitBucket,
+  tokens: number,
+  window: '1 m',
+): Ratelimit | null {
   const redis = getRedisClient();
   if (!redis) return null;
   return new Ratelimit({
     redis,
     limiter: Ratelimit.slidingWindow(tokens, window),
-    prefix: 'app:ratelimit',
+    prefix: `app:ratelimit:${bucket}`,
     analytics: false,
   });
 }
@@ -34,7 +42,7 @@ function getDefaultRatelimit(): Ratelimit | null {
   if (globalForRateLimit.defaultRatelimit !== undefined) {
     return globalForRateLimit.defaultRatelimit;
   }
-  const limiter = buildRatelimit(60, '1 m');
+  const limiter = buildRatelimit('default', 60, '1 m');
   globalForRateLimit.defaultRatelimit = limiter;
   return limiter;
 }
@@ -43,7 +51,7 @@ function getUploadRatelimit(): Ratelimit | null {
   if (globalForRateLimit.uploadRatelimit !== undefined) {
     return globalForRateLimit.uploadRatelimit;
   }
-  const limiter = buildRatelimit(20, '1 m');
+  const limiter = buildRatelimit('upload', 20, '1 m');
   globalForRateLimit.uploadRatelimit = limiter;
   return limiter;
 }
@@ -52,7 +60,7 @@ function getTranscribeRatelimit(): Ratelimit | null {
   if (globalForRateLimit.transcribeRatelimit !== undefined) {
     return globalForRateLimit.transcribeRatelimit;
   }
-  const limiter = buildRatelimit(30, '1 m');
+  const limiter = buildRatelimit('transcribe', 30, '1 m');
   globalForRateLimit.transcribeRatelimit = limiter;
   return limiter;
 }
@@ -61,7 +69,7 @@ function getListingExtractRatelimit(): Ratelimit | null {
   if (globalForRateLimit.listingExtractRatelimit !== undefined) {
     return globalForRateLimit.listingExtractRatelimit;
   }
-  const limiter = buildRatelimit(10, '1 m');
+  const limiter = buildRatelimit('listing-extract', 10, '1 m');
   globalForRateLimit.listingExtractRatelimit = limiter;
   return limiter;
 }
@@ -70,8 +78,19 @@ function getListingMatchRatelimit(): Ratelimit | null {
   if (globalForRateLimit.listingMatchRatelimit !== undefined) {
     return globalForRateLimit.listingMatchRatelimit;
   }
-  const limiter = buildRatelimit(20, '1 m');
+  const limiter = buildRatelimit('listing-match', 20, '1 m');
   globalForRateLimit.listingMatchRatelimit = limiter;
+  return limiter;
+}
+
+// why: une recherche affiche jusqu'a 10 adresses, donc 10 photos. 60 par
+// minute laisse six recherches par minute sans ouvrir la cle facturee au pillage.
+function getStreetViewRatelimit(): Ratelimit | null {
+  if (globalForRateLimit.streetViewRatelimit !== undefined) {
+    return globalForRateLimit.streetViewRatelimit;
+  }
+  const limiter = buildRatelimit('street-view', 60, '1 m');
+  globalForRateLimit.streetViewRatelimit = limiter;
   return limiter;
 }
 
@@ -80,13 +99,15 @@ export type RateLimitBucket =
   | 'upload'
   | 'transcribe'
   | 'listing-extract'
-  | 'listing-match';
+  | 'listing-match'
+  | 'street-view';
 
 function getLimiter(bucket: RateLimitBucket): Ratelimit | null {
   if (bucket === 'upload') return getUploadRatelimit();
   if (bucket === 'transcribe') return getTranscribeRatelimit();
   if (bucket === 'listing-extract') return getListingExtractRatelimit();
   if (bucket === 'listing-match') return getListingMatchRatelimit();
+  if (bucket === 'street-view') return getStreetViewRatelimit();
   return getDefaultRatelimit();
 }
 

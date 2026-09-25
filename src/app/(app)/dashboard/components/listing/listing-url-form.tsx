@@ -1,20 +1,17 @@
 'use client';
 
-import { ArrowRight } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { ArrowRight, MapPin, MapPinOff } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type FormEvent, useState } from 'react';
+import { type FormEvent, useRef, useState } from 'react';
 import * as v from 'valibot';
 import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { candidateOnMap } from '@/core/ademe/candidate-on-map';
-import type {
-  AddressCandidate,
-  AddressMatch,
-  MatchSignal,
-} from '@/core/ademe/types';
+import { candidateOnMap, mapOverview } from '@/core/ademe/candidate-on-map';
+import type { AddressCandidate, AddressMatch } from '@/core/ademe/types';
+import type { GeoPoint } from '@/core/geo/types';
 import {
   EXTRACTED_FIELD_NAMES,
   type ExtractedListing,
@@ -23,18 +20,12 @@ import {
   type ListingUrlRejection,
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
-
-// why: mapbox-gl pese environ 500 Ko compresses. Il n'est telecharge qu'au
-// premier affichage d'une carte, pas a chaque visite du tableau de bord.
-const AddressMap = dynamic(
-  () => import('./address-map').then((module) => module.AddressMap),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="mt-2 h-[320px] w-full rounded-lg border border-border bg-card" />
-    ),
-  },
-);
+import { AddressCandidateList } from './address-candidate-list';
+import {
+  AddressResultsMap,
+  MAP_LAYOUT_CLASS,
+  SEARCH_OVERLAY_CLASS,
+} from './address-results-map';
 
 const REJECTION_KEY = {
   empty: 'errorEmpty',
@@ -68,19 +59,6 @@ const MATCH_FAILURE_KEY = {
   unknown: 'errorMatchUnknown',
 } as const satisfies Record<MatchFailure, string>;
 
-const SIGNAL_KEY = {
-  surfaceM2: 'signalSurface',
-  dpeClass: 'signalDpeClass',
-  gesClass: 'signalGesClass',
-  dpeKwhM2Year: 'signalDpeValue',
-  gesKgCo2M2Year: 'signalGesValue',
-  heatingEnergy: 'signalHeating',
-  yearBuilt: 'signalYearBuilt',
-  buildingFloors: 'signalBuildingFloors',
-  landSurfaceM2: 'signalLandSurface',
-  floor: 'signalFloor',
-} as const satisfies Record<MatchSignal, string>;
-
 type MatchState =
   | { kind: 'pending' }
   | { kind: 'found'; match: AddressMatch }
@@ -88,7 +66,6 @@ type MatchState =
 
 type Status =
   | { kind: 'idle' }
-  | { kind: 'rejected'; reason: ListingUrlRejection }
   | { kind: 'pending' }
   | { kind: 'failed'; failure: ExtractionFailure }
   | { kind: 'extracted'; listing: ExtractedListing; match: MatchState };
@@ -185,14 +162,58 @@ function formatExtraction(listing: ExtractedListing): string {
   return [...header, '', ...rows].join('\n');
 }
 
+type MappedResult = {
+  listing: ExtractedListing;
+  match: AddressMatch;
+  overview: GeoPoint;
+};
+
+// why: la carte plein ecran ne s'affiche que si elle peut montrer quelque
+// chose de fiable : un jeton Mapbox, une carte que ce navigateur sait
+// dessiner, des candidats, et au moins un point geocode parmi eux. Sinon la
+// liste reste seule, sans carte.
+function mappedResult({
+  status,
+  mapboxAccessToken,
+  mapFailed,
+}: {
+  status: Status;
+  mapboxAccessToken: string;
+  mapFailed: boolean;
+}): MappedResult | null {
+  if (mapboxAccessToken.length === 0 || mapFailed) return null;
+  if (status.kind !== 'extracted' || status.match.kind !== 'found') {
+    return null;
+  }
+
+  const { match } = status.match;
+  if (match.refusedFor !== null) return null;
+  const overview = mapOverview(match.candidates);
+  if (overview === null) return null;
+  return { listing: status.listing, match, overview };
+}
+
+type Selection = { dpeNumber: string | null; request: number };
+
+const INITIAL_SELECTION: Selection = { dpeNumber: null, request: 0 };
+
+const COLUMN_LAYOUT_CLASS =
+  'flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8';
+
 export function ListingUrlForm({
   mapboxAccessToken,
+  streetViewEnabled,
 }: {
   mapboxAccessToken: string;
+  streetViewEnabled: boolean;
 }) {
   const t = useTranslations('Listing');
   const [url, setUrl] = useState('');
+  const [rejection, setRejection] = useState<ListingUrlRejection | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [selection, setSelection] = useState<Selection>(INITIAL_SELECTION);
+  const [mapFailed, setMapFailed] = useState(false);
+  const latestSubmission = useRef(0);
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -202,12 +223,21 @@ export function ListingUrlForm({
 
     const validated = validateListingUrl(url);
     if (!validated.ok) {
-      setStatus({ kind: 'rejected', reason: validated.reason });
+      setRejection(validated.reason);
       return;
     }
 
+    // why: une recherche encore en cours peut repondre apres une plus recente.
+    // Sa reponse ne doit jamais remplacer le resultat de l'annonce affichee.
+    latestSubmission.current += 1;
+    const submission = latestSubmission.current;
+    setRejection(null);
+    setSelection(INITIAL_SELECTION);
+    setMapFailed(false);
     setStatus({ kind: 'pending' });
+
     const outcome = await requestExtraction(validated.canonicalUrl);
+    if (submission !== latestSubmission.current) return;
     if (!outcome.ok) {
       setStatus({ kind: 'failed', failure: outcome.failure });
       return;
@@ -220,6 +250,7 @@ export function ListingUrlForm({
     });
 
     const matched = await requestMatch(outcome.listing);
+    if (submission !== latestSubmission.current) return;
     setStatus({
       kind: 'extracted',
       listing: outcome.listing,
@@ -229,75 +260,140 @@ export function ListingUrlForm({
     });
   }
 
-  const isRejected = status.kind === 'rejected';
-  const isFailed = status.kind === 'failed';
-  const message = isRejected
-    ? t(REJECTION_KEY[status.reason])
-    : isFailed
-      ? t(FAILURE_KEY[status.failure])
-      : status.kind === 'pending'
-        ? t('analyzing')
-        : null;
+  const isError = rejection !== null || status.kind === 'failed';
+  const message =
+    rejection !== null
+      ? t(REJECTION_KEY[rejection])
+      : status.kind === 'failed'
+        ? t(FAILURE_KEY[status.failure])
+        : status.kind === 'pending'
+          ? t('analyzing')
+          : null;
 
+  const mapped = mappedResult({ status, mapboxAccessToken, mapFailed });
+  const shown =
+    mapped === null
+      ? null
+      : candidateOnMap(mapped.match.candidates, selection.dpeNumber);
+  const onMap = mapped !== null && shown !== null;
+
+  // why: le formulaire garde la meme place dans l'arbre React dans les deux
+  // mises en page. Le remonter a chaque bascule ferait perdre le focus clavier.
   return (
-    <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8">
-      <div className="w-full max-w-xl">
-        <h1 className="text-center text-[22px] font-semibold leading-[1.3] tracking-[-0.18px] text-ink">
-          {t('heading')}
-        </h1>
-        <form
-          onSubmit={(event) => {
-            void handleSubmit(event);
+    <div className={onMap ? MAP_LAYOUT_CLASS : COLUMN_LAYOUT_CLASS}>
+      {onMap && (
+        <AddressResultsMap
+          match={mapped.match}
+          overview={mapped.overview}
+          shown={shown}
+          focusRequest={selection.request}
+          onSelect={(dpeNumber) => {
+            setSelection((current) => ({
+              dpeNumber,
+              request: current.request + 1,
+            }));
           }}
-          className="mt-6 flex items-start gap-2"
-        >
-          <div className="flex-1">
-            <Input
-              type="url"
-              inputMode="url"
-              autoComplete="off"
-              spellCheck={false}
-              value={url}
-              onChange={(event) => {
-                setUrl(event.target.value);
-                setStatus({ kind: 'idle' });
-              }}
-              placeholder={t('placeholder')}
-              aria-invalid={isRejected || isFailed}
-              aria-describedby={
-                message === null ? undefined : 'listing-url-status'
-              }
-              className="h-9"
-            />
-          </div>
-          <Button
-            type="submit"
-            size="sm"
-            loading={status.kind === 'pending'}
-            className="h-9 shrink-0"
-          >
-            {t('submit')}
-            <ArrowRight className="size-3.5" />
-          </Button>
-        </form>
-        {message !== null && (
-          <p
-            id="listing-url-status"
-            aria-live="polite"
-            className={
-              isRejected || isFailed
-                ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'
-                : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
-            }
-          >
-            {message}
-          </p>
+          onMapFailure={() => {
+            setMapFailed(true);
+          }}
+          accessToken={mapboxAccessToken}
+          extraction={formatExtraction(mapped.listing)}
+          streetViewEnabled={streetViewEnabled}
+        />
+      )}
+      <div className={onMap ? SEARCH_OVERLAY_CLASS : 'w-full max-w-xl'}>
+        {!onMap && (
+          <h1 className="text-center text-[22px] font-semibold leading-[1.3] tracking-[-0.18px] text-ink">
+            {t('heading')}
+          </h1>
         )}
-        {status.kind === 'extracted' && (
+        <Card
+          size="sm"
+          className={
+            onMap
+              ? 'gap-0 py-2 shadow-md'
+              : 'mt-6 gap-0 overflow-visible rounded-none bg-transparent py-0 ring-0'
+          }
+        >
+          <CardContent className={onMap ? 'px-2' : 'px-0'}>
+            <form
+              onSubmit={(event) => {
+                void handleSubmit(event);
+              }}
+              className="flex items-start gap-2"
+            >
+              <div className="flex-1">
+                <Input
+                  type="url"
+                  inputMode="url"
+                  autoComplete="off"
+                  spellCheck={false}
+                  value={url}
+                  onChange={(event) => {
+                    setUrl(event.target.value);
+                    setRejection(null);
+                    // why: taper une nouvelle adresse ne jette pas le resultat
+                    // affiche ; seul un nouvel envoi le remplace.
+                    setStatus((current) =>
+                      current.kind === 'failed' ? { kind: 'idle' } : current,
+                    );
+                  }}
+                  placeholder={t('placeholder')}
+                  aria-label={t('heading')}
+                  aria-invalid={isError}
+                  aria-describedby={
+                    message === null ? undefined : 'listing-url-status'
+                  }
+                  className="h-9"
+                />
+              </div>
+              <Button
+                type="submit"
+                size="sm"
+                loading={status.kind === 'pending'}
+                className="h-9 shrink-0"
+              >
+                {t('submit')}
+                <ArrowRight className="size-3.5" />
+              </Button>
+            </form>
+            {message !== null && (
+              <p
+                id="listing-url-status"
+                aria-live="polite"
+                className={
+                  isError
+                    ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'
+                    : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
+                }
+              >
+                {message}
+              </p>
+            )}
+            {onMap && (
+              <p
+                aria-live="polite"
+                className="mt-2 flex items-start gap-1.5 px-0.5 text-[12px] leading-[1.4] text-muted-foreground"
+              >
+                {shown.record.point === null ? (
+                  <MapPinOff className="mt-px size-3.5 shrink-0" aria-hidden />
+                ) : (
+                  <MapPin className="mt-px size-3.5 shrink-0" aria-hidden />
+                )}
+                {shown.record.point === null
+                  ? t('mapNoTrustedPoint', { address: shown.record.address })
+                  : t('mapPinned', { address: shown.record.address })}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+        {!onMap && status.kind === 'extracted' && (
           <>
             <AddressSection
               state={status.match}
               mapboxAccessToken={mapboxAccessToken}
+              mapFailed={mapFailed}
+              streetViewEnabled={streetViewEnabled}
             />
             <section aria-live="polite" className="mt-6">
               <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
@@ -310,16 +406,32 @@ export function ListingUrlForm({
           </>
         )}
       </div>
+      <p className="sr-only" aria-live="polite">
+        {onMap
+          ? t('addressFoundAnnouncement', {
+              count: mapped.match.candidates.length,
+              address: firstAddress(mapped.match.candidates),
+            })
+          : ''}
+      </p>
     </div>
   );
+}
+
+function firstAddress(candidates: readonly AddressCandidate[]): string {
+  return candidates[0]?.record.address ?? '';
 }
 
 function AddressSection({
   state,
   mapboxAccessToken,
+  mapFailed,
+  streetViewEnabled,
 }: {
   state: MatchState;
   mapboxAccessToken: string;
+  mapFailed: boolean;
+  streetViewEnabled: boolean;
 }) {
   const t = useTranslations('Listing');
 
@@ -339,62 +451,29 @@ function AddressSection({
         </p>
       )}
       {state.kind === 'found' && (
-        <AddressList
+        <UnmappedAddressList
           match={state.match}
           mapboxAccessToken={mapboxAccessToken}
+          mapFailed={mapFailed}
+          streetViewEnabled={streetViewEnabled}
         />
       )}
     </section>
   );
 }
 
-function MapPanel({
-  candidate,
-  mapboxAccessToken,
-}: {
-  candidate: AddressCandidate;
-  mapboxAccessToken: string;
-}) {
-  const t = useTranslations('Listing');
-  const { address, point } = candidate.record;
-
-  if (point === null) {
-    return (
-      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {t('mapNoTrustedPoint', { address })}
-      </p>
-    );
-  }
-
-  if (mapboxAccessToken.length === 0) {
-    return (
-      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {t('mapUnavailable')}
-      </p>
-    );
-  }
-
-  return (
-    <>
-      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {t('mapPinned', { address })}
-      </p>
-      <AddressMap point={point} accessToken={mapboxAccessToken} />
-    </>
-  );
-}
-
-function AddressList({
+function UnmappedAddressList({
   match,
   mapboxAccessToken,
+  mapFailed,
+  streetViewEnabled,
 }: {
   match: AddressMatch;
   mapboxAccessToken: string;
+  mapFailed: boolean;
+  streetViewEnabled: boolean;
 }) {
   const t = useTranslations('Listing');
-  const [selectedDpeNumber, setSelectedDpeNumber] = useState<string | null>(
-    null,
-  );
 
   if (match.refusedFor === 'insufficient-evidence') {
     return (
@@ -404,7 +483,8 @@ function AddressList({
     );
   }
 
-  if (match.candidates.length === 0) {
+  const [first] = match.candidates;
+  if (first === undefined) {
     return (
       <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
         {t('addressNone')}
@@ -412,70 +492,26 @@ function AddressList({
     );
   }
 
-  const shown = candidateOnMap(match.candidates, selectedDpeNumber);
+  const mapNotice =
+    mapboxAccessToken.length === 0
+      ? t('mapUnavailable')
+      : mapFailed
+        ? t('mapFailed')
+        : t('mapNoTrustedPoint', { address: first.record.address });
 
   return (
     <>
-      {shown !== null && (
-        <MapPanel candidate={shown} mapboxAccessToken={mapboxAccessToken} />
-      )}
-      <ol className="mt-2 flex flex-col gap-2">
-        {match.candidates.map((candidate) => (
-          <li
-            key={candidate.record.dpeNumber}
-            aria-current={
-              candidate.record.dpeNumber === shown?.record.dpeNumber
-                ? 'true'
-                : undefined
-            }
-            className="rounded-lg border border-border bg-card p-3 aria-[current]:border-ink"
-          >
-            <div className="flex items-baseline justify-between gap-3">
-              <span className="text-[14px] font-medium tracking-[-0.08px] text-ink">
-                {candidate.record.address}
-              </span>
-              <span className="shrink-0 font-mono text-[12px] text-slate-neutral">
-                {t('addressConfidence', {
-                  percent: Math.round(candidate.confidence * 100),
-                })}
-              </span>
-            </div>
-            <p className="mt-1 text-[12px] leading-[1.6] tracking-[-0.08px] text-slate-neutral">
-              {t('addressSupport', {
-                count: candidate.supportingRecords,
-              })}
-              {' · '}
-              {t('addressMatchedOn', {
-                signals: candidate.matched
-                  .map((signal) => t(SIGNAL_KEY[signal]))
-                  .join(', '),
-              })}
-            </p>
-            {candidate.diverged.length > 0 && (
-              <p className="mt-0.5 text-[12px] leading-[1.6] tracking-[-0.08px] text-destructive">
-                {t('addressDivergedOn', {
-                  signals: candidate.diverged
-                    .map((signal) => t(SIGNAL_KEY[signal]))
-                    .join(', '),
-                })}
-              </p>
-            )}
-            {candidate.record.point !== null &&
-              candidate.record.dpeNumber !== shown?.record.dpeNumber && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedDpeNumber(candidate.record.dpeNumber);
-                  }}
-                  className="mt-1.5 text-[12px] tracking-[-0.08px] text-slate-neutral underline underline-offset-2 hover:text-ink"
-                >
-                  {t('addressShowOnMap')}
-                </button>
-              )}
-          </li>
-        ))}
-      </ol>
       <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
+        {mapNotice}
+      </p>
+      <div className="mt-3">
+        <AddressCandidateList
+          candidates={match.candidates}
+          shownDpeNumber={first.record.dpeNumber}
+          streetViewEnabled={streetViewEnabled}
+        />
+      </div>
+      <p className="mt-3 text-[12px] tracking-[-0.08px] text-slate-neutral">
         {match.truncated
           ? t('addressTruncated', { inspected: match.inspected })
           : t('addressInspected', { inspected: match.inspected })}

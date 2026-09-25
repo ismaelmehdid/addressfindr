@@ -49,7 +49,7 @@ This is why, throughout the `listing` domain:
 ### Current state
 
 - **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring over both DPE registers, via data.ademe.fr), and the dashboard UI that chains extract → match.
-- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area). All free, public, keyless. The BAN is consumed through ADEME's `*_ban` columns rather than called directly.
+- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area). All free, public, keyless. Display only: Mapbox (map) and Google Street View (card photos), both keyed and billed. The BAN is consumed through ADEME's `*_ban` columns rather than called directly.
 - **Ground truth:** `pnpm eval:address` runs the pipeline over live pap.fr listings, hides their published street and reports at what rank it comes back. It hits Firecrawl, Groq and the public APIs for real, so it is excluded from `pnpm test` and from CI. Last run: 6/6 correctly refused for lack of a discriminating signal.
 - **Not started:** the `__NUXT__` mapping for the two lefigaro portals. Needs one real listing URL to inspect — Firecrawl only ever returns lefigaro's search page as nav chrome, so the payload paths cannot be mapped without one.
 - Spec: `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md`
@@ -111,7 +111,9 @@ Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`,
 - **Overseas coordinates are systematically wrong while claiming success.** ADEME stores DOM coordinates in the local projection (UTM 40S for Réunion) and unprojects them as Lambert-93, so `97411` lands at `56.13,-2.66` in the North Sea with `statut_geocodage` reporting success. Martinique, Guyane and Mayotte land in the Gulf of Guinea.
 - **Métropole has sentinels too.** 24 Lyon rows sit at `-5.98,-1.36` (Atlantic off Ghana) with `adresse_ban = null` and `score_ban = 0.88`. 0.5% of all rows fall outside France.
 - The gate that follows lives in `core/geo/resolve-mappable-point.ts`: status, then overseas postal code, then a métropole bounding box. **No pin beats a wrong pin.**
-- **The map speaks for the top-ranked candidate only** (`core/ademe/candidate-on-map.ts`). When #1 has no trusted point, no pin is shown — pinning #2 by default would put a different address on the map than the answer. Another candidate is pinned only when the user picks it, and the pinned address is always named above the map.
+- **The map speaks for the top-ranked candidate only** (`core/ademe/candidate-on-map.ts`). When #1 has no trusted point, no pin is shown — pinning #2 by default would put a different address on the map than the answer. Another candidate is pinned only when the user picks it, and the pinned address is always named above the map. A picked candidate without a trusted point is honoured too: the pin disappears and the map rests on the commune (`mapOverview`), it never stays on the previous address.
+- **The results view is a fullscreen map** with the candidate cards overlaid on the right (stacked below the map under `md`). It only opens when a token is set, WebGL works and at least one candidate has a trusted point; otherwise the list shows alone.
+- **Street View photos only ever point at a trusted point.** A candidate without one gets no photo. The free metadata call runs first, so an image is only billed when a panorama exists within 50 m; without `heading`, Google aims the camera at the point.
 
 ---
 
@@ -259,6 +261,7 @@ Domains and their tables:
 | `listing` | none | `application/listing/*` use cases, `core/listing/types` |
 | `commune` | none | `application/commune/resolve-commune`, `core/commune/types` |
 | `ademe` | none | `application/ademe/find-address-candidates`, `application/ademe/dto`, `core/ademe/types` |
+| `street-view` | none | `core/street-view/links` (the UI builds the `/api/street-view` photo URL and the outbound Google Maps panorama link) |
 | `rate-limit` / `email` | none (platform, open to all) | `apply-rate-limit`, `llm-cost-limiter`, `email-sender` |
 
 Rules the checker enforces:
@@ -315,6 +318,8 @@ Rules the checker enforces:
     - **Firecrawl** — scraping des annonces immobilières. Retenu après mesure : il passe DataDome sur leboncoin là où un `fetch` direct ne passe pas. Appelé en REST via `fetch`, aucun paquet npm ajouté.
     - **Mapbox GL JS** — carte 3D qui montre l'adresse trouvée (demandé explicitement le 2026-09-23). Paquet npm `mapbox-gl`, jeton public `pk.` restreint par URL dans `NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN`. Facturé au chargement de carte : 50 000/mois offerts, puis 5 $/1000 — d'où une seule `new mapboxgl.Map()` par résultat affiché, déplacée ensuite par `flyTo` d'un candidat à l'autre ; une nouvelle recherche en recrée une. Le paquet n'est téléchargé qu'au premier affichage d'une carte (`next/dynamic`). Jeton absent = carte absente, le reste du produit continue.
     - **Groq** — hébergeur d'inférence pour l'extraction de champs depuis le markdown d'annonce. Le modèle reste un modèle OpenAI (`openai/gpt-oss-120b`), donc la règle « OpenAI-only » tient sur le fond ; seul l'hôte d'inférence change. API compatible OpenAI, donc `@ai-sdk/openai` avec un `baseURL` — aucun paquet npm ajouté, et le repli vers OpenAI est un changement de config.
+    - **Google Street View Static API** — photo de rue de chaque adresse candidate (demandé explicitement le 2026-09-24). Appelé en REST via `fetch` depuis `/api/street-view`, clé serveur `GOOGLE_MAPS_API_KEY` jamais servie au navigateur, aucun paquet npm ajouté. Métadonnées gratuites, image facturée seulement si un panorama existe. Clé absente = fiches sans photo.
+      - **Pas pour la prod en l'état.** Les conditions Google Maps Platform interdisent d'afficher l'imagerie Street View et une carte non Google sur le même écran ; la carte Mapbox est donc en infraction tant qu'elle reste. Accepté le 2026-09-24 parce que l'app n'est pas en production et que le fournisseur de carte doit changer avant. Ne pas ouvrir la prod sans avoir résolu ce point.
     - Rationale et mesures : `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md` §3 et §4.1.
 - **Cron is only for retry / stuck-state cleanup.** Primary work runs in-request (or via `waitUntil`).
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { candidateOnMap } from './candidate-on-map';
+import { candidateOnMap, mapOverview } from './candidate-on-map';
 import type { AddressCandidate, DpeRecord } from './types';
 
 const LYON_3E = { latitude: 45.7522, longitude: 4.8842 };
+const LYON_7E = { latitude: 45.7322, longitude: 4.8442 };
 
 function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
   return {
@@ -67,10 +68,12 @@ describe('candidateOnMap', () => {
     );
   });
 
-  it('ignores a choice that has no pin', () => {
-    expect(candidateOnMap([pinnedFirst, unpinnedSecond], 'second')).toBe(
-      pinnedFirst,
-    );
+  // why: rester sur la premiere adresse quand l'utilisateur en choisit une
+  // autre sans point laisserait l'epingle sur une adresse qu'il n'a pas choisie.
+  it('moves to a chosen candidate even when it has no pin', () => {
+    const shown = candidateOnMap([pinnedFirst, unpinnedSecond], 'second');
+    expect(shown).toBe(unpinnedSecond);
+    expect(shown?.record.point).toBeNull();
   });
 
   it('ignores a choice that is not in this match', () => {
@@ -81,5 +84,27 @@ describe('candidateOnMap', () => {
 
   it('has nothing to show without candidates', () => {
     expect(candidateOnMap([], null)).toBeNull();
+  });
+});
+
+describe('mapOverview', () => {
+  it('centres on the trusted points of the candidates', () => {
+    const second = candidate({ dpeNumber: 'second', point: LYON_7E });
+    expect(mapOverview([pinnedFirst, second])).toEqual({
+      latitude: (LYON_3E.latitude + LYON_7E.latitude) / 2,
+      longitude: (LYON_3E.longitude + LYON_7E.longitude) / 2,
+    });
+  });
+
+  it('ignores candidates without a trusted point', () => {
+    expect(mapOverview([unpinnedFirst, pinnedSecond])).toEqual(LYON_3E);
+  });
+
+  it('has nowhere to rest when no candidate has a trusted point', () => {
+    expect(mapOverview([unpinnedFirst, unpinnedSecond])).toBeNull();
+  });
+
+  it('has nowhere to rest without candidates', () => {
+    expect(mapOverview([])).toBeNull();
   });
 });
