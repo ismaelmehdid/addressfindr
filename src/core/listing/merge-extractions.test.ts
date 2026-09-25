@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   mergeExtractions,
+  missingEvidenceFields,
   missingRequiredFields,
   unfilledFields,
 } from './merge-extractions';
@@ -83,6 +84,26 @@ describe('missingRequiredFields', () => {
       },
     ]);
     expect(missingRequiredFields(merged.values)).toEqual([]);
+  });
+});
+
+describe('missingEvidenceFields', () => {
+  it('lists the matching evidence still null', () => {
+    const merged = mergeExtractions([
+      {
+        source: 'hydration',
+        values: {
+          heatingEnergy: 'gas',
+          annualEnergyCostMinEur: 1290,
+          annualEnergyCostMaxEur: 1790,
+        },
+      },
+    ]);
+    expect(missingEvidenceFields(merged.values)).toEqual([
+      'dpeKwhM2Year',
+      'gesKgCo2M2Year',
+      'dpeDate',
+    ]);
   });
 });
 

@@ -18,6 +18,9 @@ const FIELDS = {
   dpeKwhM2Year: null,
   gesKgCo2M2Year: null,
   heatingEnergy: null,
+  annualEnergyCostMinEur: null,
+  annualEnergyCostMaxEur: null,
+  dpeDate: null,
   city: null,
   postalCode: null,
   inseeCode: null,
@@ -26,11 +29,14 @@ const FIELDS = {
   publishedAt: null,
   portal: 'leboncoin' as const,
   canonicalUrl: 'https://www.leboncoin.fr/ad/ventes_immobilieres/1',
+  pin: null,
 };
 
 const SOURCES = Object.fromEntries(
   Object.keys(FIELDS)
-    .filter((key) => key !== 'portal' && key !== 'canonicalUrl')
+    .filter(
+      (key) => key !== 'portal' && key !== 'canonicalUrl' && key !== 'pin',
+    )
     .map((key) => [key, 'absent' as const]),
 );
 

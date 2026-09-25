@@ -1,5 +1,6 @@
 import * as v from 'valibot';
 import {
+  ENERGY_COST_BOUNDS,
   LAND_SURFACE_BOUNDS,
   SURFACE_BOUNDS,
 } from '@/core/listing/field-bounds';
@@ -22,6 +23,12 @@ export type ExtractListingInput = v.InferOutput<
 >;
 
 const FieldSourceSchema = v.picklist(FIELD_SOURCES);
+
+const EnergyCostSchema = v.pipe(
+  v.number(),
+  v.minValue(ENERGY_COST_BOUNDS.min),
+  v.maxValue(ENERGY_COST_BOUNDS.max),
+);
 
 const ListingFieldsSchema = v.object({
   listingId: v.nullable(v.string()),
@@ -51,6 +58,9 @@ const ListingFieldsSchema = v.object({
   dpeKwhM2Year: v.nullable(v.number()),
   gesKgCo2M2Year: v.nullable(v.number()),
   heatingEnergy: v.nullable(v.picklist(HEATING_ENERGIES)),
+  annualEnergyCostMinEur: v.nullable(EnergyCostSchema),
+  annualEnergyCostMaxEur: v.nullable(EnergyCostSchema),
+  dpeDate: v.nullable(v.pipe(v.string(), v.isoDate())),
   city: v.nullable(v.string()),
   postalCode: v.nullable(v.string()),
   inseeCode: v.nullable(v.string()),
@@ -59,6 +69,12 @@ const ListingFieldsSchema = v.object({
   publishedAt: v.nullable(v.string()),
   portal: v.picklist(PORTAL_IDS),
   canonicalUrl: v.string(),
+  pin: v.nullable(
+    v.object({
+      latitude: v.pipe(v.number(), v.minValue(-90), v.maxValue(90)),
+      longitude: v.pipe(v.number(), v.minValue(-180), v.maxValue(180)),
+    }),
+  ),
 });
 
 const ListingSourcesSchema = v.object({
@@ -77,6 +93,9 @@ const ListingSourcesSchema = v.object({
   dpeKwhM2Year: FieldSourceSchema,
   gesKgCo2M2Year: FieldSourceSchema,
   heatingEnergy: FieldSourceSchema,
+  annualEnergyCostMinEur: FieldSourceSchema,
+  annualEnergyCostMaxEur: FieldSourceSchema,
+  dpeDate: FieldSourceSchema,
   city: FieldSourceSchema,
   postalCode: FieldSourceSchema,
   inseeCode: FieldSourceSchema,

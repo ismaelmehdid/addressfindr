@@ -1,8 +1,10 @@
 import { withinBounds } from './field-bounds';
 import {
+  parseAnnualEnergyCostRange,
   parseBedroomCount,
   parseCity,
   parseCount,
+  parseDpeDate,
   parseDpeEnergyValue,
   parseEnergyClass,
   parseGesEmissionValue,
@@ -49,6 +51,11 @@ const PARSERS: Partial<Record<ExtractedFieldName, FieldParser>> = {
   dpeKwhM2Year: parseDpeEnergyValue,
   gesKgCo2M2Year: parseGesEmissionValue,
   heatingEnergy: parseHeatingEnergy,
+  annualEnergyCostMinEur: (quote) =>
+    parseAnnualEnergyCostRange(quote)?.min ?? null,
+  annualEnergyCostMaxEur: (quote) =>
+    parseAnnualEnergyCostRange(quote)?.max ?? null,
+  dpeDate: parseDpeDate,
   city: parseCity,
   postalCode: parsePostalCode,
   inseeCode: parseInseeCode,

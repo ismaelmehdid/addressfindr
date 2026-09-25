@@ -7,7 +7,12 @@ vi.mock('@/shared/env', () => ({
 
 import type { getBuildingFacts } from '@/application/building/get-building-facts';
 import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
-import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
+import type {
+  DpeDateSearchFilter,
+  DpeRecord,
+  DpeSearchFilter,
+  UnverifiedDpeRecord,
+} from '@/core/ademe/types';
 import type { BuildingFacts } from '@/core/building/types';
 import type { Commune, CommuneResolution } from '@/core/commune/types';
 import { externalApi } from '@/core/errors';
@@ -38,6 +43,7 @@ function listing(
       ...EMPTY_EXTRACTED_VALUES,
       portal: 'leboncoin',
       canonicalUrl: 'https://www.leboncoin.fr/ad/ventes_immobilieres/1',
+      pin: null,
       propertyType: 'apartment',
       surfaceM2: 63,
       dpeClass: 'D',
@@ -76,6 +82,8 @@ function record(over: Partial<DpeRecord> = {}): DpeRecord {
     floor: 0,
     buildingComplement: null,
     establishedOn: '2026-01-07',
+    visitedOn: null,
+    annualEnergyCostEur: null,
     geocodingScore: 0.62,
     point: null,
     ...over,
@@ -86,14 +94,26 @@ function directoryReturning(
   records: DpeRecord[],
   total = records.length,
   truncated = false,
-): { directory: IDpeDirectory; filters: DpeSearchFilter[] } {
+  byDate: DpeRecord[] = [],
+  unverified: UnverifiedDpeRecord[] = [],
+): {
+  directory: IDpeDirectory;
+  filters: DpeSearchFilter[];
+  dateFilters: DpeDateSearchFilter[];
+} {
   const filters: DpeSearchFilter[] = [];
+  const dateFilters: DpeDateSearchFilter[] = [];
   return {
     filters,
+    dateFilters,
     directory: {
       search: async (filter) => {
         filters.push(filter);
-        return ok({ records, total, truncated });
+        return ok({ records, unverified, total, truncated });
+      },
+      searchByDate: async (filter) => {
+        dateFilters.push(filter);
+        return ok({ records: byDate, total: byDate.length, truncated: false });
       },
     },
   };
@@ -396,5 +416,229 @@ describe('findAddressCandidates — enrichissement batiment', () => {
     if (!withBuilding.isOk()) return;
     expect(withBuilding.value.refusedFor).toBeNull();
     expect(withBuilding.value.candidates).toHaveLength(1);
+  });
+});
+
+describe('findAddressCandidates — outside the stated commune', () => {
+  // why: measured 2026-09-24, a leboncoin listing labelled "Rennes" describes
+  // a house in Melesse, and precisement.fr found it there. The exact DPE date
+  // is what makes a search beyond the commune safe.
+  const DATED = { dpeDate: '2026-09-17' };
+  const MELESSE = record({
+    dpeNumber: '2635E2385254C',
+    banId: '35173_0120_00037',
+    address: '37 Rue Alain Colas 35520 Melesse',
+    inseeCode: '35173',
+    establishedOn: '2026-09-17',
+  });
+
+  it('looks beyond the commune when no row there carries the DPE date', async () => {
+    const { directory, dateFilters } = directoryReturning(
+      [record()],
+      1,
+      false,
+      [MELESSE],
+    );
+    const result = await findAddressCandidates(
+      { listing: listing(DATED) },
+      {
+        dpeDirectory: directory,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+
+    expect(dateFilters[0]?.departmentCode).toBe('69');
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.candidates[0]?.record.address).toBe(
+      '37 Rue Alain Colas 35520 Melesse',
+    );
+  });
+
+  // why: measured 2026-09-24, a Nantes apartment pool held 5570 rows for a
+  // 5000-row fetch limit, and the row carrying the listing's date was cut.
+  it('recovers a row of the commune that the commune search cut off', async () => {
+    const cutOff = record({
+      dpeNumber: '2644E1548320R',
+      banId: '69383_0001_00001',
+      address: '1 Avenue des Diligences 69003 Lyon',
+      establishedOn: '2026-09-17',
+    });
+    const { directory } = directoryReturning([record()], 5570, true, [cutOff]);
+    const result = await findAddressCandidates(
+      { listing: listing(DATED) },
+      {
+        dpeDirectory: directory,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(result.value.candidates[0]?.record.dpeNumber).toBe('2644E1548320R');
+  });
+
+  it('never searches beyond the commune on a DPE date older than the registers', async () => {
+    const { directory, dateFilters } = directoryReturning([record()]);
+    await findAddressCandidates(
+      { listing: listing({ dpeDate: '2018-09-05' }) },
+      {
+        dpeDirectory: directory,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(dateFilters).toHaveLength(0);
+  });
+
+  it('stays in the commune when a row there carries the DPE date', async () => {
+    const { directory, dateFilters } = directoryReturning(
+      [record({ establishedOn: '2026-09-17' })],
+      1,
+      false,
+      [MELESSE],
+    );
+    await findAddressCandidates(
+      { listing: listing(DATED) },
+      {
+        dpeDirectory: directory,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(dateFilters).toHaveLength(0);
+  });
+
+  it('never admits an outside row that contradicts the listing', async () => {
+    const { directory } = directoryReturning([record()], 1, false, [
+      { ...MELESSE, dpeKwhM2Year: 320 },
+    ]);
+    const result = await findAddressCandidates(
+      { listing: listing(DATED) },
+      {
+        dpeDirectory: directory,
+        resolveCommune: communeResolving({
+          kind: 'resolved',
+          commune: LYON_3E,
+        }),
+      },
+    );
+    expect(result.isOk()).toBe(true);
+    if (!result.isOk()) return;
+    expect(
+      result.value.candidates.map((candidate) => candidate.record.inseeCode),
+    ).not.toContain('35173');
+  });
+});
+
+describe('findAddressCandidates — rows ADEME never geocoded', () => {
+  // why: measured 2026-09-24, 1.1 to 10.8 % of a city's rows carry only the
+  // address the diagnostician typed. precisement.fr answered one of them. It
+  // is returned only once the national address register recognises it.
+  const TYPED: UnverifiedDpeRecord = {
+    dpeNumber: '2569E0000001A',
+    dataset: 'existing',
+    rawStreet: '16 rue Lavoisier',
+    rawPostalCode: '69003',
+    rawCity: 'LYON',
+    propertyType: 'apartment',
+    surfaceM2: 63,
+    dpeClass: 'D',
+    gesClass: 'D',
+    dpeKwhM2Year: 200,
+    gesKgCo2M2Year: 40,
+    heatingEnergy: null,
+    yearBuilt: null,
+    buildingFloors: null,
+    landSurfaceM2: null,
+    floor: null,
+    buildingComplement: null,
+    establishedOn: '2026-01-07',
+    visitedOn: null,
+    annualEnergyCostEur: null,
+  };
+  const RECOGNISED = {
+    label: '16 Rue Lavoisier 69003 Lyon',
+    houseNumber: '16',
+    street: 'Rue Lavoisier',
+    postalCode: '69003',
+    city: 'Lyon',
+    inseeCode: '69383',
+    banId: '69383_4180_00016',
+    kind: 'housenumber',
+    score: 0.9,
+    point: { latitude: 45.76, longitude: 4.85 },
+  };
+  const LYON = communeResolving({ kind: 'resolved', commune: LYON_3E });
+
+  it('searches the commune postal codes for them', async () => {
+    const { directory, filters } = directoryReturning([]);
+    await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        resolveCommune: LYON,
+        verifyRawAddress: async () => ok(null),
+      },
+    );
+    expect(filters[0]?.postalCodes).toEqual(['69003']);
+  });
+
+  it('returns one once the register recognises its typed address', async () => {
+    const { directory } = directoryReturning([], 0, false, [], [TYPED]);
+    const asked: string[] = [];
+    const result = await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        resolveCommune: LYON,
+        verifyRawAddress: async (input) => {
+          asked.push(input.rawStreet);
+          return ok(RECOGNISED);
+        },
+      },
+    );
+    expect(asked).toEqual(['16 rue Lavoisier']);
+    const candidate = result._unsafeUnwrap().candidates[0];
+    expect(candidate?.record.dpeNumber).toBe('2569E0000001A');
+    expect(candidate?.record.address).toBe('16 Rue Lavoisier 69003 Lyon');
+    expect(candidate?.record.banId).toBe('69383_4180_00016');
+  });
+
+  it('never returns one the register does not recognise', async () => {
+    const { directory } = directoryReturning([], 0, false, [], [TYPED]);
+    const result = await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        resolveCommune: LYON,
+        verifyRawAddress: async () => ok(null),
+      },
+    );
+    expect(result._unsafeUnwrap().candidates).toEqual([]);
+  });
+
+  it('still answers the geocoded rows when the geocoder fails', async () => {
+    const { directory } = directoryReturning([record()], 1, false, [], [TYPED]);
+    const result = await findAddressCandidates(
+      { listing: listing() },
+      {
+        dpeDirectory: directory,
+        resolveCommune: LYON,
+        verifyRawAddress: async () => err(externalApi('ban-geocoder', 'down')),
+      },
+    );
+    expect(
+      result._unsafeUnwrap().candidates.map((c) => c.record.dpeNumber),
+    ).toEqual(['2269E0123456X']);
   });
 });
