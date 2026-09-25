@@ -60,7 +60,7 @@ The "N lignes DPE évaluées" footnote is removed from the results view. The "Ch
 `Card` with its own scroll area, for the selected candidate:
 
 - **Header:** "Résultat {n}", prev/next pager (shares the left column's selection state), close button (`Button` ghost icon). Pager buttons stay focusable when disabled (`focusableWhenDisabled`).
-- **Photo:** the card's exact Street View URL (`streetViewImagePath(point)`) so the browser reuses the cached image and no second image is billed. Hidden when there is no trusted point, no key, or the image fails.
+- **Photo:** the card's exact Street View URL (`streetViewImagePath(point)`) so the browser reuses the cached image and no second image is billed. Hidden when there is no trusted point, no key, or the image fails. The photo links to the interactive panorama (`streetViewPanoramaUrl`), like precisement's "Afficher dans Google Maps".
 - **Score:** rank `Badge` + "{score}/100 score de correspondance".
 - **Address:** street line as title, "{postalCode} {city}" below, copy `Button` that writes the full address to the clipboard and confirms with a `sonner` toast.
 - **Energy labels:** DPE and GES letters as `Badge`s, each with a small dot in the official A–G colour. This is the one deliberate exception to the single-accent rule: the colour is the regulatory encoding of the letter, not decoration.
@@ -96,9 +96,9 @@ The reasons stay internal: the notice shows one generic sentence (§4). The rule
 
 ## 8. State
 
-`ListingUrlForm` keeps the submission state machine, the stale-response guard and the stable React position of the search form. New state:
+`ListingUrlForm` keeps the submission state machine and the stale-response guard. The search form is no longer part of the results view: it lives only in the centred column, so the results view moves keyboard focus to its "Emplacements probables" heading when it appears, and "Nouvelle recherche" moves focus back to the empty input. The screen-reader announcement of the result stays in one live region that never unmounts. New state:
 
-- `detailOpen: boolean` — true when a result is shown on `xl`, false on smaller screens until a card is selected; set true by any selection, false by the close button.
+- `detailPreference: 'default' | 'open' | 'closed'` — `default` means open on `xl` and closed below; any selection sets `open`, the close button sets `closed`, a new search resets it to `default`.
 
 Selection stays `{ dpeNumber, request }` so re-picking the shown result recentres the map.
 
@@ -115,8 +115,10 @@ All built from `src/components/ui` primitives (`Card`, `Badge`, `Button`, `Progr
 | `listing/listing-url-form.tsx` | Loses `formatExtraction` and every "Champs extraits" block. |
 | `core/geo/outbound-links.ts` (+ test) | §6. |
 | `core/ademe/needs-verification.ts` (+ test) | §7. |
-| `core/listing/listing-summary.ts` (+ test) | Parts of the analysed-listing title (type, rooms, surface), nulls dropped. |
-| `scripts/boundaries/manifest.mjs` | Add `core/geo/outbound-links` and `core/ademe/needs-verification` to their domains' public lists. |
+| `core/listing/listing-summary.ts` (+ test) | `listingDisplayUrl`: host without `www.` plus path, for the analysed-listing link; `null` for an unparsable URL. |
+| `core/ademe/record-facts.ts` (+ test) | `streetLine`, `placeLine`, `reliableFloor` (≥ 1 only) and `dpeDate` (strict `YYYY-MM-DD`, else `null`), shared by the cards and the detail panel. |
+| `hooks/use-media-query.ts` | `useMediaQuery(query)` over `matchMedia`, for the `lg`/`xl` placement and camera padding. |
+| `scripts/boundaries/manifest.mjs` | Add `core/geo/outbound-links`, `core/ademe/needs-verification` and `core/ademe/record-facts` to their domains' public lists. |
 | `i18n/messages/{en,fr}.json` | All new copy. |
 
 ## 10. Error handling
@@ -128,6 +130,6 @@ All built from `src/components/ui` primitives (`Card`, `Badge`, `Button`, `Progr
 
 ## 11. Testing
 
-- Unit: `needsVerification` (each trigger and neither), the outbound-link builders (including a Corsican and an arrondissement INSEE code), the listing-summary parts.
+- Unit: `needsVerification` (each trigger, neither, a single candidate), the outbound-link builders (including a Corsican, a lowercase and a malformed INSEE code), `record-facts` (floor 0, impossible dates), `listingDisplayUrl`.
 - `pnpm validate` green.
 - Browser check with mocked extract/match responses at 1440, 1100 and 390px: selection from card and both pagers, detail open/close, sheet on mobile, copy toast, links' hrefs, unpinned result, the verify notice, and no match-reasoning text anywhere in the results view.
