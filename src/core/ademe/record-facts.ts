@@ -31,6 +31,9 @@ export function dpeDate(record: Pick<DpeRecord, 'establishedOn'>): Date | null {
   const value = record.establishedOn;
   if (value === null || !ISO_DATE.test(value)) return null;
   const date = new Date(`${value}T00:00:00Z`);
+  // why: invalid month/day (e.g., 2023-13-01) produce an Invalid Date that
+  // throws on toISOString(). Check NaN first.
+  if (Number.isNaN(date.getTime())) return null;
   // why: `new Date` rolls 2023-02-30 over to March 2 instead of failing.
   return date.toISOString().slice(0, 10) === value ? date : null;
 }

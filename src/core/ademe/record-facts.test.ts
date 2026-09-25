@@ -81,4 +81,10 @@ describe('dpeDate', () => {
     expect(dpeDate({ establishedOn: '2023-04-12T10:00:00Z' })).toBeNull();
     expect(dpeDate({ establishedOn: null })).toBeNull();
   });
+
+  it('rejects a month or day outside the calendar', () => {
+    expect(dpeDate({ establishedOn: '2023-13-01' })).toBeNull();
+    expect(dpeDate({ establishedOn: '2023-04-00' })).toBeNull();
+    expect(dpeDate({ establishedOn: '2023-04-32' })).toBeNull();
+  });
 });
