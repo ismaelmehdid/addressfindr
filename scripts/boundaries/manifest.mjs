@@ -177,6 +177,7 @@ export const DOMAINS = [
     public: [
       'src/core/geo/types',
       'src/core/geo/resolve-mappable-point',
+      'src/core/geo/outbound-links',
       'src/application/geo/verify-raw-address',
     ],
   },
