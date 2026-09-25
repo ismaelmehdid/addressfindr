@@ -24,7 +24,8 @@
     "test:watch": "vitest",
     "type-check": "tsc --noEmit",
     "validate": "pnpm type-check && pnpm check && pnpm lint && pnpm check:boundaries && pnpm test",
-    "eval:address": "vitest run --config vitest.eval.config.ts"
+    "eval:address": "vitest run --config vitest.eval.config.ts src/application/ademe/address-match.live.test.ts",
+    "eval:precisement": "vitest run --config vitest.eval.config.ts src/application/listing/precisement-benchmark.live.test.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

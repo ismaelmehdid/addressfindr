@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Subagent-driven-development scratch workspace (local only)
 .superpowers/
+
+# precisement.fr benchmark cache and reports (pnpm eval:precisement)
+/.benchmark/

@@ -6,6 +6,7 @@ import { canonicalizeListingUrl } from '@/core/listing/canonical-url';
 import {
   type ExtractionLayer,
   mergeExtractions,
+  missingEvidenceFields,
   missingRequiredFields,
   unfilledFields,
 } from '@/core/listing/merge-extractions';
@@ -19,7 +20,11 @@ import {
   extractJsonLdNodes,
   mapJsonLdToValues,
 } from '@/core/listing/structured/json-ld';
-import { mapHydrationToValues } from '@/core/listing/structured/portal-mappings';
+import {
+  mapHydrationDescription,
+  mapHydrationPin,
+  mapHydrationToValues,
+} from '@/core/listing/structured/portal-mappings';
 import { REQUIRED_FIELDS } from '@/core/listing/types';
 import { firecrawlScraperAdapter } from '@/infra/external-apis/firecrawl/firecrawl-scraper-adapter';
 import { groqListingExtractor } from '@/infra/external-apis/groq/groq-listing-extractor';
@@ -66,13 +71,19 @@ export async function extractListing(
     return err(scraped.error);
   }
 
+  const hydration = extractHydrationPayload(scraped.value.rawHtml);
+  const description = mapHydrationDescription(portal, hydration);
+  // why: when the portal hydrates its full description, that text alone
+  // carries the DPE date and values; the rest of the markdown is navigation
+  // and neighbouring listings. Measured 2026-09-24: leboncoin pages run to
+  // 22 000 characters, which overran Groq's 8000 tokens-per-minute tier and
+  // failed the whole call, while the description is 700 to 2200.
+  const modelSource = description ?? scraped.value.markdown;
+
   const layers: ExtractionLayer[] = [
     {
       source: 'hydration',
-      values: mapHydrationToValues(
-        portal,
-        extractHydrationPayload(scraped.value.rawHtml),
-      ),
+      values: mapHydrationToValues(portal, hydration),
     },
     {
       source: 'json-ld',
@@ -81,12 +92,14 @@ export async function extractListing(
   ];
 
   const structured = mergeExtractions(layers);
-  const missing = missingRequiredFields(structured.values);
+  const needsModel =
+    missingRequiredFields(structured.values).length > 0 ||
+    missingEvidenceFields(structured.values).length > 0;
 
-  if (missing.length > 0) {
+  if (needsModel) {
     const extractor = deps.extractor ?? groqListingExtractor;
     const quotes = await extractor.extractQuotes({
-      markdown: scraped.value.markdown,
+      markdown: modelSource,
       missing: unfilledFields(structured.values),
     });
     // why: l'echec du modele ne doit pas perdre ce que le structure a deja donne
@@ -94,7 +107,7 @@ export async function extractListing(
       layers.push({
         source: 'llm',
         values: resolveQuotedFields({
-          source: scraped.value.markdown,
+          source: modelSource,
           quotes: quotes.value,
         }),
       });
@@ -137,7 +150,12 @@ export async function extractListing(
   });
 
   return ok({
-    fields: { ...merged.values, portal, canonicalUrl },
+    fields: {
+      ...merged.values,
+      portal,
+      canonicalUrl,
+      pin: mapHydrationPin(portal, hydration),
+    },
     sources: merged.sources,
   });
 }

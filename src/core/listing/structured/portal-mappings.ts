@@ -1,3 +1,4 @@
+import type { GeoPoint } from '@/core/geo/types';
 import { withinBounds } from '../field-bounds';
 import {
   parseCity,
@@ -9,6 +10,7 @@ import {
   ENERGY_CLASSES,
   type EnergyClass,
   type ExtractedValues,
+  type HeatingEnergy,
   type PortalId,
 } from '../types';
 
@@ -57,11 +59,14 @@ function setNumeric(
   values: Partial<ExtractedValues>,
   field:
     | 'surfaceM2'
+    | 'landSurfaceM2'
     | 'rooms'
     | 'bedrooms'
     | 'floor'
     | 'buildingFloors'
-    | 'yearBuilt',
+    | 'yearBuilt'
+    | 'annualEnergyCostMinEur'
+    | 'annualEnergyCostMaxEur',
   raw: unknown,
 ): void {
   if (typeof raw !== 'string' && typeof raw !== 'number') return;
@@ -70,10 +75,37 @@ function setNumeric(
   values[field] = parsed;
 }
 
+// why: only values observed on real listings are translated. `other` covers a
+// heat pump as well as wood: guessing would rule out the right ADEME row on an
+// energy the listing never states.
+const LEBONCOIN_HEATING: Record<string, HeatingEnergy> = {
+  gas: 'gas',
+  electric: 'electricity',
+};
+
+// why: the label prints a range around the cost ADEME publishes. A single
+// bound, or inverted bounds, no longer locate that cost.
+function setEnergyCostRange(
+  values: Partial<ExtractedValues>,
+  rawMin: unknown,
+  rawMax: unknown,
+): void {
+  const bounds: Partial<ExtractedValues> = {};
+  setNumeric(bounds, 'annualEnergyCostMinEur', rawMin);
+  setNumeric(bounds, 'annualEnergyCostMaxEur', rawMax);
+  const min = bounds.annualEnergyCostMinEur;
+  const max = bounds.annualEnergyCostMaxEur;
+  if (min == null || max == null || min >= max) return;
+  values.annualEnergyCostMinEur = min;
+  values.annualEnergyCostMaxEur = max;
+}
+
 function mapLeboncoin(payload: unknown): Partial<ExtractedValues> {
   const ad = findAdNode(payload);
   if (!ad) return {};
   const values: Partial<ExtractedValues> = {};
+  let energyCostMin: unknown = null;
+  let energyCostMax: unknown = null;
 
   if (typeof ad.list_id === 'number' || typeof ad.list_id === 'string') {
     values.listingId = String(ad.list_id);
@@ -87,6 +119,13 @@ function mapLeboncoin(payload: unknown): Partial<ExtractedValues> {
     const label = attribute.value_label;
 
     if (key === 'square') setNumeric(values, 'surfaceM2', value);
+    else if (key === 'land_plot_surface') {
+      setNumeric(values, 'landSurfaceM2', value);
+    } else if (key === 'heating_mode' && typeof value === 'string') {
+      const energy = LEBONCOIN_HEATING[value];
+      if (energy) values.heatingEnergy = energy;
+    } else if (key === 'annual_energy_budget_min') energyCostMin = value;
+    else if (key === 'annual_energy_budget_max') energyCostMax = value;
     else if (key === 'rooms') setNumeric(values, 'rooms', value);
     else if (key === 'bedrooms') setNumeric(values, 'bedrooms', value);
     else if (key === 'floor_number') setNumeric(values, 'floor', value);
@@ -104,6 +143,8 @@ function mapLeboncoin(payload: unknown): Partial<ExtractedValues> {
       if (parsed) values.propertyType = parsed;
     }
   }
+
+  setEnergyCostRange(values, energyCostMin, energyCostMax);
 
   const location = ad.location;
   if (isRecord(location)) {
@@ -125,6 +166,53 @@ const MAPPERS: Partial<
 > = {
   leboncoin: mapLeboncoin,
 };
+
+// why: Firecrawl cuts the leboncoin description at "Voir plus". The DPE date
+// and its numeric values live in the rest, which only the hydration payload
+// carries in full.
+const DESCRIPTION_READERS: Partial<
+  Record<PortalId, (payload: unknown) => string | null>
+> = {
+  leboncoin: (payload) => {
+    const body = findAdNode(payload)?.body;
+    return typeof body === 'string' && body.trim().length > 0 ? body : null;
+  },
+};
+
+export function mapHydrationDescription(
+  portal: PortalId,
+  payload: unknown,
+): string | null {
+  if (payload === null || payload === undefined) return null;
+  return DESCRIPTION_READERS[portal]?.(payload) ?? null;
+}
+
+// why: leboncoin places its pin either from an address the seller typed or on
+// the town. Only the first says where the dwelling is, and only when it is a
+// point rather than a drawn shape.
+const PIN_READERS: Partial<
+  Record<PortalId, (payload: unknown) => GeoPoint | null>
+> = {
+  leboncoin: (payload) => {
+    const location = findAdNode(payload)?.location;
+    if (!isRecord(location)) return null;
+    if (location.source !== 'address' || location.is_shape !== false) {
+      return null;
+    }
+    const { lat, lng } = location;
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+    return { latitude: lat, longitude: lng };
+  },
+};
+
+export function mapHydrationPin(
+  portal: PortalId,
+  payload: unknown,
+): GeoPoint | null {
+  if (payload === null || payload === undefined) return null;
+  return PIN_READERS[portal]?.(payload) ?? null;
+}
 
 export function mapHydrationToValues(
   portal: PortalId,

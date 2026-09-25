@@ -154,9 +154,17 @@ export const DOMAINS = [
     // Coordonnees et confiance geographique, sans dependance a une source.
     // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
     name: 'geo',
-    dirs: ['src/core/geo', 'src/application/geo'],
+    dirs: [
+      'src/core/geo',
+      'src/application/geo',
+      'src/infra/external-apis/ban-geocoder',
+    ],
     schemas: [],
-    public: ['src/core/geo/types', 'src/core/geo/resolve-mappable-point'],
+    public: [
+      'src/core/geo/types',
+      'src/core/geo/resolve-mappable-point',
+      'src/application/geo/verify-raw-address',
+    ],
   },
   {
     name: 'commune',

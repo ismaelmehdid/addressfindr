@@ -80,6 +80,9 @@ const SIGNAL_KEY = {
   buildingFloors: 'signalBuildingFloors',
   landSurfaceM2: 'signalLandSurface',
   floor: 'signalFloor',
+  annualEnergyCost: 'signalEnergyCost',
+  dpeDate: 'signalDpeDate',
+  pinDistance: 'signalPin',
 } as const satisfies Record<MatchSignal, string>;
 
 type MatchState =

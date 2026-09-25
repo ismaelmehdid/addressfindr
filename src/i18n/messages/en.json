@@ -135,6 +135,9 @@
     "addressInsufficientEvidence": "This listing does not show its energy label, so nothing separates the buildings that fit. Rather than name a street at random, no address is given.",
     "addressSupport": "{count} DPE record(s) at this address",
     "signalBuildingFloors": "building floors",
-    "signalLandSurface": "plot area"
+    "signalLandSurface": "plot area",
+    "signalEnergyCost": "energy cost",
+    "signalDpeDate": "DPE date",
+    "signalPin": "listing map pin"
   }
 }

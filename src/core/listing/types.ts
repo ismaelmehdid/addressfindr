@@ -1,3 +1,5 @@
+import type { GeoPoint } from '@/core/geo/types';
+
 export const ENERGY_CLASSES = ['A', 'B', 'C', 'D', 'E', 'F', 'G'] as const;
 export type EnergyClass = (typeof ENERGY_CLASSES)[number];
 
@@ -54,6 +56,9 @@ export type ExtractedValues = {
   dpeKwhM2Year: number | null;
   gesKgCo2M2Year: number | null;
   heatingEnergy: HeatingEnergy | null;
+  annualEnergyCostMinEur: number | null;
+  annualEnergyCostMaxEur: number | null;
+  dpeDate: string | null;
   city: string | null;
   postalCode: string | null;
   inseeCode: string | null;
@@ -78,6 +83,9 @@ export const EXTRACTED_FIELD_NAMES = [
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
   'heatingEnergy',
+  'annualEnergyCostMinEur',
+  'annualEnergyCostMaxEur',
+  'dpeDate',
   'city',
   'postalCode',
   'inseeCode',
@@ -90,9 +98,12 @@ export type ExtractedFieldName = (typeof EXTRACTED_FIELD_NAMES)[number];
 export const FIELD_SOURCES = ['json-ld', 'hydration', 'llm', 'absent'] as const;
 export type FieldSource = (typeof FIELD_SOURCES)[number];
 
+// why: the pin is portal metadata, not a value read on the page. It never
+// goes through the model or the precedence merge.
 export type ListingFields = ExtractedValues & {
   portal: PortalId;
   canonicalUrl: string;
+  pin: GeoPoint | null;
 };
 
 export type ExtractedListing = {
@@ -106,6 +117,20 @@ export const REQUIRED_FIELDS = [
   'dpeClass',
   'city',
   'propertyType',
+] as const satisfies readonly ExtractedFieldName[];
+
+// why: measured 2026-09-24 on 25 leboncoin listings, structured data always
+// fills the required fields, so the model never ran — and these values, which
+// live only in the description, were never read. Without them, surface and
+// letters alone ranked 17 listings out of 25 at random, at 100 %. Their absence
+// alone therefore justifies calling the model.
+export const MATCHING_EVIDENCE_FIELDS = [
+  'dpeKwhM2Year',
+  'gesKgCo2M2Year',
+  'heatingEnergy',
+  'annualEnergyCostMinEur',
+  'annualEnergyCostMaxEur',
+  'dpeDate',
 ] as const satisfies readonly ExtractedFieldName[];
 
 export const LISTING_EXTRACTION_MODELS = [
@@ -132,6 +157,9 @@ export const EMPTY_EXTRACTED_VALUES: ExtractedValues = {
   dpeKwhM2Year: null,
   gesKgCo2M2Year: null,
   heatingEnergy: null,
+  annualEnergyCostMinEur: null,
+  annualEnergyCostMaxEur: null,
+  dpeDate: null,
   city: null,
   postalCode: null,
   inseeCode: null,

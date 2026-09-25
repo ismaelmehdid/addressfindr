@@ -143,16 +143,20 @@ describe('extractListing', () => {
     if (result.isErr()) expect(result.error.code).toBe('validation');
   });
 
-  // why: c'est ce garde qui garde le cout marginal a zero sur leboncoin, ou
-  // l'hydratation remplit tout. Sans ce test, supprimer le `if` ne casserait
-  // rien — le modele serait appele avec un `missing` vide et rendrait {}.
-  it('does not call the model when the structured layers fill every required field', async () => {
+  // why: measured 2026-09-24 against precisement.fr on 25 leboncoin listings.
+  // Hydration fills every required field, so the model never ran, and the
+  // DPE date — which lives only in the description, cut at "Voir plus" in the
+  // markdown — was never read.
+  it('asks the model for the matching evidence leboncoin leaves in its description', async () => {
+    const description =
+      'Maison familiale.\nDate de réalisation du diagnostic énergétique : 14/04/2022';
     const leboncoinHtml = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify(
       {
         props: {
           pageProps: {
             ad: {
               list_id: 3257628986,
+              body: description,
               location: { city: "Saint-Ouen-l'Aumône", zipcode: '95310' },
               attributes: [
                 {
@@ -170,26 +174,36 @@ describe('extractListing', () => {
       },
     )}</script>`;
 
-    let calls = 0;
+    let sourceSeen = '';
+    let askedFields: readonly string[] = [];
     const result = await extractListing(
       { url: 'https://www.leboncoin.fr/ad/ventes_immobilieres/3257628986' },
       {
-        scraper: scraper('markdown non utilise', leboncoinHtml),
+        scraper: scraper('Maison familiale… Voir plus', leboncoinHtml),
         extractor: {
-          extractQuotes: async () => {
-            calls += 1;
-            return ok({});
+          extractQuotes: async (input) => {
+            sourceSeen = input.markdown;
+            askedFields = input.missing;
+            return ok({
+              dpeDate:
+                'Date de réalisation du diagnostic énergétique : 14/04/2022',
+              surfaceM2: 'Maison familiale 250 m²',
+            });
           },
         },
       },
     );
 
-    expect(calls).toBe(0);
+    expect(askedFields).toContain('dpeDate');
+    expect(askedFields).not.toContain('surfaceM2');
+    expect(sourceSeen).toContain('14/04/2022');
+    expect(sourceSeen).not.toContain('Voir plus');
     expect(result.isOk()).toBe(true);
     if (result.isOk()) {
+      expect(result.value.fields.dpeDate).toBe('2022-04-14');
+      expect(result.value.sources.dpeDate).toBe('llm');
       expect(result.value.fields.surfaceM2).toBe(102);
-      expect(result.value.fields.dpeClass).toBe('B');
-      expect(result.value.sources.dpeClass).toBe('hydration');
+      expect(result.value.sources.surfaceM2).toBe('hydration');
     }
   });
 

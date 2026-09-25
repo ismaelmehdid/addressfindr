@@ -1,9 +1,11 @@
+import type { GeoPoint } from '@/core/geo/types';
 import type { ExtractedValues } from '@/core/listing/types';
 import { addressGroupKey } from './address-identity';
 import {
   type AddressCandidate,
   type AddressMatch,
   type DpeRecord,
+  FIRST_REGISTERED_DPE_DATE,
   MAX_CANDIDATES_RETURNED,
   type MatchRefusal,
   type MatchSignal,
@@ -24,7 +26,7 @@ function gradeNumber(
 }
 
 function gradeSignal(
-  signal: MatchSignal,
+  signal: DirectSignal,
   listed: number | string,
   found: number | string,
 ): SignalVerdict | null {
@@ -46,18 +48,18 @@ function gradeSignal(
   const delta = Math.abs(listed - found);
 
   if (signal === 'surfaceM2') {
-    // why: la recherche a deja borne la surface, donc un ecart residuel est un
-    // accord faible et non une divergence. Il rapporte moins, jamais moins que
-    // rien : sinon l'etiquette affichee contredirait le score.
-    return gradeNumber(
-      delta,
-      [
-        [0.5, 2],
-        [1.5, 1.5],
-      ],
-      1,
-      2,
-    );
+    // why: the search already bounds the surface at 12 %, so a residual gap
+    // is weak agreement, not divergence. It earns less as it grows and never
+    // less than nothing: the row the cost and the date designate can sit 11 %
+    // away (annexes counted by the listing).
+    const ratio = delta / listed;
+    return ratio <= 0.01
+      ? { award: 2, weight: 2 }
+      : ratio <= 0.03
+        ? { award: 1.5, weight: 2 }
+        : ratio <= 0.06
+          ? { award: 1, weight: 2 }
+          : { award: 0.5, weight: 2 };
   }
   if (signal === 'dpeKwhM2Year') {
     return gradeNumber(
@@ -133,6 +135,9 @@ function gradeSignal(
 // Mesure du 2026-09-22 : sans cette liste, une annonce pap.fr sans DPE sortait
 // dix adresses a 100% que rien ne separait.
 const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
+  'annualEnergyCost',
+  'dpeDate',
+  'pinDistance',
   'gesClass',
   'dpeKwhM2Year',
   'gesKgCo2M2Year',
@@ -143,7 +148,16 @@ const DISCRIMINATING_SIGNALS: readonly MatchSignal[] = [
   'floor',
 ];
 
-const SIGNALS: readonly MatchSignal[] = [
+type DirectSignal = Exclude<
+  MatchSignal,
+  'annualEnergyCost' | 'dpeDate' | 'pinDistance'
+>;
+
+// why: the listing's map pin travels beside the extracted values, never
+// inside them — it is portal metadata, not a value read on the page.
+type MatchValues = ExtractedValues & { pin?: GeoPoint | null };
+
+const DIRECT_SIGNALS: readonly DirectSignal[] = [
   'surfaceM2',
   'dpeClass',
   'gesClass',
@@ -156,12 +170,135 @@ const SIGNALS: readonly MatchSignal[] = [
   'floor',
 ];
 
+// why: the label prints a range rounded to ten euros around the cost ADEME
+// publishes. Measured 2026-09-24 on four rows precisement.fr designates: the
+// midpoint lands within 0.5 % of the cost. On a small dwelling the rounding of
+// both bounds outweighs the percentage, hence the floor in euros.
+const ENERGY_COST_TOLERANCE_RATIO = 0.015;
+const ENERGY_COST_TOLERANCE_MIN_EUR = 15;
+
+function gradeEnergyCost(
+  values: ExtractedValues,
+  record: DpeRecord,
+): SignalVerdict | null {
+  const min = values.annualEnergyCostMinEur;
+  const max = values.annualEnergyCostMaxEur;
+  const found = record.annualEnergyCostEur;
+  if (min === null || max === null || found === null) return null;
+  const unit = Math.max(
+    found * ENERGY_COST_TOLERANCE_RATIO,
+    ENERGY_COST_TOLERANCE_MIN_EUR,
+  );
+  return gradeNumber(
+    Math.abs((min + max) / 2 - found),
+    [
+      [unit, 4],
+      [unit * 2, 3],
+      [unit * 4, 1],
+    ],
+    -3,
+    4,
+  );
+}
+
+// why: the listing quotes the date the diagnostic was carried out, which
+// ADEME publishes in two fields — the visit and the establishment, sometimes a
+// day apart. Another date designates another DPE: another dwelling, or a
+// diagnostic redone.
+const DPE_DATE_NEAR_DAYS = 3;
+const MS_PER_DAY = 86_400_000;
+
+function gradeDpeDate(
+  values: ExtractedValues,
+  record: DpeRecord,
+): SignalVerdict | null {
+  const listed = values.dpeDate;
+  const found = [record.establishedOn, record.visitedOn].filter(
+    (date): date is string => date !== null,
+  );
+  if (listed === null || found.length === 0) return null;
+  if (listed < FIRST_REGISTERED_DPE_DATE) return null;
+  if (found.includes(listed)) return { award: 4, weight: 4 };
+  const listedAt = Date.parse(listed);
+  const nearest = Math.min(
+    ...found.map((date) => Math.abs(Date.parse(date) - listedAt) / MS_PER_DAY),
+  );
+  return nearest <= DPE_DATE_NEAR_DAYS
+    ? { award: 2, weight: 4 }
+    : { award: -3, weight: 4 };
+}
+
+const EARTH_RADIUS_M = 6_371_000;
+
+function metresBetween(a: GeoPoint, b: GeoPoint): number {
+  const radians = Math.PI / 180;
+  const dLat = (b.latitude - a.latitude) * radians;
+  const dLon = (b.longitude - a.longitude) * radians;
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(a.latitude * radians) *
+      Math.cos(b.latitude * radians) *
+      Math.sin(dLon / 2) ** 2;
+  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
+}
+
+// why: measured 2026-09-24 on leboncoin pins placed from a typed address: the
+// row precisement.fr designates sat 3 m, 13 m, 94 m and 393 m away, and 1 km
+// on a listing they flag as ambiguous. Close credits strongly; far only
+// doubts, since a seller can pin the street corner rather than the door.
+function gradePin(
+  values: MatchValues,
+  record: DpeRecord,
+): SignalVerdict | null {
+  if (!values.pin || record.point === null) return null;
+  return gradeNumber(
+    metresBetween(values.pin, record.point),
+    [
+      [60, 3],
+      [150, 2],
+      [400, 1],
+    ],
+    -1,
+    3,
+  );
+}
+
+function verdictsFor(
+  values: MatchValues,
+  record: DpeRecord,
+): [MatchSignal, SignalVerdict][] {
+  const verdicts: [MatchSignal, SignalVerdict][] = [];
+  for (const signal of DIRECT_SIGNALS) {
+    const listed = values[signal];
+    const found = record[signal];
+    if (listed === null || found === null) continue;
+    if (!isComparable(signal, record)) continue;
+    const verdict = gradeSignal(signal, listed, found);
+    if (verdict !== null) verdicts.push([signal, verdict]);
+  }
+  const cost = gradeEnergyCost(values, record);
+  if (cost !== null) verdicts.push(['annualEnergyCost', cost]);
+  const date = gradeDpeDate(values, record);
+  if (date !== null) verdicts.push(['dpeDate', date]);
+  const pin = gradePin(values, record);
+  if (pin !== null) verdicts.push(['pinDistance', pin]);
+  return verdicts;
+}
+
+// why: the score is the share of compared evidence that agrees. On the
+// surface and both letters alone — 6 points of weight — full agreement read
+// 100 %, while hundreds of rows share those three values. Measured 2026-09-24:
+// 17 leboncoin listings out of 25 returned a wrong address at 100 % this way.
+// The denominator never drops below this floor: approaching 100 takes a
+// numeric or dated value.
+const EVIDENCE_FLOOR_WEIGHT = 12;
+
 // why: numero_etage_appartement vaut 0 sur 85 des 89 lignes renseignees du
 // releve du 2026-09-22. C'est une valeur par defaut, pas un rez-de-chaussee.
 // La comparer ecarterait la bonne ligne sur une donnee que l'ADEME n'a pas.
 // why: un appartement n'a pas de terrain — la parcelle porte tout l'immeuble,
 // donc la comparer a ce qu'annonce un lot serait une erreur garantie.
-function isComparable(signal: MatchSignal, record: DpeRecord): boolean {
+function isComparable(signal: DirectSignal, record: DpeRecord): boolean {
   if (signal === 'landSurfaceM2') return record.propertyType === 'house';
   return signal !== 'floor' || (record.floor !== null && record.floor !== 0);
 }
@@ -184,7 +321,7 @@ function geocodingFactor(score: number | null): number {
 }
 
 export function scoreCandidate(input: {
-  values: ExtractedValues;
+  values: MatchValues;
   record: DpeRecord;
 }): AddressCandidate {
   const matched: MatchSignal[] = [];
@@ -192,15 +329,7 @@ export function scoreCandidate(input: {
   let awarded = 0;
   let available = 0;
 
-  for (const signal of SIGNALS) {
-    const listed = input.values[signal];
-    const found = input.record[signal];
-    if (listed === null || found === null) continue;
-    if (!isComparable(signal, input.record)) continue;
-
-    const verdict = gradeSignal(signal, listed, found);
-    if (verdict === null) continue;
-
+  for (const [signal, verdict] of verdictsFor(input.values, input.record)) {
     awarded += verdict.award;
     available += verdict.weight;
     // why: l'etiquette suit le signe du score. Un signal credite ne peut pas
@@ -210,7 +339,12 @@ export function scoreCandidate(input: {
   }
 
   const agreement =
-    available === 0 ? 0 : Math.min(1, Math.max(0, awarded / available));
+    available === 0
+      ? 0
+      : Math.min(
+          1,
+          Math.max(0, awarded / Math.max(available, EVIDENCE_FLOOR_WEIGHT)),
+        );
   const confidence = agreement * geocodingFactor(input.record.geocodingScore);
 
   return {
@@ -257,13 +391,9 @@ function groupByAddress(
   return [...groups.values()];
 }
 
-function hasDiscriminatingEvidence(
-  candidates: readonly AddressCandidate[],
-): boolean {
-  return candidates.some((candidate) =>
-    [...candidate.matched, ...candidate.diverged].some((signal) =>
-      DISCRIMINATING_SIGNALS.includes(signal),
-    ),
+function carriesEvidence(candidate: AddressCandidate): boolean {
+  return [...candidate.matched, ...candidate.diverged].some((signal) =>
+    DISCRIMINATING_SIGNALS.includes(signal),
   );
 }
 
@@ -275,7 +405,7 @@ function supports(candidate: AddressCandidate): boolean {
 // adresses valent un aller-retour vers la BDNB, une seconde sur les lignes
 // enrichies. Meme ordre dans les deux cas, donc meme fonction.
 function rankAll(
-  values: ExtractedValues,
+  values: MatchValues,
   records: readonly DpeRecord[],
 ): AddressCandidate[] {
   const scored = records.map((record) => scoreCandidate({ values, record }));
@@ -295,8 +425,36 @@ function rankAll(
   });
 }
 
+export function carriesDpeDate(record: DpeRecord, dpeDate: string): boolean {
+  return record.establishedOn === dpeDate || record.visitedOn === dpeDate;
+}
+
+const LABEL_NUMBERS: readonly MatchSignal[] = [
+  'annualEnergyCost',
+  'dpeKwhM2Year',
+  'gesKgCo2M2Year',
+];
+
+// why: a row from outside the stated commune lacks the commune's implicit
+// support, and a wrong address costs more than none. It is admitted only on
+// the exact DPE date plus a number printed on the label, with nothing
+// contradicting the listing.
+export function admitsOutsideCommune(input: {
+  values: MatchValues;
+  record: DpeRecord;
+}): boolean {
+  const { dpeDate } = input.values;
+  const sameDay = dpeDate !== null && carriesDpeDate(input.record, dpeDate);
+  const scored = scoreCandidate(input);
+  return (
+    sameDay &&
+    scored.diverged.length === 0 &&
+    scored.matched.some((signal) => LABEL_NUMBERS.includes(signal))
+  );
+}
+
 export function rankedBanIds(input: {
-  values: ExtractedValues;
+  values: MatchValues;
   records: readonly DpeRecord[];
   limit: number;
 }): string[] {
@@ -311,19 +469,21 @@ export function rankedBanIds(input: {
 }
 
 export function rankCandidates(input: {
-  values: ExtractedValues;
+  values: MatchValues;
   records: readonly DpeRecord[];
   truncated: boolean;
 }): AddressMatch {
   const candidates = rankAll(input.values, input.records);
 
-  // why: la porte se decidait sur toute la population avant la coupe. Une
-  // seule ligne enfouie loin dans le classement debloquait donc une liste
-  // entiere dont aucune entree ne portait la moindre preuve. Elle se decide
-  // desormais sur la liste reellement rendue.
-  const shortlist = candidates.slice(0, MAX_CANDIDATES_RETURNED);
+  // why: the gate used to be decided on the whole population, so one row
+  // carrying evidence let a shortlist of rows that only agreed on the search
+  // filters through. A row whose only agreement is the surface and the DPE
+  // letter says nothing about this dwelling, so it is never returned at all.
+  const shortlist = candidates
+    .filter(carriesEvidence)
+    .slice(0, MAX_CANDIDATES_RETURNED);
   const refusedFor: MatchRefusal | null =
-    shortlist.length > 0 && !hasDiscriminatingEvidence(shortlist)
+    candidates.length > 0 && shortlist.length === 0
       ? 'insufficient-evidence'
       : null;
 

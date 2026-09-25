@@ -1,12 +1,17 @@
 import 'server-only';
 
 import { dpeSearchCacheKey } from '@/core/ademe/search-cache-key';
-import type { DpeRecord, DpeSearchFilter } from '@/core/ademe/types';
+import type {
+  DpeRecord,
+  DpeSearchFilter,
+  UnverifiedDpeRecord,
+} from '@/core/ademe/types';
 import { getRedisClient } from '@/infra/external-apis/redis/client';
 import { log } from '@/shared/logger';
 
 export type CachedSearch = {
   records: DpeRecord[];
+  unverified: UnverifiedDpeRecord[];
   total: number;
   truncated: boolean;
 };
@@ -15,7 +20,7 @@ export type CachedSearch = {
 // entree ecrite avant un changement de forme de DpeRecord ou de CachedSearch
 // serait relue telle quelle et rejetee par le client : changer la forme
 // impose d'incrementer cette version.
-const REDIS_KEY_PREFIX = 'app:ademe-search:v2';
+const REDIS_KEY_PREFIX = 'app:ademe-search:v4';
 const TTL_SECONDS = 6 * 60 * 60;
 
 // why: sans Redis — en local, ou si Upstash n'est pas configure — un repli en
