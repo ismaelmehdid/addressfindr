@@ -132,9 +132,19 @@ export function ResultsWorkspace({
     headingRef.current?.focus();
   }, []);
 
+  // why: closing the detail (close button, or the mobile Sheet's
+  // onOpenChange(false)) can unmount the panel that held focus. Moving focus
+  // to the results heading right after the close renders keeps it from
+  // dropping to <body>.
+  function closeDetail(): void {
+    onCloseDetail();
+    requestAnimationFrame(() => {
+      headingRef.current?.focus();
+    });
+  }
+
   const detail = (
     <ResultDetailPanel
-      key={shown.record.dpeNumber}
       candidate={shown}
       rank={rank}
       onPrevious={
@@ -151,8 +161,9 @@ export function ResultsWorkspace({
               onSelect(next.record.dpeNumber);
             }
       }
-      onClose={onCloseDetail}
+      onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
+      listing={listing.fields}
     />
   );
 
@@ -265,7 +276,14 @@ export function ResultsWorkspace({
             <Badge
               variant="outline"
               aria-live="polite"
-              className="absolute top-3 left-3 z-10 h-auto max-w-[calc(100%-1.5rem)] gap-1.5 bg-paper py-1 whitespace-normal shadow-sm"
+              className={cn(
+                'absolute top-3 left-3 z-10 h-auto gap-1.5 bg-paper py-1 whitespace-normal shadow-sm',
+                // why: between lg and xl the floating detail panel (z-20)
+                // covers the right 424px, so the chip must not grow under it.
+                isLg && !isXl && detailOpen
+                  ? 'max-w-[calc(100%_-_448px)]'
+                  : 'max-w-[calc(100%-1.5rem)]',
+              )}
             >
               {shown.record.point === null ? (
                 <MapPinOff aria-hidden />
@@ -307,7 +325,7 @@ export function ResultsWorkspace({
         <Sheet
           open={detailOpen}
           onOpenChange={(open) => {
-            if (!open) onCloseDetail();
+            if (!open) closeDetail();
           }}
         >
           <SheetContent

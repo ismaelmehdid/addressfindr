@@ -60,9 +60,13 @@ export function AnalysedListingCard({
     place,
   ].filter((fact) => fact !== null);
   const displayUrl = listingDisplayUrl(fields.canonicalUrl);
-  const openLabel = t('listingOpen', {
-    host: displayUrl ?? fields.canonicalUrl,
-  });
+  // why: listingDisplayUrl returns "host/path"; the link label shows only the
+  // host, or the raw URL when it could not be parsed.
+  const host =
+    displayUrl === null
+      ? fields.canonicalUrl
+      : (displayUrl.split('/')[0] ?? displayUrl);
+  const openLabel = t('listingOpen', { host });
 
   return (
     <Card size="sm">
