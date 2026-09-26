@@ -65,7 +65,7 @@ The "N lignes DPE évaluées" footnote is removed from the results view. The "Ch
 - **Address:** street line as title, "{postalCode} {city}" below, copy `Button` that writes the full address to the clipboard and confirms with a `sonner` toast.
 - **Energy labels:** DPE and GES letters as `Badge`s, each with a small dot in the official A–G colour. This is the one deliberate exception to the single-accent rule: the colour is the regulatory encoding of the letter, not decoration.
 - **Fact tiles** (2-column grid of small `Card`s): type, surface, year built, heating, DPE date, floor.
-  - A tile shows a ✓ when its signal is in `candidate.matched`, as in the screenshot; nothing otherwise. Diverged signals are never displayed.
+  - A tile shows a ✓ only when the value it displays exactly equals the listing's own value (year built, heating, DPE date, floor); never on type or surface, which are search filters. The DPE date tile shows whichever of the register's establishment or visit date equals the listing's DPE date, else the establishment date.
   - The floor tile appears only for `floor >= 1`. ADEME stores `0` as a default on most rows (CLAUDE.md), so `0` never reads as "ground floor".
   - A tile whose value is `null` is not rendered.
 - **Verify elsewhere:** four outbound links (§6), rendered as outline link tiles in a 2 × 2 grid, each opening in a new tab. Only shown when the result has a trusted point.
@@ -87,8 +87,9 @@ These parameters are the sites' own URL conventions, not documented APIs; the li
 
 ## 7. Match-to-verify rule
 
-`needsVerification(match): boolean` in `src/core/ademe/needs-verification.ts`, pure and unit-tested. True when either:
+`needsVerification(match): boolean` in `src/core/ademe/needs-verification.ts`, pure and unit-tested. True when any of:
 
+- the candidate pool was truncated at the row limit (`match.truncated`), since the right address may sit past the cutoff, or
 - result #1 has at least one diverged signal, or
 - result #2 scores within 10 points of #1 (`confidence` difference < 0.10).
 
