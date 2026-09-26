@@ -9,10 +9,14 @@ function points(confidence: number): number {
 }
 
 export function needsVerification(
-  match: Pick<AddressMatch, 'candidates'>,
+  match: Pick<AddressMatch, 'candidates' | 'truncated'>,
 ): boolean {
   const [top, runnerUp] = match.candidates;
   if (top === undefined) return false;
+  // why: the row that would have answered may sit past the row-limit cutoff,
+  // so a truncated pool deserves a caution even when the shown top result is
+  // clear and agreeing.
+  if (match.truncated) return true;
   if (top.diverged.length > 0) return true;
   if (runnerUp === undefined) return false;
   return (

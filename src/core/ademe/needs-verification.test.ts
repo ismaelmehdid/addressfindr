@@ -52,6 +52,7 @@ describe('needsVerification', () => {
     expect(
       needsVerification({
         candidates: [candidate('a', 0.91), candidate('b', 0.66)],
+        truncated: false,
       }),
     ).toBe(false);
   });
@@ -63,6 +64,7 @@ describe('needsVerification', () => {
           candidate('a', 0.91, ['heatingEnergy']),
           candidate('b', 0.4),
         ],
+        truncated: false,
       }),
     ).toBe(true);
   });
@@ -73,6 +75,7 @@ describe('needsVerification', () => {
     expect(
       needsVerification({
         candidates: [candidate('a', 0.84), candidate('b', 0.806)],
+        truncated: false,
       }),
     ).toBe(true);
   });
@@ -81,20 +84,42 @@ describe('needsVerification', () => {
     expect(
       needsVerification({
         candidates: [candidate('a', 0.9), candidate('b', 0.8)],
+        truncated: false,
       }),
     ).toBe(false);
   });
 
   it('judges a single candidate on its own divergence only', () => {
-    expect(needsVerification({ candidates: [candidate('a', 0.5)] })).toBe(
-      false,
-    );
     expect(
-      needsVerification({ candidates: [candidate('a', 0.9, ['floor'])] }),
+      needsVerification({
+        candidates: [candidate('a', 0.5)],
+        truncated: false,
+      }),
+    ).toBe(false);
+    expect(
+      needsVerification({
+        candidates: [candidate('a', 0.9, ['floor'])],
+        truncated: false,
+      }),
     ).toBe(true);
   });
 
   it('is quiet without candidates', () => {
-    expect(needsVerification({ candidates: [] })).toBe(false);
+    expect(needsVerification({ candidates: [], truncated: false })).toBe(false);
+  });
+
+  // why: the row that would have answered may sit past the row-limit cutoff,
+  // so even a clear, agreeing top result deserves a caution.
+  it('asks for a check when the pool was truncated, even with a clear answer', () => {
+    expect(
+      needsVerification({
+        candidates: [candidate('a', 0.95), candidate('b', 0.2)],
+        truncated: true,
+      }),
+    ).toBe(true);
+  });
+
+  it('is quiet when truncated but there are no candidates to show', () => {
+    expect(needsVerification({ candidates: [], truncated: true })).toBe(false);
   });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { dpeDate, placeLine, reliableFloor, streetLine } from './record-facts';
+import {
+  factAgreement,
+  placeLine,
+  reliableFloor,
+  shownDpeDate,
+  streetLine,
+} from './record-facts';
 
 describe('streetLine', () => {
   it('joins the house number and the street', () => {
@@ -65,26 +71,118 @@ describe('reliableFloor', () => {
   });
 });
 
-describe('dpeDate', () => {
-  it('reads an ISO date as UTC midnight', () => {
-    expect(dpeDate({ establishedOn: '2023-04-12' })?.toISOString()).toBe(
-      '2023-04-12T00:00:00.000Z',
+describe('shownDpeDate', () => {
+  it('reads an ISO date as UTC midnight and agrees when it matches the listing', () => {
+    const result = shownDpeDate(
+      { establishedOn: '2023-04-12', visitedOn: null },
+      '2023-04-12',
     );
+    expect(result?.date.toISOString()).toBe('2023-04-12T00:00:00.000Z');
+    expect(result?.agrees).toBe(true);
+  });
+
+  it('shows the visited date, agreeing, when that is the one the listing names', () => {
+    const result = shownDpeDate(
+      { establishedOn: '2023-04-10', visitedOn: '2023-04-12' },
+      '2023-04-12',
+    );
+    expect(result?.date.toISOString()).toBe('2023-04-12T00:00:00.000Z');
+    expect(result?.agrees).toBe(true);
+  });
+
+  it('falls back to the established date, disagreeing, when neither date matches the listing', () => {
+    const result = shownDpeDate(
+      { establishedOn: '2023-04-10', visitedOn: '2023-04-11' },
+      '2023-04-12',
+    );
+    expect(result?.date.toISOString()).toBe('2023-04-10T00:00:00.000Z');
+    expect(result?.agrees).toBe(false);
+  });
+
+  it('disagrees when the listing has no DPE date at all', () => {
+    const result = shownDpeDate(
+      { establishedOn: '2023-04-10', visitedOn: null },
+      null,
+    );
+    expect(result?.date.toISOString()).toBe('2023-04-10T00:00:00.000Z');
+    expect(result?.agrees).toBe(false);
   });
 
   it('rejects a date that does not exist', () => {
-    expect(dpeDate({ establishedOn: '2023-02-30' })).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: '2023-02-30', visitedOn: null }, null),
+    ).toBeNull();
   });
 
   it('rejects any other format', () => {
-    expect(dpeDate({ establishedOn: '12/04/2023' })).toBeNull();
-    expect(dpeDate({ establishedOn: '2023-04-12T10:00:00Z' })).toBeNull();
-    expect(dpeDate({ establishedOn: null })).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: '12/04/2023', visitedOn: null }, null),
+    ).toBeNull();
+    expect(
+      shownDpeDate(
+        { establishedOn: '2023-04-12T10:00:00Z', visitedOn: null },
+        null,
+      ),
+    ).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: null, visitedOn: null }, null),
+    ).toBeNull();
   });
 
   it('rejects a month or day outside the calendar', () => {
-    expect(dpeDate({ establishedOn: '2023-13-01' })).toBeNull();
-    expect(dpeDate({ establishedOn: '2023-04-00' })).toBeNull();
-    expect(dpeDate({ establishedOn: '2023-04-32' })).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: '2023-13-01', visitedOn: null }, null),
+    ).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: '2023-04-00', visitedOn: null }, null),
+    ).toBeNull();
+    expect(
+      shownDpeDate({ establishedOn: '2023-04-32', visitedOn: null }, null),
+    ).toBeNull();
+  });
+});
+
+describe('factAgreement', () => {
+  const listing = {
+    yearBuilt: 1990,
+    heatingEnergy: 'gas' as const,
+    floor: 3,
+  };
+  const record = {
+    yearBuilt: 1990,
+    heatingEnergy: 'gas' as const,
+    floor: 3,
+  };
+
+  it('agrees on every fact that exactly equals the listing', () => {
+    expect(factAgreement(record, listing)).toEqual({
+      yearBuilt: true,
+      heatingEnergy: true,
+      floor: true,
+    });
+  });
+
+  it('disagrees on a year built one year apart', () => {
+    expect(
+      factAgreement({ ...record, yearBuilt: 1991 }, listing).yearBuilt,
+    ).toBe(false);
+  });
+
+  it('disagrees when the record side is unknown', () => {
+    expect(
+      factAgreement({ ...record, heatingEnergy: null }, listing).heatingEnergy,
+    ).toBe(false);
+  });
+
+  it('disagrees when the listing side is unknown', () => {
+    expect(
+      factAgreement(record, { ...listing, heatingEnergy: null }).heatingEnergy,
+    ).toBe(false);
+  });
+
+  it('never agrees on a floor of 0, the ADEME default', () => {
+    expect(
+      factAgreement({ ...record, floor: 0 }, { ...listing, floor: 0 }).floor,
+    ).toBe(false);
   });
 });
