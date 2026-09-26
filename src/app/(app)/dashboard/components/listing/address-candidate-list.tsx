@@ -22,7 +22,7 @@ import { cn } from '@/lib/utils';
 
 type CardOptions = {
   shownDpeNumber: string | null;
-  onSelect?: (dpeNumber: string) => void;
+  onSelect: (dpeNumber: string) => void;
   streetViewEnabled: boolean;
 };
 
@@ -88,7 +88,6 @@ function CandidateCard({
   const { record } = candidate;
   const isShown = record.dpeNumber === shownDpeNumber;
   const emphasised = rank === 1 || isShown;
-  const selectable = onSelect !== undefined;
   const score = Math.round(candidate.confidence * 100);
   const wasShown = useRef(isShown);
 
@@ -96,11 +95,11 @@ function CandidateCard({
   // the top card is already at the top; scrolling would hide the section title
   // on a phone, where a card is taller than the panel.
   useEffect(() => {
-    if (isShown && !wasShown.current && selectable) {
+    if (isShown && !wasShown.current) {
       cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
     wasShown.current = isShown;
-  }, [isShown, selectable]);
+  }, [isShown]);
 
   const facts = [
     record.city,
@@ -179,20 +178,16 @@ function CandidateCard({
       size="sm"
       className={cn('gap-0 py-0', isShown && 'ring-2 ring-primary')}
     >
-      {onSelect === undefined ? (
-        body
-      ) : (
-        <button
-          type="button"
-          aria-current={isShown ? 'true' : undefined}
-          onClick={() => {
-            onSelect(record.dpeNumber);
-          }}
-          className="flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted"
-        >
-          {body}
-        </button>
-      )}
+      <button
+        type="button"
+        aria-current={isShown ? 'true' : undefined}
+        onClick={() => {
+          onSelect(record.dpeNumber);
+        }}
+        className="flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted"
+      >
+        {body}
+      </button>
     </Card>
   );
 }
