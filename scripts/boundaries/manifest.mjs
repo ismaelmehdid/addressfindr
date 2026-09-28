@@ -242,7 +242,6 @@ export const DOMAINS = [
       'src/core/billing',
       'src/application/billing',
       'src/infra/external-apis/autumn',
-      'src/app/(app)/paywall',
       'src/app/api/autumn',
       'src/app/api/billing',
     ],

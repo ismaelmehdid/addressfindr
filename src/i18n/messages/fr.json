@@ -4,12 +4,6 @@
     "cancel": "Annuler",
     "delete": "Supprimer"
   },
-  "Paywall": {
-    "title": "Choisissez une formule pour continuer",
-    "subtitle": "Votre espace de travail nécessite un abonnement actif pour utiliser l'application.",
-    "upgrade": "Passer à Pro",
-    "devSkip": "Ignorer le paywall (dev uniquement)"
-  },
   "Meta": {
     "signIn": "Connexion",
     "dashboard": "Tableau de bord",
