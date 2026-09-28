@@ -148,15 +148,15 @@
     "detailCopied": "Adresse copiée",
     "detailCopyFailed": "Impossible de copier l’adresse",
     "detailStreetViewOpen": "Ouvrir dans Google Street View (nouvel onglet)",
-    "detailDpe": "DPE {letter}",
-    "detailGes": "GES {letter}",
+    "detailDpe": "DPE <square>{letter}</square>",
+    "detailGes": "GES <square>{letter}</square>",
     "detailFactAgrees": "Conforme à l’annonce",
     "factType": "Type de bien",
     "factSurface": "Surface",
     "factYearBuilt": "Année de construction",
     "factHeating": "Chauffage",
     "factDpeDate": "Date du DPE",
-    "factFloor": "Étage",
+    "factFloor": "Étage estimé",
     "factFloorValue": "{floor, selectordinal, one {#er} other {#e}} étage",
     "heatingGas": "Gaz",
     "heatingElectricity": "Électricité",
@@ -191,6 +191,7 @@
     "listingNewTab": "(nouvel onglet)",
     "listingFloorGround": "Rez-de-chaussée",
     "photoExplorePanorama": "Explorer le panorama",
-    "photoUnavailable": "Image indisponible"
+    "photoUnavailable": "Image indisponible",
+    "factLand": "Terrain cadastral"
   }
 }

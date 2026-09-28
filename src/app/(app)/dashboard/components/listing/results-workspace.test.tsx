@@ -228,8 +228,9 @@ describe('ResultsWorkspace heading pager', () => {
   });
 });
 
+// why: the street line is the panel's h2; the header title is its first <p>.
 function detailHeader(): HTMLElement {
-  const header = container.querySelector('aside h2')?.parentElement;
+  const header = container.querySelector('aside p')?.parentElement;
   if (header === null || header === undefined) {
     throw new Error('no detail header');
   }
@@ -248,7 +249,10 @@ describe('ResultsWorkspace detail header', () => {
   it('names the result and shows its rank among the results', async () => {
     await render({ shown: SECOND });
 
-    expect(detailHeader().querySelector('h2')?.textContent).toBe('Résultat 2');
+    expect(container.querySelector('aside')?.getAttribute('aria-label')).toBe(
+      'Résultat 2',
+    );
+    expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
     expect(detailHeader().querySelector('[role="group"]')?.textContent).toBe(
       '2 / 3',
     );
@@ -276,7 +280,7 @@ describe('ResultsWorkspace detail header', () => {
     await render({ shown: SECOND });
 
     expect(document.activeElement).toBe(next);
-    expect(detailHeader().querySelector('h2')?.textContent).toBe('Résultat 2');
+    expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
   });
 });
 
