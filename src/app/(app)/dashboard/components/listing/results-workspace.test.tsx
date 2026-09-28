@@ -2,7 +2,15 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  onTestFinished,
+  vi,
+} from 'vitest';
 import type {
   AddressCandidate,
   AddressMatch,
@@ -217,5 +225,130 @@ describe('ResultsWorkspace heading pager', () => {
       [FIRST.record.dpeNumber],
       [THIRD.record.dpeNumber],
     ]);
+  });
+});
+
+function detailHeader(): HTMLElement {
+  const header = container.querySelector('aside h2')?.parentElement;
+  if (header === null || header === undefined) {
+    throw new Error('no detail header');
+  }
+  return header;
+}
+
+function detailButton(label: string): HTMLButtonElement {
+  const button = detailHeader().querySelector<HTMLButtonElement>(
+    `button[aria-label="${label}"]`,
+  );
+  if (button === null) throw new Error(`no "${label}" button in the detail`);
+  return button;
+}
+
+describe('ResultsWorkspace detail header', () => {
+  it('names the result and shows its rank among the results', async () => {
+    await render({ shown: SECOND });
+
+    expect(detailHeader().querySelector('h2')?.textContent).toBe('Résultat 2');
+    expect(detailHeader().querySelector('[role="group"]')?.textContent).toBe(
+      '2 / 3',
+    );
+    expect(detailButton('Fermer le détail')).toBeDefined();
+  });
+
+  it('hides the pager when there is a single result', async () => {
+    await render({ match: match([FIRST]) });
+
+    expect(detailHeader().querySelector('[role="group"]')).toBeNull();
+    expect(
+      [...detailHeader().querySelectorAll('button')].map((button) =>
+        button.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Fermer le détail']);
+  });
+
+  it('keeps focus on the pager button when the shown result changes', async () => {
+    await render({ shown: FIRST });
+    const next = detailButton('Résultat suivant');
+    act(() => {
+      next.focus();
+    });
+
+    await render({ shown: SECOND });
+
+    expect(document.activeElement).toBe(next);
+    expect(detailHeader().querySelector('h2')?.textContent).toBe('Résultat 2');
+  });
+});
+
+function pressKey(key: string, target: Element = document.body): void {
+  act(() => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
+function outsideElement(html: string): HTMLElement {
+  const host = document.createElement('div');
+  host.innerHTML = html;
+  document.body.append(host);
+  onTestFinished(() => {
+    host.remove();
+  });
+  const element = host.querySelector<HTMLElement>('[data-target]');
+  if (element === null) throw new Error('no target element');
+  return element;
+}
+
+describe('ResultsWorkspace detail shortcuts', () => {
+  it('closes the detail on Escape', async () => {
+    const onCloseDetail = vi.fn();
+    await render({ onCloseDetail });
+
+    pressKey('Escape');
+    expect(onCloseDetail).toHaveBeenCalledOnce();
+  });
+
+  it('shows the previous and next results on the arrow keys, wrapping around', async () => {
+    const onSelect = vi.fn();
+    await render({ shown: FIRST, onSelect });
+
+    pressKey('ArrowLeft');
+    pressKey('ArrowRight');
+    expect(onSelect.mock.calls).toEqual([
+      [THIRD.record.dpeNumber],
+      [SECOND.record.dpeNumber],
+    ]);
+  });
+
+  it.each([
+    ['a text field', '<textarea data-target></textarea>'],
+    [
+      'a radio group',
+      '<div role="radiogroup"><button role="radio" data-target></button></div>',
+    ],
+    ['the map', '<div role="application"><div data-target></div></div>'],
+  ])('leaves the keys to %s', async (_, html) => {
+    const onSelect = vi.fn();
+    const onCloseDetail = vi.fn();
+    await render({ onSelect, onCloseDetail });
+    const target = outsideElement(html);
+
+    pressKey('ArrowLeft', target);
+    pressKey('ArrowRight', target);
+    pressKey('Escape', target);
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onCloseDetail).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while no detail is open', async () => {
+    const onSelect = vi.fn();
+    const onCloseDetail = vi.fn();
+    await render({ detailPreference: 'closed', onSelect, onCloseDetail });
+
+    pressKey('ArrowRight');
+    pressKey('Escape');
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onCloseDetail).not.toHaveBeenCalled();
   });
 });

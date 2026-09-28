@@ -142,7 +142,7 @@
     "verifyNoticeTitle": "Match to verify",
     "verifyNoticeBody": "We could not confirm the property with certainty. Compare the surface, the energy classes and the year of construction with the listing.",
     "detailTitle": "Result {rank}",
-    "detailClose": "Close the result",
+    "detailClose": "Close the detail",
     "detailScoreLabel": "match score",
     "detailCopy": "Copy the address",
     "detailCopied": "Address copied",
@@ -189,6 +189,8 @@
     "resultsPager": "Browse the results",
     "listingOpenTitle": "Open the original listing: {url}",
     "listingNewTab": "(new tab)",
-    "listingFloorGround": "Ground floor"
+    "listingFloorGround": "Ground floor",
+    "photoExplorePanorama": "Explore the panorama",
+    "photoUnavailable": "Image unavailable"
   }
 }

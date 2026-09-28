@@ -29,6 +29,7 @@ import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
 import { ResultDetailPanel } from './result-detail-panel';
 import { ResultsPager } from './results-pager';
+import { useDetailShortcuts } from './use-detail-shortcuts';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -155,10 +156,20 @@ export function ResultsWorkspace({
     });
   }
 
+  // why: the mobile Sheet already closes itself on Escape; only the lg panel
+  // needs the shortcut to close it.
+  useDetailShortcuts({
+    enabled: detailOpen,
+    onClose: isLg ? closeDetail : null,
+    onPrevious: selectPrevious,
+    onNext: selectNext,
+  });
+
   const detail = (
     <ResultDetailPanel
       candidate={shown}
       rank={rank}
+      total={total}
       onPrevious={selectPrevious}
       onNext={selectNext}
       onClose={closeDetail}

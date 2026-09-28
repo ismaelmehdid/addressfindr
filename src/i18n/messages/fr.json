@@ -142,7 +142,7 @@
     "verifyNoticeTitle": "Correspondance à vérifier",
     "verifyNoticeBody": "Nous n’avons pas pu confirmer le bien avec certitude. Comparez la surface, les classes énergie et l’année de construction avec l’annonce.",
     "detailTitle": "Résultat {rank}",
-    "detailClose": "Fermer le résultat",
+    "detailClose": "Fermer le détail",
     "detailScoreLabel": "score de correspondance",
     "detailCopy": "Copier l’adresse",
     "detailCopied": "Adresse copiée",
@@ -189,6 +189,8 @@
     "resultsPager": "Parcourir les résultats",
     "listingOpenTitle": "Ouvrir l’annonce d’origine : {url}",
     "listingNewTab": "(nouvel onglet)",
-    "listingFloorGround": "Rez-de-chaussée"
+    "listingFloorGround": "Rez-de-chaussée",
+    "photoExplorePanorama": "Explorer le panorama",
+    "photoUnavailable": "Image indisponible"
   }
 }

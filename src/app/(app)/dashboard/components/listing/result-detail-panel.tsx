@@ -4,24 +4,19 @@ import {
   ArrowUpRight,
   Building2,
   Check,
-  ChevronLeft,
-  ChevronRight,
   Copy,
   Landmark,
   MapPin,
   TriangleAlert,
   X,
 } from 'lucide-react';
-import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
   factAgreement,
   placeLine,
@@ -41,10 +36,8 @@ import type {
   ExtractedValues,
   HeatingEnergy,
 } from '@/core/listing/types';
-import {
-  streetViewImagePath,
-  streetViewPanoramaUrl,
-} from '@/core/street-view/links';
+import { ResultDetailPhoto } from './result-detail-photo';
+import { ResultsPager } from './results-pager';
 
 // why: the official DPE and GES label colours encode the letter itself; they
 // are the one deliberate exception to the single accent colour.
@@ -113,6 +106,7 @@ async function copied(text: string): Promise<boolean> {
 export function ResultDetailPanel({
   candidate,
   rank,
+  total,
   onPrevious,
   onNext,
   onClose,
@@ -121,6 +115,7 @@ export function ResultDetailPanel({
 }: {
   candidate: AddressCandidate;
   rank: number;
+  total: number;
   onPrevious: (() => void) | null;
   onNext: (() => void) | null;
   onClose: () => void;
@@ -131,39 +126,24 @@ export function ResultDetailPanel({
 
   // why: the header (and its pager/close buttons) stays mounted across a
   // selection change, so keyboard focus on one of its buttons survives
-  // "Adresse suivante"/"précédente" instead of dropping to <body>. Only the
-  // body below, keyed on the shown result, resets its own state.
+  // "Résultat suivant"/"précédent" instead of dropping to <body>. Only the
+  // photo and the body below, keyed on the shown result, reset their state.
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
         <h2 className="text-[13px] font-semibold text-ink">
           {t('detailTitle', { rank })}
         </h2>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('addressPrevious')}
-            disabled={onPrevious === null}
-            focusableWhenDisabled
-            onClick={() => {
-              onPrevious?.();
-            }}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('addressNext')}
-            disabled={onNext === null}
-            focusableWhenDisabled
-            onClick={() => {
-              onNext?.();
-            }}
-          >
-            <ChevronRight />
-          </Button>
+          {onPrevious !== null && onNext !== null && (
+            <ResultsPager
+              rank={rank}
+              total={total}
+              onPrevious={onPrevious}
+              onNext={onNext}
+              className="gap-0.5"
+            />
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -174,11 +154,15 @@ export function ResultDetailPanel({
           </Button>
         </div>
       </div>
+      <ResultDetailPhoto
+        key={`photo:${candidate.record.dpeNumber}`}
+        record={candidate.record}
+        streetViewEnabled={streetViewEnabled}
+      />
       <ResultDetailBody
-        key={candidate.record.dpeNumber}
+        key={`body:${candidate.record.dpeNumber}`}
         candidate={candidate}
         rank={rank}
-        streetViewEnabled={streetViewEnabled}
         listing={listing}
       />
     </div>
@@ -188,17 +172,14 @@ export function ResultDetailPanel({
 function ResultDetailBody({
   candidate,
   rank,
-  streetViewEnabled,
   listing,
 }: {
   candidate: AddressCandidate;
   rank: number;
-  streetViewEnabled: boolean;
   listing: DetailListing;
 }) {
   const t = useTranslations('Listing');
   const format = useFormatter();
-  const [photoFailed, setPhotoFailed] = useState(false);
   const { record } = candidate;
   const { point } = record;
   const score = Math.round(candidate.confidence * 100);
@@ -299,31 +280,6 @@ function ResultDetailBody({
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      {streetViewEnabled && point !== null && !photoFailed && (
-        <a
-          href={streetViewPanoramaUrl(point)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t('detailStreetViewOpen')}
-          className="relative block aspect-[2/1]"
-        >
-          <Skeleton className="absolute inset-0 rounded-none" />
-          <Image
-            unoptimized
-            fill
-            sizes="420px"
-            src={streetViewImagePath(point)}
-            alt={t('streetViewAlt', { address: record.address })}
-            onError={() => {
-              setPhotoFailed(true);
-            }}
-            className="object-cover"
-          />
-          <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
-            {t('streetViewBadge')}
-          </Badge>
-        </a>
-      )}
       <div className="flex flex-col gap-4 p-4">
         <div className="flex items-center gap-2">
           <Badge>{rank}</Badge>
