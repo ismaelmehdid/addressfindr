@@ -159,7 +159,8 @@ function CandidateCard({
       size="sm"
       style={scoreStyle(score)}
       className={cn(
-        'gap-0 py-0 transition-[opacity,background-color,box-shadow]',
+        // why: the primitive's data-[size=sm] spacing outranks a plain override
+        'gap-0 py-0 data-[size=sm]:gap-0 data-[size=sm]:py-0 transition-[opacity,background-color,box-shadow]',
         selected && 'bg-(--score-tint) ring-2 ring-(--score)',
         dimmed && 'lg:opacity-60 lg:hover:opacity-100',
       )}
@@ -219,7 +220,7 @@ function CandidateCard({
           )}
           <CardTitle
             className={cn(
-              'text-[15px] leading-snug text-ink',
+              'text-[15px] leading-snug text-ink group-data-[size=sm]/card:text-[15px]',
               selected ? 'font-semibold' : 'font-medium',
             )}
           >
