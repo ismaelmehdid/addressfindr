@@ -93,6 +93,24 @@
     "backDashboard": "Retour au tableau de bord",
     "backHome": "Retour à l'accueil"
   },
+  "ListingFeedback": {
+    "confirm": "C’est ce logement",
+    "confirmed": "Logement confirmé, merci !",
+    "failed": "Le retour n’a pas pu être enregistré, réessayez plus tard.",
+    "missingTitle": "Le bien n’est pas dans la liste ?",
+    "missingBody": "L’annonce le décrit peut-être mal, ou il n’est pas encore référencé dans les données publiques. Le signaler affine le service, recherche après recherche.",
+    "noneMatch": "Aucun emplacement ne correspond",
+    "thanks": "Merci.",
+    "reasonLegend": "Qu’est-ce qui n’allait pas ?",
+    "reasonWrongCommune": "La commune n’est pas la bonne",
+    "reasonWrongDwellings": "Les logements proposés ne collent pas à l’annonce",
+    "reasonAddressMissing": "Je connais la bonne adresse, elle n’était pas là",
+    "reasonUnsure": "Je ne saurais pas dire",
+    "commentLabel": "Autre chose ? (facultatif)",
+    "commentNote": "N’y mettez ni nom ni coordonnées.",
+    "send": "Envoyer",
+    "detailSent": "C’est noté, merci."
+  },
   "Listing": {
     "heading": "Collez le lien d'une annonce immobilière",
     "placeholder": "https://www.seloger.com/annonces/...",
