@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/card';
 import { listingDisplayUrl } from '@/core/listing/listing-summary';
 import type { ExtractedListing } from '@/core/listing/types';
+import { ListingPortalIcon } from './listing-portal-icon';
 
 type ListingChip = { id: string; icon: LucideIcon; label: string };
 
@@ -146,9 +147,12 @@ export function AnalysedListingCard({
               ))}
             </ul>
           )}
-          <p className="truncate text-[12px] text-muted-foreground underline-offset-2 group-hover/listing:underline">
-            {displayUrl}
-            <span className="sr-only"> {t('listingNewTab')}</span>
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <ListingPortalIcon portal={fields.portal} />
+            <span className="min-w-0 truncate underline-offset-2 group-hover/listing:underline">
+              {displayUrl}
+              <span className="sr-only"> {t('listingNewTab')}</span>
+            </span>
           </p>
         </CardContent>
       </Card>

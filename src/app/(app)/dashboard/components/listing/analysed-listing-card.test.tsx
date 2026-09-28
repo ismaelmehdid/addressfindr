@@ -19,6 +19,8 @@ import { AnalysedListingCard } from './analysed-listing-card';
 const LISTING_URL =
   'https://www.leboncoin.fr/ad/ventes_immobilieres/2345678901?utm_source=newsletter';
 const DISPLAY_URL = 'leboncoin.fr/ad/ventes_immobilieres/2345678901';
+const LEBONCOIN_FAVICON =
+  'https://www.google.com/s2/favicons?domain=leboncoin.fr&sz=64';
 
 function listing(
   over: Partial<ExtractedListing['fields']> = {},
@@ -99,6 +101,18 @@ function chips(): { text: string; icon: string }[] {
   });
 }
 
+function favicon(): HTMLImageElement | null {
+  return container.querySelector('img');
+}
+
+function failFavicon(): void {
+  const image = favicon();
+  if (image === null) throw new Error('no favicon to fail');
+  act(() => {
+    image.dispatchEvent(new Event('error'));
+  });
+}
+
 describe('AnalysedListingCard', () => {
   it('is one link to the listing, opened in a new tab', () => {
     render(listing());
@@ -120,6 +134,43 @@ describe('AnalysedListingCard', () => {
     expect(link.title).toBe(`Ouvrir l’annonce d’origine : ${DISPLAY_URL}`);
     expect(link.textContent).toContain(DISPLAY_URL);
     expect(link.textContent).not.toContain('utm_source');
+  });
+
+  it('shows the portal favicon, decorative, before the listing URL', () => {
+    render(listing());
+    const icon = favicon();
+
+    expect(icon?.src).toBe(LEBONCOIN_FAVICON);
+    expect(icon?.getAttribute('alt')).toBe('');
+    expect(icon?.getAttribute('aria-hidden')).toBe('true');
+    expect(icon?.parentElement?.firstElementChild).toBe(icon);
+    expect(icon?.parentElement?.textContent).toContain(DISPLAY_URL);
+  });
+
+  it('falls back to a globe when the favicon does not load', () => {
+    render(listing());
+    failFavicon();
+    const globe = container.querySelector('svg.lucide-globe');
+
+    expect(favicon()).toBeNull();
+    expect(globe?.getAttribute('aria-hidden')).toBe('true');
+    expect(globe?.parentElement?.textContent).toContain(DISPLAY_URL);
+  });
+
+  it('tries the favicon again for a listing from another portal', () => {
+    render(listing());
+    failFavicon();
+    render(
+      listing({
+        portal: 'seloger',
+        canonicalUrl:
+          'https://www.seloger.com/annonces/achat/appartement/lyon-3eme-69/123.htm',
+      }),
+    );
+
+    expect(favicon()?.src).toBe(
+      'https://www.google.com/s2/favicons?domain=seloger.com&sz=64',
+    );
   });
 
   it('shows each listing detail as a chip, icon on the left, in order', () => {
