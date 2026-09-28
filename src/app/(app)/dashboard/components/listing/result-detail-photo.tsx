@@ -10,8 +10,9 @@ import { streetViewPanoramaUrl } from '@/core/street-view/links';
 import { cn } from '@/lib/utils';
 import { useCandidatePhoto } from './use-candidate-photo';
 
+// why: in the 85svh mobile sheet a full 320px photo can leave the body no height.
 const PHOTO_AREA_CLASS =
-  'relative block h-[320px] shrink-0 overflow-hidden border-b border-border bg-mist';
+  'relative block h-[min(320px,40svh)] shrink-0 overflow-hidden border-b border-border bg-mist lg:h-[320px]';
 
 export function ResultDetailPhoto({
   record,
