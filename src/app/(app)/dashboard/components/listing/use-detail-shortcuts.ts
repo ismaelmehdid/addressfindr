@@ -5,14 +5,15 @@ import { useEffect, useEffectEvent } from 'react';
 type ShortcutAction = 'close' | 'previous' | 'next';
 
 // why: these elements already give Escape or the arrow keys a meaning (the
-// text caret, a radio group, the map's own keyboard panning); a shortcut
-// must never steal the key from them.
+// text caret, a radio group, a toggle group's roving focus, the map's own
+// keyboard panning); a shortcut must never steal the key from them.
 const KEY_OWNERS = [
   'input',
   'textarea',
   'select',
   '[contenteditable]:not([contenteditable="false"])',
   '[role="radiogroup"]',
+  '[data-slot="toggle-group"]',
   '[role="application"]',
 ].join(', ');
 
