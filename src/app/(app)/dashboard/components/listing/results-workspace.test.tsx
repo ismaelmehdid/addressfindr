@@ -407,17 +407,10 @@ const READY_MAP = {
   overview: { latitude: 45.7597, longitude: 4.8422 },
 } as const;
 
-// why: next/dynamic loads the map in a promise chain; one macrotask inside
-// act() lets it resolve and render the stand-in.
 async function renderWithMap(
   props: Partial<ComponentProps<typeof ResultsWorkspace>> = {},
 ): Promise<void> {
   await render({ map: READY_MAP, accessToken: 'pk.test', ...props });
-  await act(async () => {
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-  });
 }
 
 function mapViewSwitch(): HTMLElement | null {
@@ -444,6 +437,16 @@ function drawnMapView(): string | null | undefined {
   return container
     .querySelector('[role="application"]')
     ?.getAttribute('data-view');
+}
+
+// why: the toggle group moves focus between its options in a microtask; an
+// async act() lets it land before the next key.
+async function pressFocusedKey(key: string): Promise<void> {
+  await act(async () => {
+    (document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  });
 }
 
 const MAP_VIEW = messages.Listing.mapViewMap;
@@ -488,18 +491,19 @@ describe('ResultsWorkspace map view switch', () => {
     expect(drawnMapView()).toBe('map');
   });
 
-  it('leaves the arrow keys and Escape to the switch', async () => {
+  it('keeps the arrow keys and Escape from the detail shortcuts', async () => {
     const onSelect = vi.fn();
     const onCloseDetail = vi.fn();
     await renderWithMap({ onSelect, onCloseDetail });
-    const option = mapViewOption(MAP_VIEW);
     act(() => {
-      option.focus();
+      mapViewOption(MAP_VIEW).focus();
     });
 
-    pressKey('ArrowRight', option);
-    pressKey('ArrowLeft', option);
-    pressKey('Escape', option);
+    await pressFocusedKey('ArrowRight');
+    expect(document.activeElement).toBe(mapViewOption(SATELLITE_VIEW));
+    await pressFocusedKey('ArrowLeft');
+    expect(document.activeElement).toBe(mapViewOption(MAP_VIEW));
+    await pressFocusedKey('Escape');
     expect(onSelect).not.toHaveBeenCalled();
     expect(onCloseDetail).not.toHaveBeenCalled();
   });
@@ -531,11 +535,11 @@ describe('ResultsWorkspace map view switch', () => {
     expect(strip?.classList).toContain(right);
   });
 
-  it('shares a flex line with the address chip, so the two never overlap', async () => {
+  it('shares one flex box with the address chip, so the two never overlap', async () => {
     await renderWithMap();
 
-    const line = mapViewSwitch()?.parentElement;
-    expect(line?.querySelector('[aria-live="polite"]')?.textContent).toBe(
+    const box = mapViewSwitch()?.parentElement;
+    expect(box?.querySelector('[aria-live="polite"]')?.textContent).toBe(
       messages.Listing.mapNoTrustedPoint.replace(
         '{address}',
         FIRST.record.address,
