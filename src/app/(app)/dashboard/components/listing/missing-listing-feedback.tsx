@@ -35,15 +35,18 @@ export function MissingListingFeedback({
   feedback: SearchFeedback;
 }): React.ReactElement {
   const t = useTranslations('ListingFeedback');
-  // why: the spinner belongs to this button only, not to a confirmation
-  // sent from the detail panel.
-  const [pressed, setPressed] = useState(false);
   const [reason, setReason] = useState<FeedbackReason | null>(null);
   const [comment, setComment] = useState('');
   const reasonLabelId = useId();
   const commentId = useId();
   const commentNoteId = useId();
-  const { verdict, verdictStatus, verdictFailure, detailStatus } = feedback;
+  const {
+    verdict,
+    verdictStatus,
+    verdictPending,
+    verdictFailure,
+    detailStatus,
+  } = feedback;
   const canSendDetail = reason !== null || comment.trim() !== '';
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
@@ -71,9 +74,8 @@ export function MissingListingFeedback({
             size="lg"
             className="w-full"
             disabled={verdictStatus === 'sending'}
-            loading={verdictStatus === 'sending' && pressed}
+            loading={verdictPending?.kind === 'none_match'}
             onClick={() => {
-              setPressed(true);
               feedback.reportNoneMatch();
             }}
           >

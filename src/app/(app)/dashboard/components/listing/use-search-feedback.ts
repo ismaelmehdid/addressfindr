@@ -25,6 +25,7 @@ export type SearchFeedback = {
     | { kind: 'confirmed'; dpeNumber: string }
     | { kind: 'none_match'; detailSent: boolean };
   verdictStatus: SendStatus;
+  verdictPending: VerdictAttempt | null;
   verdictFailure: VerdictAttempt | null;
   detailStatus: SendStatus;
   confirm: (dpeNumber: string) => void;
@@ -108,6 +109,9 @@ export function useSearchFeedback(input: {
     kind: 'none',
   });
   const [verdictStatus, setVerdictStatus] = useState<SendStatus>('idle');
+  const [verdictPending, setVerdictPending] = useState<VerdictAttempt | null>(
+    null,
+  );
   const [verdictFailure, setVerdictFailure] = useState<VerdictAttempt | null>(
     null,
   );
@@ -121,6 +125,7 @@ export function useSearchFeedback(input: {
     if (verdict.kind !== 'none' || verdictInFlight.current) return;
     verdictInFlight.current = true;
     setVerdictStatus('sending');
+    setVerdictPending(attempt);
     setVerdictFailure(null);
     void sendVerdict({
       searchId,
@@ -131,6 +136,7 @@ export function useSearchFeedback(input: {
       candidates: toFeedbackCandidates(input.candidates),
     }).then((saved) => {
       verdictInFlight.current = false;
+      setVerdictPending(null);
       if (!saved) {
         setVerdictStatus('failed');
         setVerdictFailure(attempt);
@@ -184,6 +190,7 @@ export function useSearchFeedback(input: {
   return {
     verdict,
     verdictStatus,
+    verdictPending,
     verdictFailure,
     detailStatus,
     confirm,

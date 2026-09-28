@@ -2,7 +2,6 @@
 
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import type { SearchFeedback } from './use-search-feedback';
 
@@ -14,10 +13,7 @@ export function ConfirmListingButton({
   dpeNumber: string;
 }): React.ReactElement | null {
   const t = useTranslations('ListingFeedback');
-  // why: the spinner stays on the button that was pressed, even when the
-  // panel is reused for another candidate.
-  const [pressedFor, setPressedFor] = useState<string | null>(null);
-  const { verdict, verdictStatus, verdictFailure } = feedback;
+  const { verdict, verdictStatus, verdictPending, verdictFailure } = feedback;
 
   if (verdict.kind === 'confirmed') {
     if (verdict.dpeNumber !== dpeNumber) return null;
@@ -33,6 +29,9 @@ export function ConfirmListingButton({
   }
   if (verdict.kind === 'none_match') return null;
 
+  const pending =
+    verdictPending?.kind === 'confirmed' &&
+    verdictPending.dpeNumber === dpeNumber;
   const failed =
     verdictFailure?.kind === 'confirmed' &&
     verdictFailure.dpeNumber === dpeNumber;
@@ -43,9 +42,8 @@ export function ConfirmListingButton({
         size="lg"
         className="w-full"
         disabled={verdictStatus === 'sending'}
-        loading={verdictStatus === 'sending' && pressedFor === dpeNumber}
+        loading={pending}
         onClick={() => {
-          setPressedFor(dpeNumber);
           feedback.confirm(dpeNumber);
         }}
       >
