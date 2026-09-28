@@ -341,7 +341,8 @@ export function ResultsWorkspace({
           <SheetContent
             side="bottom"
             showCloseButton={false}
-            className="flex max-h-[85svh] flex-col gap-0 p-0"
+            // why: replaces the primitive's same-variant h-auto, under which the detail's scroll area never scrolls
+            className="flex flex-col gap-0 p-0 data-[side=bottom]:h-[85svh]"
           >
             <SheetTitle className="sr-only">
               {t('detailTitle', { rank })}

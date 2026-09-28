@@ -30,11 +30,13 @@ import { ResultsWorkspace } from './results-workspace';
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-// why: jsdom implements neither; every media query matches, so the view lays
-// itself out as on a wide screen (lg and xl).
+// why: jsdom implements neither. Every media query matches unless a test
+// narrows the screen, so by default the view lays itself out as on a wide
+// screen (lg and xl).
+let wideScreen = true;
 HTMLElement.prototype.scrollIntoView = vi.fn();
 window.matchMedia = (query: string): MediaQueryList => ({
-  matches: true,
+  matches: wideScreen,
   media: query,
   onchange: null,
   addEventListener: () => {},
@@ -355,6 +357,24 @@ describe('ResultsWorkspace detail shortcuts', () => {
     pressKey('Escape');
     expect(onSelect).not.toHaveBeenCalled();
     expect(onCloseDetail).not.toHaveBeenCalled();
+  });
+});
+
+describe('ResultsWorkspace detail sheet below lg', () => {
+  // why: jsdom cannot lay out, so this pins the class the sheet's scrolling
+  // depends on: the detail's scroll area only scrolls inside a definite height.
+  it('gives the bottom sheet a definite height instead of the primitive h-auto', async () => {
+    wideScreen = false;
+    onTestFinished(() => {
+      wideScreen = true;
+    });
+    await render({});
+
+    const sheet = document.querySelector('[data-slot="sheet-content"]');
+    expect(container.querySelector('aside')).toBeNull();
+    expect(sheet?.getAttribute('data-side')).toBe('bottom');
+    expect(sheet?.classList).toContain('data-[side=bottom]:h-[85svh]');
+    expect(sheet?.classList).not.toContain('data-[side=bottom]:h-auto');
   });
 });
 
