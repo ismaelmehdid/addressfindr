@@ -2,7 +2,7 @@
 
 import { SearchX } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type FormEvent, useId, useState } from 'react';
+import { type FormEvent, useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -20,6 +20,7 @@ import {
   isFeedbackReason,
   MAX_FEEDBACK_COMMENT_LENGTH,
 } from '@/core/listing/feedback';
+import { useFocusWhenShown } from './use-focus-when-shown';
 import type { SearchFeedback } from './use-search-feedback';
 
 const REASON_KEY = {
@@ -48,10 +49,21 @@ export function MissingListingFeedback({
     detailStatus,
   } = feedback;
   const canSendDetail = reason !== null || comment.trim() !== '';
+  const thanksRef = useRef<HTMLParagraphElement>(null);
+  const detailSentRef = useRef<HTMLParagraphElement>(null);
+  const focusThanksWhenShown = useFocusWhenShown(
+    thanksRef,
+    verdict.kind === 'none_match' && !verdict.detailSent,
+  );
+  const focusDetailSentWhenShown = useFocusWhenShown(
+    detailSentRef,
+    verdict.kind === 'none_match' && verdict.detailSent,
+  );
 
   function handleSubmit(event: FormEvent<HTMLFormElement>): void {
     event.preventDefault();
     if (!canSendDetail) return;
+    focusDetailSentWhenShown();
     feedback.sendDetail({ reason, comment });
   }
 
@@ -76,6 +88,7 @@ export function MissingListingFeedback({
             disabled={verdictStatus === 'sending'}
             loading={verdictPending?.kind === 'none_match'}
             onClick={() => {
+              focusThanksWhenShown();
               feedback.reportNoneMatch();
             }}
           >
@@ -90,7 +103,12 @@ export function MissingListingFeedback({
       )}
       {verdict.kind === 'none_match' && verdict.detailSent && (
         <CardContent>
-          <p role="status" className="text-[13px] font-medium text-ink">
+          <p
+            ref={detailSentRef}
+            role="status"
+            tabIndex={-1}
+            className="text-[13px] font-medium text-ink outline-none"
+          >
             {t('detailSent')}
           </p>
         </CardContent>
@@ -98,7 +116,12 @@ export function MissingListingFeedback({
       {verdict.kind === 'none_match' && !verdict.detailSent && (
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-            <p role="status" className="text-[13px] font-medium text-ink">
+            <p
+              ref={thanksRef}
+              role="status"
+              tabIndex={-1}
+              className="text-[13px] font-medium text-ink outline-none"
+            >
               {t('thanks')}
             </p>
             <div className="flex flex-col gap-2">

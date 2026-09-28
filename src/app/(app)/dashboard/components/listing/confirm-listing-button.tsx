@@ -2,7 +2,9 @@
 
 import { Check } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { useFocusWhenShown } from './use-focus-when-shown';
 import type { SearchFeedback } from './use-search-feedback';
 
 export function ConfirmListingButton({
@@ -14,13 +16,20 @@ export function ConfirmListingButton({
 }): React.ReactElement | null {
   const t = useTranslations('ListingFeedback');
   const { verdict, verdictStatus, verdictPending, verdictFailure } = feedback;
+  const confirmationRef = useRef<HTMLParagraphElement>(null);
+  const focusConfirmationWhenShown = useFocusWhenShown(
+    confirmationRef,
+    verdict.kind === 'confirmed' && verdict.dpeNumber === dpeNumber,
+  );
 
   if (verdict.kind === 'confirmed') {
     if (verdict.dpeNumber !== dpeNumber) return null;
     return (
       <p
+        ref={confirmationRef}
         role="status"
-        className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-charcoal-soft text-[14px] font-medium text-ink"
+        tabIndex={-1}
+        className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-charcoal-soft text-[14px] font-medium text-ink outline-none"
       >
         <Check className="size-4" aria-hidden />
         {t('confirmed')}
@@ -44,6 +53,7 @@ export function ConfirmListingButton({
         disabled={verdictStatus === 'sending'}
         loading={pending}
         onClick={() => {
+          focusConfirmationWhenShown();
           feedback.confirm(dpeNumber);
         }}
       >
