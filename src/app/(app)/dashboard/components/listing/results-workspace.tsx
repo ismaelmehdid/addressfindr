@@ -247,7 +247,7 @@ export function ResultsWorkspace({
             )}
             <AddressCandidateList
               candidates={candidates}
-              shownDpeNumber={shown.record.dpeNumber}
+              selectedDpeNumber={detailOpen ? shown.record.dpeNumber : null}
               onSelect={onSelect}
               streetViewEnabled={streetViewEnabled}
             />

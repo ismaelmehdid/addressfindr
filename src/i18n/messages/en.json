@@ -175,6 +175,17 @@
     "linkDvfHint": "Past sale prices",
     "mapRegionLabel": "Map",
     "linkVilledereve": "Villederêve",
-    "linkVilledereveHint": "Life in the commune"
+    "linkVilledereveHint": "Life in the commune",
+    "photoSatellite": "Satellite",
+    "aerialAlt": "Aerial photo around {address}",
+    "cardVerify": "Check this address →",
+    "addressFloor": "Floor {floor}",
+    "addressLand": "Plot {surface} m²",
+    "cardYearBuilt": "Built in {year}",
+    "scoreVeryLikely": "Very likely match",
+    "scoreLikely": "Likely match",
+    "scoreApproximate": "Approximate match",
+    "scoreUncertain": "Uncertain match",
+    "scoreUnreliable": "Unreliable match"
   }
 }

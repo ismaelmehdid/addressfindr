@@ -175,6 +175,17 @@
     "linkDvfHint": "Prix des ventes",
     "mapRegionLabel": "Carte",
     "linkVilledereve": "Villederêve",
-    "linkVilledereveHint": "Vie de la commune"
+    "linkVilledereveHint": "Vie de la commune",
+    "photoSatellite": "Satellite",
+    "aerialAlt": "Photo aérienne autour de {address}",
+    "cardVerify": "Vérifier cette adresse →",
+    "addressFloor": "Étage {floor}",
+    "addressLand": "Terrain {surface} m²",
+    "cardYearBuilt": "{type, select, house {Construite en {year}} other {Construit en {year}}}",
+    "scoreVeryLikely": "Correspondance très probable",
+    "scoreLikely": "Correspondance probable",
+    "scoreApproximate": "Correspondance approximative",
+    "scoreUncertain": "Correspondance incertaine",
+    "scoreUnreliable": "Correspondance peu fiable"
   }
 }
