@@ -137,7 +137,8 @@ export function ResultsWorkspace({
       : (): void => {
           onSelect(next.record.dpeNumber);
         };
-  const padding = isLg && !isXl && detailOpen ? PANEL_CLEARANCE : NO_CLEARANCE;
+  const panelFloats = isLg && !isXl && detailOpen;
+  const padding = panelFloats ? PANEL_CLEARANCE : NO_CLEARANCE;
 
   // why: the search form is not part of this view, so keyboard focus would
   // fall to <body> when it appears; it lands on the results heading instead.
@@ -250,7 +251,17 @@ export function ResultsWorkspace({
       >
         {map.kind === 'ready' ? (
           <>
-            <div className="absolute inset-0">
+            <div
+              className={cn(
+                'absolute inset-0',
+                // why: the floating panel covers the right 424px of the map
+                // (PANEL_CLEARANCE), so the bottom-right controls, the
+                // attribution among them, move clear of it. mapbox-gl.css is
+                // unlayered, so only an !important utility outranks its
+                // `right: 0`.
+                panelFloats && '[&_.mapboxgl-ctrl-bottom-right]:right-[424px]!',
+              )}
+            >
               <MapErrorBoundary fallback={null} onError={onMapFailure}>
                 <AddressMap
                   point={shown.record.point}
@@ -268,7 +279,7 @@ export function ResultsWorkspace({
                 'absolute top-3 left-3 z-10 h-auto gap-1.5 bg-paper py-1 whitespace-normal shadow-sm',
                 // why: between lg and xl the floating detail panel (z-20)
                 // covers the right 424px, so the chip must not grow under it.
-                isLg && !isXl && detailOpen
+                panelFloats
                   ? 'max-w-[calc(100%_-_448px)]'
                   : 'max-w-[calc(100%-1.5rem)]',
               )}

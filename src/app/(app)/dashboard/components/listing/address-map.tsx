@@ -101,9 +101,10 @@ export function AddressMap({
     mapRef.current = map;
     markerRef.current = new mapboxgl.Marker();
 
-    // why: the address panel covers the bottom-right corner, where Mapbox puts
-    // its attribution by default; the attribution must stay visible.
-    map.addControl(new mapboxgl.AttributionControl(), 'bottom-left');
+    // why: Mapbox's terms want the attribution, with its "Improve this map"
+    // link, bottom-right. Without a `compact` option it still collapses on its
+    // own when the map is 640 px wide or less.
+    map.addControl(new mapboxgl.AttributionControl(), 'bottom-right');
 
     map.on('style.load', () => {
       map.addLayer(BUILDINGS_LAYER, firstLabelLayerId(map));
