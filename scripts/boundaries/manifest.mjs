@@ -137,6 +137,7 @@ export const DOMAINS = [
       'src/core/ademe/candidate-on-map',
       'src/core/ademe/needs-verification',
       'src/core/ademe/record-facts',
+      'src/core/ademe/score-scale',
     ],
   },
   {
