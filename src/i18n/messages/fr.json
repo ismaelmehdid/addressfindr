@@ -15,10 +15,6 @@
     "upgrade": "Passer à Pro",
     "devSkip": "Ignorer le paywall (dev uniquement)"
   },
-  "Nav": {
-    "dashboard": "Tableau de bord",
-    "signOut": "Se déconnecter"
-  },
   "Meta": {
     "signIn": "Connexion",
     "dashboard": "Tableau de bord",
@@ -48,38 +44,6 @@
     "rename": "Renommer",
     "deleteConfirmTitle": "Supprimer la conversation ?",
     "deleteConfirmDescription": "Cela supprimera définitivement la conversation et ses messages. Cette action est irréversible."
-  },
-  "Settings": {
-    "title": "Paramètres",
-    "placeholder": "Paramètres bientôt disponibles.",
-    "profileSection": "Profil",
-    "editProfile": "Modifier",
-    "sessionsSection": "Sessions actives",
-    "currentSession": "Cet appareil",
-    "sessionMeta": "Connecté le {date}",
-    "sessionMetaWithIp": "Connecté le {date} · {ip}",
-    "revoke": "Déconnecter",
-    "revokeOthers": "Déconnecter les autres sessions",
-    "revokeSuccess": "Session déconnectée",
-    "revokeOthersSuccess": "Autres sessions déconnectées",
-    "emptySessions": "Aucune session active.",
-    "accountsSection": "Comptes liés",
-    "linkedOn": "Lié le {date}",
-    "unlink": "Délier",
-    "unlinkSuccess": "Compte délié",
-    "emptyAccounts": "Aucun compte lié.",
-    "dangerSection": "Compte",
-    "signOutTitle": "Se déconnecter de cet appareil",
-    "signOutDescription": "Vous devrez vous reconnecter pour accéder à votre espace."
-  },
-  "EditProfile": {
-    "title": "Modifier le profil",
-    "description": "Modifiez votre nom. L'édition de l'avatar n'est pas encore disponible.",
-    "firstName": "Prénom",
-    "lastName": "Nom",
-    "save": "Enregistrer",
-    "cancel": "Annuler",
-    "avatarHint": "Édition de l'avatar bientôt disponible"
   },
   "Errors": {
     "title": "Une erreur est survenue",

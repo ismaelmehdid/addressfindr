@@ -15,10 +15,6 @@
     "upgrade": "Upgrade to Pro",
     "devSkip": "Skip paywall (dev only)"
   },
-  "Nav": {
-    "dashboard": "Dashboard",
-    "signOut": "Sign out"
-  },
   "Meta": {
     "signIn": "Sign in",
     "dashboard": "Dashboard",
@@ -48,38 +44,6 @@
     "rename": "Rename",
     "deleteConfirmTitle": "Delete conversation?",
     "deleteConfirmDescription": "This will permanently remove the conversation and its messages. This action cannot be undone."
-  },
-  "Settings": {
-    "title": "Settings",
-    "placeholder": "Settings coming soon.",
-    "profileSection": "Profile",
-    "editProfile": "Edit",
-    "sessionsSection": "Active sessions",
-    "currentSession": "This device",
-    "sessionMeta": "Signed in {date}",
-    "sessionMetaWithIp": "Signed in {date} · {ip}",
-    "revoke": "Sign out",
-    "revokeOthers": "Sign out other sessions",
-    "revokeSuccess": "Session signed out",
-    "revokeOthersSuccess": "Other sessions signed out",
-    "emptySessions": "No active sessions.",
-    "accountsSection": "Linked accounts",
-    "linkedOn": "Linked {date}",
-    "unlink": "Unlink",
-    "unlinkSuccess": "Account unlinked",
-    "emptyAccounts": "No linked accounts.",
-    "dangerSection": "Account",
-    "signOutTitle": "Sign out of this device",
-    "signOutDescription": "You'll need to sign in again to access your workspace."
-  },
-  "EditProfile": {
-    "title": "Edit profile",
-    "description": "Update your name. Avatar editing is not available yet.",
-    "firstName": "First name",
-    "lastName": "Last name",
-    "save": "Save",
-    "cancel": "Cancel",
-    "avatarHint": "Avatar editing coming soon"
   },
   "Errors": {
     "title": "Something went wrong",
