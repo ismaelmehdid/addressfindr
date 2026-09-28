@@ -17,10 +17,7 @@
   },
   "Nav": {
     "dashboard": "Tableau de bord",
-    "settings": "Paramètres",
-    "signIn": "Se connecter",
-    "signOut": "Se déconnecter",
-    "language": "Langue"
+    "signOut": "Se déconnecter"
   },
   "Meta": {
     "signIn": "Connexion",
