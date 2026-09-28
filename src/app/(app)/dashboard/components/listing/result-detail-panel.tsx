@@ -93,7 +93,12 @@ type OutboundLink = {
 
 type DetailListing = Pick<
   ExtractedValues,
-  'yearBuilt' | 'heatingEnergy' | 'floor' | 'dpeDate'
+  | 'propertyType'
+  | 'surfaceM2'
+  | 'yearBuilt'
+  | 'heatingEnergy'
+  | 'floor'
+  | 'dpeDate'
 >;
 
 async function copied(text: string): Promise<boolean> {
@@ -202,9 +207,6 @@ function ResultDetailBody({
   const date = shownDpeDate(record, listing.dpeDate);
   const agreement = factAgreement(record, listing);
 
-  // why: type and surface are search filters, not evidence (CLAUDE.md) — a
-  // signal already used to narrow the candidate pool discriminates nothing,
-  // so their tiles never carry a ✓.
   const facts: Fact[] = [
     record.propertyType === null
       ? null
@@ -214,7 +216,7 @@ function ResultDetailBody({
             record.propertyType === 'apartment'
               ? t('addressPropertyApartment')
               : t('addressPropertyHouse'),
-          agrees: false,
+          agrees: agreement.propertyType,
         },
     record.surfaceM2 === null
       ? null
@@ -225,7 +227,7 @@ function ResultDetailBody({
               maximumFractionDigits: 1,
             }),
           }),
-          agrees: false,
+          agrees: agreement.surfaceM2,
         },
     record.yearBuilt === null
       ? null

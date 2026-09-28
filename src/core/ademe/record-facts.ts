@@ -57,15 +57,55 @@ export function shownDpeDate(
   return date === null ? null : { date, agrees };
 }
 
-// why: CLAUDE.md — a wrong address costs more than no address, so a tile's
-// checkmark must mean the shown value exactly equals the listing's own value,
-// never "scored above zero" (a hard-filter signal like surface always does).
+export function copyableAddress(
+  record: Pick<
+    DpeRecord,
+    'address' | 'street' | 'streetNumber' | 'postalCode' | 'city'
+  >,
+): string {
+  // why: without a parsed street, the full address already carries the
+  // postal code and the city.
+  if (record.street === null) return record.address;
+  const place = placeLine(record);
+  const street = streetLine(record);
+  return place === null ? street : `${street}, ${place}`;
+}
+
+type AgreementFields =
+  | 'propertyType'
+  | 'surfaceM2'
+  | 'yearBuilt'
+  | 'heatingEnergy'
+  | 'floor';
+
+export type FactAgreement = Record<AgreementFields, boolean>;
+
+const SURFACE_AGREEMENT_M2 = 1;
+
+// why: 63.9 - 62.9 is 1.0000000000000142 in floating point, so the gap is
+// compared in whole hundredths of a square metre.
+function surfacesAgree(record: number | null, listing: number | null): boolean {
+  return (
+    record !== null &&
+    listing !== null &&
+    Math.round(Math.abs(listing - record) * 100) <= SURFACE_AGREEMENT_M2 * 100
+  );
+}
+
+// why: a tile's ✓ is a display match, not scoring evidence — it means the
+// shown value equals the listing's own value (the surface within 1 m²), never
+// "scored above zero" (a hard-filter signal like surface always does).
 export function factAgreement(
-  record: Pick<DpeRecord, 'yearBuilt' | 'heatingEnergy' | 'floor'>,
-  listing: Pick<ExtractedValues, 'yearBuilt' | 'heatingEnergy' | 'floor'>,
-): { yearBuilt: boolean; heatingEnergy: boolean; floor: boolean } {
+  record: Pick<DpeRecord, AgreementFields>,
+  listing: Pick<ExtractedValues, AgreementFields>,
+): FactAgreement {
   const floor = reliableFloor(record);
   return {
+    propertyType:
+      record.propertyType !== null &&
+      listing.propertyType !== null &&
+      record.propertyType === listing.propertyType,
+    surfaceM2: surfacesAgree(record.surfaceM2, listing.surfaceM2),
     yearBuilt:
       record.yearBuilt !== null &&
       listing.yearBuilt !== null &&
