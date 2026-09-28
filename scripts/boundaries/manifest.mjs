@@ -6,7 +6,6 @@ export const DOMAINS = [
       'src/application/me',
       'src/application/settings',
       'src/app/auth',
-      'src/app/(public)/sign-in',
     ],
     schemas: ['src/infra/database/schema/auth-schema'],
     public: [

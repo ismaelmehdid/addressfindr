@@ -4,11 +4,6 @@
     "cancel": "Cancel",
     "delete": "Delete"
   },
-  "SignIn": {
-    "title": "Sign in",
-    "google": "Continue with Google",
-    "microsoft": "Continue with Microsoft"
-  },
   "Paywall": {
     "title": "Choose a plan to continue",
     "subtitle": "Your workspace needs an active subscription to use the app.",

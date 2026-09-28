@@ -4,11 +4,6 @@
     "cancel": "Annuler",
     "delete": "Supprimer"
   },
-  "SignIn": {
-    "title": "Connexion",
-    "google": "Continuer avec Google",
-    "microsoft": "Continuer avec Microsoft"
-  },
   "Paywall": {
     "title": "Choisissez une formule pour continuer",
     "subtitle": "Votre espace de travail nécessite un abonnement actif pour utiliser l'application.",
