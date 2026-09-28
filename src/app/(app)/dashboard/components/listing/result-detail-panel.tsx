@@ -313,7 +313,16 @@ function ResultDetailBody({
                   : null}
             </p>
           </div>
-          <Tooltip>
+          <Tooltip
+            onOpenChange={(open, details) => {
+              // why: Next.js mounts React on `document`, so the tooltip's
+              // stopPropagation cannot keep this Escape from the detail
+              // shortcut; marking it handled makes it close only the tooltip.
+              if (!open && details.reason === 'escape-key') {
+                details.event.preventDefault();
+              }
+            }}
+          >
             <TooltipTrigger
               render={
                 <Button
