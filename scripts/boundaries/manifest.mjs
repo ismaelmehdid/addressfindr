@@ -110,6 +110,7 @@ export const DOMAINS = [
       'src/app/(app)/dashboard/components/listing',
       'src/infra/external-apis/firecrawl',
       'src/infra/external-apis/groq',
+      'src/infra/data-access/listing-feedback',
       'src/app/api/listings',
     ],
     schemas: ['src/infra/database/schema/listing-feedback-schema'],
