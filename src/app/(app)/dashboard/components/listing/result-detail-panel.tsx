@@ -2,7 +2,7 @@
 
 import {
   ArrowUpRight,
-  BarChart3,
+  Building2,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -34,7 +34,7 @@ import {
   dvfSalesUrl,
   georisquesReportUrl,
   googleMapsUrl,
-  inseeCommuneUrl,
+  villedereveCommuneUrl,
 } from '@/core/geo/outbound-links';
 import type {
   EnergyClass,
@@ -288,10 +288,10 @@ function ResultDetailBody({
             icon: Landmark,
           },
           {
-            href: inseeCommuneUrl(record.inseeCode),
-            title: t('linkInsee'),
-            hint: t('linkInseeHint'),
-            icon: BarChart3,
+            href: villedereveCommuneUrl(record.inseeCode),
+            title: t('linkVilledereve'),
+            hint: t('linkVilledereveHint'),
+            icon: Building2,
           },
         ].filter((link): link is OutboundLink => link.href !== null);
 

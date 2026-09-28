@@ -173,8 +173,8 @@
     "linkGeorisquesHint": "Site risks",
     "linkDvf": "DVF",
     "linkDvfHint": "Past sale prices",
-    "linkInsee": "INSEE",
-    "linkInseeHint": "Commune statistics",
-    "mapRegionLabel": "Map"
+    "mapRegionLabel": "Map",
+    "linkVilledereve": "Villederêve",
+    "linkVilledereveHint": "Life in the commune"
   }
 }

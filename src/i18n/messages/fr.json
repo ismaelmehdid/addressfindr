@@ -173,8 +173,8 @@
     "linkGeorisquesHint": "Risques du terrain",
     "linkDvf": "DVF",
     "linkDvfHint": "Prix des ventes",
-    "linkInsee": "INSEE",
-    "linkInseeHint": "Chiffres de la commune",
-    "mapRegionLabel": "Carte"
+    "mapRegionLabel": "Carte",
+    "linkVilledereve": "Villederêve",
+    "linkVilledereveHint": "Vie de la commune"
   }
 }
