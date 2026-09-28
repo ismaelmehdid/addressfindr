@@ -6,7 +6,7 @@ This is a real system with real users.
 > Build code that is **correct, simple, and maintainable**.
 > **Correctness > cleverness · Simplicity > abstraction · Explicitness > magic · Consistency > preference.**
 
-Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth and file upload + RAG indexing. **The product is built on top of that base — it does not replace it.**
+Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth and file upload + RAG indexing. **The product is built on top of that base — it does not replace it.** The app shows no account UI: auth and billing stay in the codebase, dormant, and the tool is the home page.
 
 The user-facing brand is still undecided, so **never hard-code a product name in user-visible copy**; everything user-facing goes through `next-intl`.
 
@@ -176,7 +176,7 @@ Measured on 25 live leboncoin listings (Lyon, Bordeaux, Nantes, houses around To
 
 - **Runtime**: Next.js 16 (App Router) · React 19 · TypeScript 6
 - **DB / data**: Drizzle ORM + Postgres · Supabase Storage (file objects) · ZeroEntropy (RAG vector store) · Upstash Redis (rate-limit / cache)
-- **Auth**: Better Auth (Google + Microsoft OAuth)
+- **Auth**: Better Auth (Google + Microsoft OAuth) — server side only, dormant: the app has no sign-in, settings or paywall UI
 - **Validation**: **valibot 1.x** (schemas at every boundary)
 - **Errors**: **neverthrow** `Result<T, AppError>`
 - **i18n**: **next-intl** — keys in `src/i18n/messages/{en,fr}.json`; `t('missing.key')` is a compile error via `IntlMessages` augmentation in `src/global.d.ts`
@@ -209,8 +209,8 @@ src/
     external-apis/   Mastra agents + tools, OpenAI, ZeroEntropy, Brave, …
     auth/            Better Auth (server + client)
   app/               Next.js App Router UI
-    (public)/        unauthenticated routes
-    (app)/           authenticated routes (gated by layout.tsx)
+    (public)/        `/` (redirects to `/dashboard`) and the public error pages
+    (app)/           the dashboard — the tool itself, open to anonymous visitors
     api/             route handlers — the ONLY server entry point (chat stream, files, conversations, cron, …)
     auth/[...all]/   Better Auth handler
   shared/            logger, env, telemetry, errors-http, utils
@@ -326,7 +326,7 @@ Rules the checker enforces:
 
 ### UI
 
-- **Sidebar stays collapsed (icon-rail only)** in this app — deliberate stylistic choice, never propose expanding it.
+- **No sidebar and no account UI.** The dashboard layout is a plain full-height `<main>`; there is no sign-in page, sign-out, settings, profile, paywall or language switcher. Auth and billing stay in the backend, dormant — do not add account UI back unless asked.
 - shadcn primitives in `src/components/ui/*` — copy patterns from there. Reuse `cn()` from `src/lib/utils.ts`.
 - Design language lives in `DESIGN.md` — light-mode, layered off-whites, one accent color.
 - No emojis in code/files unless the user asks.
@@ -351,7 +351,7 @@ Rules the checker enforces:
 
 ## i18n
 
-- Default `fr`, fallback `en`. No `[locale]` in URLs — locale comes from `LOCALE` cookie.
+- Default `fr`, fallback `en`. No `[locale]` in URLs — locale comes from `LOCALE` cookie. Nothing in the UI sets it (there is no language switcher); `/api/locale` still does if called.
 - **Type-source-of-truth: `src/i18n/messages/en.json`.** All other locales must mirror its shape.
 - `IntlMessages` augmentation in `src/global.d.ts` turns missing keys into compile errors.
 

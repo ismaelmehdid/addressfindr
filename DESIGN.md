@@ -13,7 +13,7 @@ This app is a production tool, not a marketing page. The interface is built for 
 |------|-------|-------|------|
 | Linen | `#FAF9F5` | `--color-linen` | App canvas — the base page background. Warm off-white, never pure white. |
 | Paper | `#FFFFFF` | `--color-paper` | Elevated surfaces (cards, modals, popovers, dropdown menus). |
-| Mist | `#F2F1EC` | `--color-mist` | Subtle fill — table row hover, sidebar hover, secondary buttons at rest, input backgrounds. |
+| Mist | `#F2F1EC` | `--color-mist` | Subtle fill — table row hover, secondary buttons at rest, input backgrounds. |
 | Stone | `#E5E3DD` | `--color-stone` | Default hairline border for cards, inputs, dividers between regions. |
 | Pebble | `#CFCDC6` | `--color-pebble` | Stronger border for emphasized separation, disabled control outlines, table column dividers. |
 | Slate | `#7C7B75` | `--color-slate` | Tertiary text — metadata, timestamps, helper text, inactive icons. |
@@ -124,13 +124,12 @@ Shadows are tinted toward Charcoal (warm dark grey) rather than pure black, to s
 
 ### Layout
 
-- **App shell:** sidebar (240px) + main content + optional inspector panel (320px)
+- **App shell:** one full-height main region (`h-svh`) — no sidebar, no top bar, no account UI; the results view splits it into list, map and detail
 - **Section gap:** 24px
 - **Card padding:** 16px (default), 12px (compact list cards), 24px (modal/page header)
 - **Form row gap:** 16px
 - **Element gap:** 8px
 - **Table row height:** 36px (default), 32px (dense)
-- **Sidebar item height:** 28px
 
 ## Components
 
@@ -169,13 +168,8 @@ Identical to Input Field, but with a 12px `Graphite` chevron icon at the right e
 
 `Mist` background, no border, 6px border-radius, padding 6px 10px 6px 32px (16px `Slate` search icon at left). On focus: `Paper` background, 1px `Stone` border, `Charcoal` focus ring.
 
-### Sidebar Nav Item
-**Role:** Primary navigation entries in the left sidebar.
-
-Transparent background, `Graphite` text, 13px Inter 500, 4px border-radius, padding 6px 8px, 16px icon at left in `Slate`. Hover: `Mist` background, text `Ink`, icon `Graphite`. **Active:** `Charcoal Soft` background, `Charcoal` text, `Charcoal` icon, plus a 2px `Charcoal` indicator bar at the left edge.
-
 ### Section Header
-**Role:** Grouping label inside sidebar or panels.
+**Role:** Grouping label inside panels and cards.
 
 `Slate` text, 11px Inter 500, uppercase, letter-spacing +0.4px, padding 8px 8px 4px. Non-interactive.
 
@@ -255,7 +249,7 @@ Centered stack, 48px line-illustration in `Ash`, heading `Ink` 18px 600, body `G
 
 | Level | Name | Value | Purpose |
 |-------|------|-------|---------|
-| 0 | Linen Canvas | `#FAF9F5` | Application background, sidebar background, page base. |
+| 0 | Linen Canvas | `#FAF9F5` | Application background, panel background, page base. |
 | 1 | Paper Card | `#FFFFFF` | Cards, tables, modals, popovers, dropdown menus, primary content containers. |
 | 2 | Mist Fill | `#F2F1EC` | Hover backgrounds, table header rows, modal footers, search inputs, inset blocks within cards. |
 | 3 | Charcoal Soft Accent | `#EDECE6` | Selected row, active nav item, accent-tinted info block. |
@@ -274,7 +268,7 @@ This is a working tool. Imagery is functional, never decorative. Empty states us
 
 ## Layout
 
-The app uses a three-region shell: a fixed 240px sidebar on `Linen`, a flexible main region on `Linen` with content cards on `Paper`, and an optional 320px inspector panel on the right (also `Linen`, with 1px `Stone` left divider). Sidebars and inspectors do not float — they are flush, full-height columns. Main content has a 24px outer padding and a max-width of 1280px for primary content lanes; tables and inspector flows may extend full-width. Within a page, vertical rhythm is set by `--section-gap` (24px) between cards, with 16px between rows inside a card. Page headers use `--text-heading` (22px) and sit directly on the canvas, not inside a card. Sticky elements (top bar, table headers) get a 1px `Stone` bottom border instead of a shadow.
+The app shell is a single full-height region on `Linen`: no sidebar, no top bar and no account UI (no sign-in, avatar, settings, paywall or language switcher) — the tool is the home page. The page owns its layout inside that region. The listing form sits centred in one column. The results view is a three-panel workspace: listing and candidates on the left, the map in the centre, the selected result's detail on the right — floating over the map as a `Paper` card between `lg` and `xl`, a bottom sheet below `lg`. The left column and the docked detail are flush, full-height columns divided by 1px `Stone` borders. The document never scrolls; each column scrolls on its own. Within a panel, vertical rhythm is set by `--section-gap` (24px) between blocks, with 16px between rows inside a card. Sticky elements (panel headers, table headers) get a 1px `Stone` bottom border instead of a shadow.
 
 ## Agent Prompt Guide
 
@@ -293,7 +287,6 @@ Quick Color Reference:
 Example Component Prompts:
 - **Primary button:** `Charcoal` background (#2F3130), `Linen` text (#FAF9F5), Inter 500 at 14px with -0.08px tracking, 6px border-radius, padding 8px 14px. Hover: background `Charcoal Deep` (#1F2120). Focus: 3px `Charcoal` 16%-alpha ring.
 - **Default card:** `Paper` background (#FFFFFF), 1px `Stone` border (#E5E3DD), 8px border-radius, `rgba(45, 47, 42, 0.04) 0px 1px 2px 0px` shadow, 16px padding. Title: Inter 600 at 18px in `Ink` (#2D2F2A). Body: Inter 400 at 14px in `Ink` with `Graphite` (#4A4945) secondary copy.
-- **Sidebar nav item (active):** `Charcoal Soft` background (#EDECE6), 2px `Charcoal` (#2F3130) left indicator bar, `Charcoal` text Inter 500 at 13px, 4px border-radius, padding 6px 8px, 16px `Charcoal` icon at left.
 - **Data table row:** `Paper` background, 36px height, 1px `Stone` bottom divider, `Ink` text Inter 400 at 14px. Numeric columns right-aligned in JetBrains Mono 13px with `tnum`. Hover: `Mist` (#F2F1EC) background. Selected: `Charcoal Soft` background.
 - **Input field (focused):** `Paper` background, `Ink` text 14px, 1px `Charcoal` border, 3px `Charcoal` 16%-alpha focus ring, 6px border-radius, padding 8px 12px.
 - **Status badge — success:** `Success Soft` background (#E4F0E8), `Success` text (#2D7A4F) Inter 500 at 11px, 4px border-radius, padding 2px 8px.
@@ -385,7 +378,6 @@ Example Component Prompts:
   --spacing-64: 64px;
 
   /* Layout */
-  --sidebar-width: 240px;
   --inspector-width: 320px;
   --content-max: 1280px;
   --section-gap: 24px;

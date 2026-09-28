@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  // why: the dev bubble sits on the Mapbox logo, which must stay visible.
+  devIndicators: false,
 };
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');

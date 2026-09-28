@@ -6,8 +6,6 @@ export const DOMAINS = [
       'src/application/me',
       'src/application/settings',
       'src/app/auth',
-      'src/app/(public)/sign-in',
-      'src/app/(app)/dashboard/settings',
     ],
     schemas: ['src/infra/database/schema/auth-schema'],
     public: [
@@ -244,7 +242,6 @@ export const DOMAINS = [
       'src/core/billing',
       'src/application/billing',
       'src/infra/external-apis/autumn',
-      'src/app/(app)/paywall',
       'src/app/api/autumn',
       'src/app/api/billing',
     ],

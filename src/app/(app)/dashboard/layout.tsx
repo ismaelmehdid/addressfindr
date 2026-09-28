@@ -1,21 +1,24 @@
 import type { ReactNode } from 'react';
-import { getCurrentUser } from '@/application/me/get-current-user';
-import { DashboardMainShell } from './components/dashboard-main-shell';
-import { DashboardWrapper } from './components/dashboard-wrapper';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { DashboardHeaderBridgeProvider } from './components/dashboard-header-bridge-context';
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
   header,
 }: {
   children: ReactNode;
   header: ReactNode;
-}): Promise<React.ReactElement> {
-  const currentUser = await getCurrentUser();
-  const user = currentUser.isOk() ? currentUser.value : null;
-
+}): React.ReactElement {
   return (
-    <DashboardWrapper user={user}>
-      <DashboardMainShell header={header}>{children}</DashboardMainShell>
-    </DashboardWrapper>
+    <DashboardHeaderBridgeProvider>
+      <TooltipProvider delay={0}>
+        <main className="flex h-svh min-h-0 min-w-0 flex-col overflow-hidden bg-linen">
+          <div className="w-full shrink-0">{header}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+            {children}
+          </div>
+        </main>
+      </TooltipProvider>
+    </DashboardHeaderBridgeProvider>
   );
 }
