@@ -1,72 +1,63 @@
 'use client';
 
-import {
-  ArrowUpRight,
-  BarChart3,
-  Check,
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  Landmark,
-  MapPin,
-  TriangleAlert,
-  X,
-} from 'lucide-react';
-import Image from 'next/image';
+import { Check, Copy, X } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import type { ReactNode } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  copyableAddress,
   factAgreement,
   placeLine,
   reliableFloor,
   shownDpeDate,
   streetLine,
 } from '@/core/ademe/record-facts';
+import { scoreBand, scoreFromConfidence } from '@/core/ademe/score-scale';
 import type { AddressCandidate } from '@/core/ademe/types';
-import {
-  dvfSalesUrl,
-  georisquesReportUrl,
-  googleMapsUrl,
-  inseeCommuneUrl,
-} from '@/core/geo/outbound-links';
 import type {
   EnergyClass,
   ExtractedValues,
   HeatingEnergy,
 } from '@/core/listing/types';
-import {
-  streetViewImagePath,
-  streetViewPanoramaUrl,
-} from '@/core/street-view/links';
+import { cn } from '@/lib/utils';
+import { ResultDetailPhoto } from './result-detail-photo';
+import { ResultsPager } from './results-pager';
+import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
+import { useCopyAddress } from './use-copy-address';
+import { VerifyElsewhere } from './verify-elsewhere';
 
-// why: the official DPE and GES label colours encode the letter itself; they
-// are the one deliberate exception to the single accent colour.
+type LetterColour = { background: string; letter: 'ink' | 'white' };
+
+// why: the official DPE and GES label colours encode the letter itself; like
+// the score ramp they are an exception to the single accent colour. Each
+// letter is set in whichever of ink or white contrasts more with its square.
 const DPE_COLOUR = {
-  A: '#319834',
-  B: '#33CC31',
-  C: '#CBFC34',
-  D: '#FBFE06',
-  E: '#FBCC05',
-  F: '#FC9935',
-  G: '#FC0205',
-} as const satisfies Record<EnergyClass, string>;
+  A: { background: '#00a06d', letter: 'ink' },
+  B: { background: '#52b153', letter: 'ink' },
+  C: { background: '#cbd934', letter: 'ink' },
+  D: { background: '#f4e70f', letter: 'ink' },
+  E: { background: '#f0b40f', letter: 'ink' },
+  F: { background: '#eb8235', letter: 'ink' },
+  G: { background: '#d7221f', letter: 'white' },
+} as const satisfies Record<EnergyClass, LetterColour>;
 
 const GES_COLOUR = {
-  A: '#F6EDFD',
-  B: '#E4C7FA',
-  C: '#D5AAF6',
-  D: '#CB95F3',
-  E: '#BA72EF',
-  F: '#A74DEB',
-  G: '#8A19DF',
-} as const satisfies Record<EnergyClass, string>;
+  A: { background: '#f2e9fb', letter: 'ink' },
+  B: { background: '#e0c7f7', letter: 'ink' },
+  C: { background: '#cda6f2', letter: 'ink' },
+  D: { background: '#ba85ee', letter: 'ink' },
+  E: { background: '#a663e9', letter: 'white' },
+  F: { background: '#9341e5', letter: 'white' },
+  G: { background: '#7f1fe0', letter: 'white' },
+} as const satisfies Record<EnergyClass, LetterColour>;
 
 const HEATING_KEY = {
   gas: 'heatingGas',
@@ -84,30 +75,20 @@ type Fact = {
   agrees: boolean;
 };
 
-type OutboundLink = {
-  href: string;
-  title: string;
-  hint: string;
-  icon: typeof MapPin;
-};
-
 type DetailListing = Pick<
   ExtractedValues,
-  'yearBuilt' | 'heatingEnergy' | 'floor' | 'dpeDate'
+  | 'propertyType'
+  | 'surfaceM2'
+  | 'yearBuilt'
+  | 'heatingEnergy'
+  | 'floor'
+  | 'dpeDate'
 >;
-
-async function copied(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export function ResultDetailPanel({
   candidate,
   rank,
+  total,
   onPrevious,
   onNext,
   onClose,
@@ -116,6 +97,7 @@ export function ResultDetailPanel({
 }: {
   candidate: AddressCandidate;
   rank: number;
+  total: number;
   onPrevious: (() => void) | null;
   onNext: (() => void) | null;
   onClose: () => void;
@@ -126,39 +108,24 @@ export function ResultDetailPanel({
 
   // why: the header (and its pager/close buttons) stays mounted across a
   // selection change, so keyboard focus on one of its buttons survives
-  // "Adresse suivante"/"précédente" instead of dropping to <body>. Only the
-  // body below, keyed on the shown result, resets its own state.
+  // "Résultat suivant"/"précédent" instead of dropping to <body>. Only the
+  // photo and the body below, keyed on the shown result, reset their state.
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <h2 className="text-[13px] font-semibold text-ink">
+      <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+        <p className="text-[13px] font-semibold text-ink">
           {t('detailTitle', { rank })}
-        </h2>
+        </p>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('addressPrevious')}
-            disabled={onPrevious === null}
-            focusableWhenDisabled
-            onClick={() => {
-              onPrevious?.();
-            }}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('addressNext')}
-            disabled={onNext === null}
-            focusableWhenDisabled
-            onClick={() => {
-              onNext?.();
-            }}
-          >
-            <ChevronRight />
-          </Button>
+          {onPrevious !== null && onNext !== null && (
+            <ResultsPager
+              rank={rank}
+              total={total}
+              onPrevious={onPrevious}
+              onNext={onNext}
+              className="gap-0.5"
+            />
+          )}
           <Button
             variant="ghost"
             size="icon-sm"
@@ -169,42 +136,70 @@ export function ResultDetailPanel({
           </Button>
         </div>
       </div>
+      <ResultDetailPhoto
+        key={`photo:${candidate.record.dpeNumber}`}
+        record={candidate.record}
+        streetViewEnabled={streetViewEnabled}
+      />
       <ResultDetailBody
-        key={candidate.record.dpeNumber}
+        key={`body:${candidate.record.dpeNumber}`}
         candidate={candidate}
         rank={rank}
-        streetViewEnabled={streetViewEnabled}
         listing={listing}
       />
     </div>
   );
 }
 
+function EnergyBadge({
+  label,
+  letter,
+}: {
+  label: 'dpe' | 'ges';
+  letter: EnergyClass;
+}) {
+  const t = useTranslations('Listing');
+  const colour = label === 'dpe' ? DPE_COLOUR[letter] : GES_COLOUR[letter];
+  const square = (chunks: ReactNode) => (
+    <span
+      className={cn(
+        'flex size-5 items-center justify-center rounded-[3px] text-[12px] font-bold',
+        colour.letter === 'white' ? 'text-white' : 'text-ink',
+      )}
+      style={{ backgroundColor: colour.background }}
+    >
+      {chunks}
+    </span>
+  );
+
+  return (
+    <Badge variant="outline" className="h-7 gap-1.5 py-0 pr-1 pl-2 text-[12px]">
+      {label === 'dpe'
+        ? t.rich('detailDpe', { letter, square })
+        : t.rich('detailGes', { letter, square })}
+    </Badge>
+  );
+}
+
 function ResultDetailBody({
   candidate,
   rank,
-  streetViewEnabled,
   listing,
 }: {
   candidate: AddressCandidate;
   rank: number;
-  streetViewEnabled: boolean;
   listing: DetailListing;
 }) {
   const t = useTranslations('Listing');
   const format = useFormatter();
-  const [photoFailed, setPhotoFailed] = useState(false);
   const { record } = candidate;
-  const { point } = record;
-  const score = Math.round(candidate.confidence * 100);
+  const score = scoreFromConfidence(candidate.confidence);
   const place = placeLine(record);
   const floor = reliableFloor(record);
   const date = shownDpeDate(record, listing.dpeDate);
   const agreement = factAgreement(record, listing);
+  const { status: copyStatus, copy } = useCopyAddress(copyableAddress(record));
 
-  // why: type and surface are search filters, not evidence (CLAUDE.md) — a
-  // signal already used to narrow the candidate pool discriminates nothing,
-  // so their tiles never carry a ✓.
   const facts: Fact[] = [
     record.propertyType === null
       ? null
@@ -214,7 +209,7 @@ function ResultDetailBody({
             record.propertyType === 'apartment'
               ? t('addressPropertyApartment')
               : t('addressPropertyHouse'),
-          agrees: false,
+          agrees: agreement.propertyType,
         },
     record.surfaceM2 === null
       ? null
@@ -223,6 +218,24 @@ function ResultDetailBody({
           value: t('addressSurface', {
             surface: format.number(record.surfaceM2, {
               maximumFractionDigits: 1,
+            }),
+          }),
+          agrees: agreement.surfaceM2,
+        },
+    floor === null
+      ? null
+      : {
+          label: t('factFloor'),
+          value: t('factFloorValue', { floor }),
+          agrees: agreement.floor,
+        },
+    record.landSurfaceM2 === null
+      ? null
+      : {
+          label: t('factLand'),
+          value: t('addressSurface', {
+            surface: format.number(record.landSurfaceM2, {
+              maximumFractionDigits: 0,
             }),
           }),
           agrees: false,
@@ -251,81 +264,16 @@ function ResultDetailBody({
           }),
           agrees: date.agrees,
         },
-    floor === null
-      ? null
-      : {
-          label: t('factFloor'),
-          value: t('factFloorValue', { floor }),
-          agrees: agreement.floor,
-        },
   ].filter((fact) => fact !== null);
-
-  const links: OutboundLink[] =
-    point === null
-      ? []
-      : [
-          {
-            href: googleMapsUrl(point),
-            title: t('linkGoogleMaps'),
-            hint: t('linkGoogleMapsHint'),
-            icon: MapPin,
-          },
-          {
-            href: georisquesReportUrl({
-              point,
-              inseeCode: record.inseeCode,
-              address: record.address,
-              city: record.city,
-            }),
-            title: t('linkGeorisques'),
-            hint: t('linkGeorisquesHint'),
-            icon: TriangleAlert,
-          },
-          {
-            href: dvfSalesUrl({ point, inseeCode: record.inseeCode }),
-            title: t('linkDvf'),
-            hint: t('linkDvfHint'),
-            icon: Landmark,
-          },
-          {
-            href: inseeCommuneUrl(record.inseeCode),
-            title: t('linkInsee'),
-            hint: t('linkInseeHint'),
-            icon: BarChart3,
-          },
-        ].filter((link): link is OutboundLink => link.href !== null);
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      {streetViewEnabled && point !== null && !photoFailed && (
-        <a
-          href={streetViewPanoramaUrl(point)}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={t('detailStreetViewOpen')}
-          className="relative block aspect-[2/1]"
-        >
-          <Skeleton className="absolute inset-0 rounded-none" />
-          <Image
-            unoptimized
-            fill
-            sizes="420px"
-            src={streetViewImagePath(point)}
-            alt={t('streetViewAlt', { address: record.address })}
-            onError={() => {
-              setPhotoFailed(true);
-            }}
-            className="object-cover"
-          />
-          <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
-            {t('streetViewBadge')}
-          </Badge>
-        </a>
-      )}
-      <div className="flex flex-col gap-4 p-4">
+      <div className="flex flex-col gap-4 p-4" style={scoreStyle(score)}>
         <div className="flex items-center gap-2">
-          <Badge>{rank}</Badge>
-          <span className="text-[20px] font-semibold tabular-nums text-ink">
+          <Badge className="size-7 rounded-full bg-(--score) p-0 text-[13px] font-semibold text-white tabular-nums">
+            {rank}
+          </Badge>
+          <span className="text-[20px] font-semibold tabular-nums text-(--score)">
             {t.rich('addressScore', {
               score,
               muted: (chunks) => (
@@ -338,117 +286,96 @@ function ResultDetailBody({
           <span className="text-[12px] text-muted-foreground">
             {t('detailScoreLabel')}
           </span>
+          <span className="sr-only">
+            {t(SCORE_LABEL_KEY[scoreBand(score)])}
+          </span>
         </div>
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-[20px] font-semibold leading-tight tracking-[-0.18px] text-ink">
+            <h2 className="text-[20px] font-semibold leading-tight tracking-[-0.18px] text-ink">
               {streetLine(record)}
-            </p>
+            </h2>
             {place !== null && (
               <p className="mt-0.5 text-[14px] text-graphite">{place}</p>
             )}
+            <p
+              role="status"
+              className={cn(
+                'text-[12px]',
+                copyStatus !== 'idle' && 'mt-1',
+                copyStatus === 'failed' ? 'text-destructive' : 'text-graphite',
+              )}
+            >
+              {copyStatus === 'copied'
+                ? t('detailCopied')
+                : copyStatus === 'failed'
+                  ? t('detailCopyFailed')
+                  : null}
+            </p>
           </div>
-          <Button
-            variant="outline"
-            size="icon-sm"
-            aria-label={t('detailCopy')}
-            onClick={() => {
-              void copied(record.address).then((ok) => {
-                if (ok) toast.success(t('detailCopied'));
-                else toast.error(t('detailCopyFailed'));
-              });
+          <Tooltip
+            onOpenChange={(open, details) => {
+              // why: Next.js mounts React on `document`, so the tooltip's
+              // stopPropagation cannot keep this Escape from the detail
+              // shortcut; marking it handled makes it close only the tooltip.
+              if (!open && details.reason === 'escape-key') {
+                details.event.preventDefault();
+              }
             }}
           >
-            <Copy />
-          </Button>
+            <TooltipTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label={t('detailCopy')}
+                  onClick={copy}
+                />
+              }
+            >
+              {copyStatus === 'copied' ? <Check /> : <Copy />}
+            </TooltipTrigger>
+            <TooltipContent>{t('detailCopy')}</TooltipContent>
+          </Tooltip>
         </div>
         {(record.dpeClass !== null || record.gesClass !== null) && (
           <div className="flex items-center gap-2">
             {record.dpeClass !== null && (
-              <Badge variant="outline">
-                <span
-                  aria-hidden
-                  className="size-2 rounded-full ring-1 ring-foreground/15"
-                  style={{ backgroundColor: DPE_COLOUR[record.dpeClass] }}
-                />
-                {t('detailDpe', { letter: record.dpeClass })}
-              </Badge>
+              <EnergyBadge label="dpe" letter={record.dpeClass} />
             )}
             {record.gesClass !== null && (
-              <Badge variant="outline">
-                <span
-                  aria-hidden
-                  className="size-2 rounded-full ring-1 ring-foreground/15"
-                  style={{ backgroundColor: GES_COLOUR[record.gesClass] }}
-                />
-                {t('detailGes', { letter: record.gesClass })}
-              </Badge>
+              <EnergyBadge label="ges" letter={record.gesClass} />
             )}
           </div>
         )}
         {facts.length > 0 && (
           <div className="grid grid-cols-2 gap-2">
             {facts.map((fact) => (
-              <Card key={fact.label} size="sm" className="gap-0 py-2.5">
-                <CardContent className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] text-muted-foreground">
-                      {fact.label}
-                    </p>
-                    <p className="mt-0.5 text-[14px] font-medium text-ink">
-                      {fact.value}
-                    </p>
-                  </div>
+              <Card
+                key={fact.label}
+                size="sm"
+                // why: the primitive's data-[size=sm] spacing outranks a plain override
+                className="gap-0 py-2.5 data-[size=sm]:gap-0 data-[size=sm]:py-2.5"
+              >
+                <CardContent className="flex flex-col">
+                  <p className="text-[11px] text-muted-foreground">
+                    {fact.label}
+                  </p>
+                  <p className="mt-0.5 text-[14px] font-medium text-ink">
+                    {fact.value}
+                  </p>
                   {fact.agrees && (
-                    <span className="shrink-0 text-ink">
-                      <Check className="size-3.5" aria-hidden />
-                      <span className="sr-only">{t('detailFactAgrees')}</span>
-                    </span>
+                    <p className="mt-1 flex items-center gap-1 text-[11px] font-medium text-graphite">
+                      <Check className="size-3 shrink-0" aria-hidden />
+                      {t('detailFactAgrees')}
+                    </p>
                   )}
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
-        {links.length > 0 && (
-          <>
-            <Separator />
-            <section className="flex flex-col gap-2">
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.06em] text-graphite">
-                {t('verifyElsewhere')}
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                {links.map((link) => (
-                  <a
-                    key={link.title}
-                    href={link.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonVariants({
-                      variant: 'outline',
-                      className:
-                        'h-auto justify-start gap-2.5 whitespace-normal px-3 py-2.5 text-left',
-                    })}
-                  >
-                    <link.icon className="size-4 shrink-0" aria-hidden />
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-[13px] font-medium">
-                        {link.title}
-                      </span>
-                      <span className="block text-[11px] font-normal text-muted-foreground">
-                        {link.hint}
-                      </span>
-                    </span>
-                    <ArrowUpRight
-                      className="size-3.5 shrink-0 text-muted-foreground"
-                      aria-hidden
-                    />
-                  </a>
-                ))}
-              </div>
-            </section>
-          </>
-        )}
+        <VerifyElsewhere record={record} />
       </div>
     </ScrollArea>
   );

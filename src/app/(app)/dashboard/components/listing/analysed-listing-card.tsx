@@ -2,7 +2,6 @@
 
 import { ExternalLink } from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
-import { buttonVariants } from '@/components/ui/button';
 import {
   Card,
   CardAction,
@@ -39,6 +38,14 @@ export function AnalysedListingCard({
             maximumFractionDigits: 1,
           }),
         });
+  // why: this is the listing's own floor, read from the page; unlike ADEME's
+  // default 0, a 0 here is a real ground floor.
+  const floor =
+    fields.floor === null
+      ? null
+      : fields.floor === 0
+        ? t('listingFloorGround')
+        : t('addressFloor', { floor: fields.floor });
   const place =
     fields.city === null
       ? null
@@ -54,58 +61,53 @@ export function AnalysedListingCard({
   const facts = [
     type,
     surface,
+    floor,
     fields.yearBuilt === null
       ? null
       : t('addressYearBuilt', { year: String(fields.yearBuilt) }),
     place,
   ].filter((fact) => fact !== null);
-  const displayUrl = listingDisplayUrl(fields.canonicalUrl);
-  // why: listingDisplayUrl returns "host/path"; the link label shows only the
-  // host, or the raw URL when it could not be parsed.
-  const host =
-    displayUrl === null
-      ? fields.canonicalUrl
-      : (displayUrl.split('/')[0] ?? displayUrl);
-  const openLabel = t('listingOpen', { host });
+  const displayUrl =
+    listingDisplayUrl(fields.canonicalUrl) ?? fields.canonicalUrl;
 
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.06em]">
-          {t('listingAnalysedLabel')}
-        </CardDescription>
-        <CardTitle className="text-[15px] font-semibold">
-          {title.length > 0 ? title : t('listingUntitled')}
-        </CardTitle>
-        <CardAction>
-          <a
-            href={fields.canonicalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={openLabel}
-            className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}
-          >
-            <ExternalLink aria-hidden />
-          </a>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1.5">
-        {facts.length > 0 && (
-          <p className="text-[13px] text-muted-foreground">
-            {facts.join(' · ')}
-          </p>
-        )}
-        {displayUrl !== null && (
-          <a
-            href={fields.canonicalUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="truncate text-[12px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          >
+    <a
+      href={fields.canonicalUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={t('listingOpenTitle', { url: displayUrl })}
+      className="group/listing block rounded-xl"
+    >
+      <Card
+        size="sm"
+        className="transition-colors group-hover/listing:bg-mist/60"
+      >
+        <CardHeader>
+          <CardDescription className="text-[11px] font-semibold uppercase tracking-[0.06em]">
+            {t('listingAnalysedLabel')}
+          </CardDescription>
+          <CardTitle className="text-[15px] font-semibold group-data-[size=sm]/card:text-[15px]">
+            {title.length > 0 ? title : t('listingUntitled')}
+          </CardTitle>
+          <CardAction>
+            <ExternalLink
+              aria-hidden
+              className="size-4 text-muted-foreground transition-colors group-hover/listing:text-ink"
+            />
+          </CardAction>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-1.5">
+          {facts.length > 0 && (
+            <p className="text-[13px] text-muted-foreground">
+              {facts.join(' · ')}
+            </p>
+          )}
+          <p className="truncate text-[12px] text-muted-foreground underline-offset-2 group-hover/listing:underline">
             {displayUrl}
-          </a>
-        )}
-      </CardContent>
-    </Card>
+            <span className="sr-only"> {t('listingNewTab')}</span>
+          </p>
+        </CardContent>
+      </Card>
+    </a>
   );
 }

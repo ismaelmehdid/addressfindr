@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  MapPin,
-  MapPinOff,
-  Search,
-} from 'lucide-react';
+import { ChevronDown, Info, MapPin, MapPinOff, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
@@ -36,6 +28,8 @@ import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
 import { ResultDetailPanel } from './result-detail-panel';
+import { ResultsPager } from './results-pager';
+import { useDetailShortcuts } from './use-detail-shortcuts';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -116,15 +110,35 @@ export function ResultsWorkspace({
   const isXl = useMediaQuery(XL_QUERY);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const { candidates } = match;
-  const index = candidates.findIndex(
-    (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
+  const total = candidates.length;
+  const index = Math.max(
+    0,
+    candidates.findIndex(
+      (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
+    ),
   );
-  const previous = candidates[index - 1];
-  const next = candidates[index + 1];
+  // why: the pagers wrap around, so as soon as there are two results every
+  // one of them has a neighbour on both sides.
+  const previous =
+    total > 1 ? candidates[(index - 1 + total) % total] : undefined;
+  const next = total > 1 ? candidates[(index + 1) % total] : undefined;
   const rank = index + 1;
   const detailOpen =
     detailPreference === 'default' ? isXl : detailPreference === 'open';
-  const padding = isLg && !isXl && detailOpen ? PANEL_CLEARANCE : NO_CLEARANCE;
+  const selectPrevious =
+    previous === undefined
+      ? null
+      : (): void => {
+          onSelect(previous.record.dpeNumber);
+        };
+  const selectNext =
+    next === undefined
+      ? null
+      : (): void => {
+          onSelect(next.record.dpeNumber);
+        };
+  const panelFloats = isLg && !isXl && detailOpen;
+  const padding = panelFloats ? PANEL_CLEARANCE : NO_CLEARANCE;
 
   // why: the search form is not part of this view, so keyboard focus would
   // fall to <body> when it appears; it lands on the results heading instead.
@@ -143,24 +157,22 @@ export function ResultsWorkspace({
     });
   }
 
+  // why: the mobile Sheet already closes itself on Escape; only the lg panel
+  // needs the shortcut to close it.
+  useDetailShortcuts({
+    enabled: detailOpen,
+    onClose: isLg ? closeDetail : null,
+    onPrevious: selectPrevious,
+    onNext: selectNext,
+  });
+
   const detail = (
     <ResultDetailPanel
       candidate={shown}
       rank={rank}
-      onPrevious={
-        previous === undefined
-          ? null
-          : () => {
-              onSelect(previous.record.dpeNumber);
-            }
-      }
-      onNext={
-        next === undefined
-          ? null
-          : () => {
-              onSelect(next.record.dpeNumber);
-            }
-      }
+      total={total}
+      onPrevious={selectPrevious}
+      onNext={selectNext}
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
       listing={listing.fields}
@@ -185,7 +197,7 @@ export function ResultsWorkspace({
               {t('resultsNewSearch')}
             </Button>
             <AnalysedListingCard listing={listing} />
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex min-h-7 items-center justify-between gap-2">
               <h2
                 id="results-heading"
                 ref={headingRef}
@@ -194,37 +206,14 @@ export function ResultsWorkspace({
               >
                 {t('addressHeading')}
               </h2>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('addressPrevious')}
-                  disabled={previous === undefined}
-                  focusableWhenDisabled
-                  onClick={() => {
-                    if (previous !== undefined) {
-                      onSelect(previous.record.dpeNumber);
-                    }
-                  }}
-                >
-                  <ChevronLeft />
-                </Button>
-                <span className="min-w-10 text-center text-[12px] tabular-nums text-muted-foreground">
-                  {t('addressPager', { index: rank, total: candidates.length })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('addressNext')}
-                  disabled={next === undefined}
-                  focusableWhenDisabled
-                  onClick={() => {
-                    if (next !== undefined) onSelect(next.record.dpeNumber);
-                  }}
-                >
-                  <ChevronRight />
-                </Button>
-              </div>
+              {detailOpen && selectPrevious !== null && selectNext !== null && (
+                <ResultsPager
+                  rank={rank}
+                  total={total}
+                  onPrevious={selectPrevious}
+                  onNext={selectNext}
+                />
+              )}
             </div>
             {needsVerification(match) && (
               <Alert role="status">
@@ -247,7 +236,7 @@ export function ResultsWorkspace({
             )}
             <AddressCandidateList
               candidates={candidates}
-              shownDpeNumber={shown.record.dpeNumber}
+              selectedDpeNumber={detailOpen ? shown.record.dpeNumber : null}
               onSelect={onSelect}
               streetViewEnabled={streetViewEnabled}
             />
@@ -262,7 +251,20 @@ export function ResultsWorkspace({
       >
         {map.kind === 'ready' ? (
           <>
-            <div className="absolute inset-0">
+            <div
+              className={cn(
+                'absolute inset-0',
+                // why: the floating panel covers the right 424px of the map
+                // (PANEL_CLEARANCE), so the bottom-right controls, the
+                // attribution among them, move clear of it. mapbox-gl.css is
+                // unlayered, so only an !important utility outranks its
+                // `right: 0`. The stack also stops at the bottom-left Mapbox
+                // logo (its right edge sits near 94px, plus a 10px gap) so
+                // the two never overlap.
+                panelFloats && '[&_.mapboxgl-ctrl-bottom-right]:right-[424px]!',
+                panelFloats && '[&_.mapboxgl-ctrl-bottom-right]:left-[104px]!',
+              )}
+            >
               <MapErrorBoundary fallback={null} onError={onMapFailure}>
                 <AddressMap
                   point={shown.record.point}
@@ -280,7 +282,7 @@ export function ResultsWorkspace({
                 'absolute top-3 left-3 z-10 h-auto gap-1.5 bg-paper py-1 whitespace-normal shadow-sm',
                 // why: between lg and xl the floating detail panel (z-20)
                 // covers the right 424px, so the chip must not grow under it.
-                isLg && !isXl && detailOpen
+                panelFloats
                   ? 'max-w-[calc(100%_-_448px)]'
                   : 'max-w-[calc(100%-1.5rem)]',
               )}

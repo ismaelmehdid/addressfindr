@@ -3,7 +3,7 @@ import {
   dvfSalesUrl,
   georisquesReportUrl,
   googleMapsUrl,
-  inseeCommuneUrl,
+  villedereveCommuneUrl,
 } from './outbound-links';
 
 const LAVOISIER = { latitude: 45.755599, longitude: 4.858685 };
@@ -90,23 +90,63 @@ describe('dvfSalesUrl', () => {
   });
 });
 
-describe('inseeCommuneUrl', () => {
-  it('opens the arrondissement dossier with its own code', () => {
-    expect(inseeCommuneUrl('69383')).toBe(
-      'https://www.insee.fr/fr/statistiques/2011101?geo=COM-69383',
+describe('villedereveCommuneUrl', () => {
+  it('opens the commune page by its INSEE code', () => {
+    expect(villedereveCommuneUrl('33063')).toBe(
+      'https://villedereve.fr/ville/33063',
     );
   });
 
-  // why: INSEE answers HTTP 500 to COM-2a004; only the uppercase code works.
+  // why: villedereve has no arrondissement pages, so Lyon 3e, Paris 15e and
+  // Marseille 1er open their commune.
+  it('opens the parent commune of a municipal arrondissement', () => {
+    expect(villedereveCommuneUrl('69381')).toBe(
+      'https://villedereve.fr/ville/69123',
+    );
+    expect(villedereveCommuneUrl('69383')).toBe(
+      'https://villedereve.fr/ville/69123',
+    );
+    expect(villedereveCommuneUrl('69389')).toBe(
+      'https://villedereve.fr/ville/69123',
+    );
+    expect(villedereveCommuneUrl('75101')).toBe(
+      'https://villedereve.fr/ville/75056',
+    );
+    expect(villedereveCommuneUrl('75115')).toBe(
+      'https://villedereve.fr/ville/75056',
+    );
+    expect(villedereveCommuneUrl('75120')).toBe(
+      'https://villedereve.fr/ville/75056',
+    );
+    expect(villedereveCommuneUrl('13201')).toBe(
+      'https://villedereve.fr/ville/13055',
+    );
+    expect(villedereveCommuneUrl('13216')).toBe(
+      'https://villedereve.fr/ville/13055',
+    );
+  });
+
+  it('keeps a neighbouring code that is not an arrondissement', () => {
+    expect(villedereveCommuneUrl('69380')).toBe(
+      'https://villedereve.fr/ville/69380',
+    );
+    expect(villedereveCommuneUrl('75121')).toBe(
+      'https://villedereve.fr/ville/75121',
+    );
+    expect(villedereveCommuneUrl('13217')).toBe(
+      'https://villedereve.fr/ville/13217',
+    );
+  });
+
   it('uppercases and trims a Corsican code', () => {
-    expect(inseeCommuneUrl(' 2a004 ')).toBe(
-      'https://www.insee.fr/fr/statistiques/2011101?geo=COM-2A004',
+    expect(villedereveCommuneUrl(' 2a004 ')).toBe(
+      'https://villedereve.fr/ville/2A004',
     );
   });
 
   it('gives no link for a code that is not five characters', () => {
-    expect(inseeCommuneUrl('2A04')).toBeNull();
-    expect(inseeCommuneUrl('693830')).toBeNull();
-    expect(inseeCommuneUrl('')).toBeNull();
+    expect(villedereveCommuneUrl('2A04')).toBeNull();
+    expect(villedereveCommuneUrl('693830')).toBeNull();
+    expect(villedereveCommuneUrl('')).toBeNull();
   });
 });

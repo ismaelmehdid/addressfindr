@@ -135,6 +135,7 @@ export const DOMAINS = [
       'src/core/ademe/candidate-on-map',
       'src/core/ademe/needs-verification',
       'src/core/ademe/record-facts',
+      'src/core/ademe/score-scale',
     ],
   },
   {
@@ -165,8 +166,8 @@ export const DOMAINS = [
     public: ['src/core/street-view/links'],
   },
   {
-    // Coordonnees et confiance geographique, sans dependance a une source.
-    // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
+    // Coordinates and geographic trust, independent of any source.
+    // ademe feeds it raw rows; the UI reads the point to display from it.
     name: 'geo',
     dirs: [
       'src/core/geo',
@@ -178,6 +179,7 @@ export const DOMAINS = [
       'src/core/geo/types',
       'src/core/geo/resolve-mappable-point',
       'src/core/geo/outbound-links',
+      'src/core/geo/aerial-image',
       'src/application/geo/verify-raw-address',
     ],
   },

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  copyableAddress,
   factAgreement,
   placeLine,
   reliableFloor,
@@ -142,13 +143,69 @@ describe('shownDpeDate', () => {
   });
 });
 
+describe('copyableAddress', () => {
+  it('joins the street line and the place with a comma', () => {
+    expect(
+      copyableAddress({
+        address: '16 Rue Lavoisier 69003 Lyon',
+        streetNumber: '16',
+        street: 'Rue Lavoisier',
+        postalCode: '69003',
+        city: 'Lyon',
+      }),
+    ).toBe('16 Rue Lavoisier, 69003 Lyon');
+  });
+
+  it('keeps what is known of the place', () => {
+    expect(
+      copyableAddress({
+        address: '16 Rue Lavoisier Lyon',
+        streetNumber: '16',
+        street: 'Rue Lavoisier',
+        postalCode: null,
+        city: 'Lyon',
+      }),
+    ).toBe('16 Rue Lavoisier, Lyon');
+  });
+
+  it('copies the street line alone when the place is unknown', () => {
+    expect(
+      copyableAddress({
+        address: '16 Rue Lavoisier',
+        streetNumber: '16',
+        street: 'Rue Lavoisier',
+        postalCode: null,
+        city: null,
+      }),
+    ).toBe('16 Rue Lavoisier');
+  });
+
+  // why: the full address already ends with the postal code and the city;
+  // appending them again would copy them twice.
+  it('copies the full address as it is when the street is unknown', () => {
+    expect(
+      copyableAddress({
+        address: '16 Rue Lavoisier 69003 Lyon',
+        streetNumber: '16',
+        street: null,
+        postalCode: '69003',
+        city: 'Lyon',
+      }),
+    ).toBe('16 Rue Lavoisier 69003 Lyon');
+  });
+});
+
 describe('factAgreement', () => {
   const listing = {
+    propertyType: 'apartment' as const,
+    surfaceM2: 63,
     yearBuilt: 1990,
     heatingEnergy: 'gas' as const,
     floor: 3,
   };
   const record = {
+    propertyType: 'apartment' as const,
+    surfaceM2: 63,
     yearBuilt: 1990,
     heatingEnergy: 'gas' as const,
     floor: 3,
@@ -156,10 +213,57 @@ describe('factAgreement', () => {
 
   it('agrees on every fact that exactly equals the listing', () => {
     expect(factAgreement(record, listing)).toEqual({
+      propertyType: true,
+      surfaceM2: true,
       yearBuilt: true,
       heatingEnergy: true,
       floor: true,
     });
+  });
+
+  it('disagrees on a different property type', () => {
+    expect(
+      factAgreement({ ...record, propertyType: 'house' }, listing).propertyType,
+    ).toBe(false);
+  });
+
+  it('disagrees on a property type the record does not know', () => {
+    expect(
+      factAgreement({ ...record, propertyType: null }, listing).propertyType,
+    ).toBe(false);
+  });
+
+  it('agrees on a surface up to 1 m² away, on either side', () => {
+    expect(factAgreement({ ...record, surfaceM2: 62 }, listing).surfaceM2).toBe(
+      true,
+    );
+    expect(factAgreement({ ...record, surfaceM2: 64 }, listing).surfaceM2).toBe(
+      true,
+    );
+    expect(
+      factAgreement(
+        { ...record, surfaceM2: 62.9 },
+        { ...listing, surfaceM2: 63.9 },
+      ).surfaceM2,
+    ).toBe(true);
+  });
+
+  it('disagrees on a surface more than 1 m² away', () => {
+    expect(
+      factAgreement({ ...record, surfaceM2: 64.05 }, listing).surfaceM2,
+    ).toBe(false);
+    expect(
+      factAgreement({ ...record, surfaceM2: 61.5 }, listing).surfaceM2,
+    ).toBe(false);
+  });
+
+  it('disagrees on a surface either side does not know', () => {
+    expect(
+      factAgreement({ ...record, surfaceM2: null }, listing).surfaceM2,
+    ).toBe(false);
+    expect(
+      factAgreement(record, { ...listing, surfaceM2: null }).surfaceM2,
+    ).toBe(false);
   });
 
   it('disagrees on a year built one year apart', () => {

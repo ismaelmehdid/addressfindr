@@ -8027,9 +8027,9 @@ Click "C'est ce logement" on #1: it becomes "Logement confirmé, merci !", the o
 
 With the detail open: `→`/`←` move between results with the header pager keeping focus; `Esc` closes on `lg`; typing arrows inside the comment textarea does not switch results.
 
-- [ ] **Step 7: 1100 × 800 and 390 × 844**
+- [ ] **Step 7: 1100 × 800, 390 × 844 and 844 × 390**
 
-1100: the detail floats over the map, the attribution sits left of it and stays readable (not overlapping the Mapbox logo). 390: map on top, list below, the detail opens as a bottom sheet with the photo and "C'est ce logement" reachable by scrolling.
+1100: the detail floats over the map, the attribution sits left of it and stays readable (not overlapping the Mapbox logo). 390: map on top, list below, the detail opens as a bottom sheet with the photo and "C'est ce logement" reachable by scrolling. 844 × 390 (landscape phone, below `lg`): the bottom sheet's header and photo stay fixed, the photo is shorter than 320 px and not clipped, and the sheet body scrolls to the address, "Vérifier ailleurs" and "C'est ce logement".
 
 - [ ] **Step 8: Clean up**
 
