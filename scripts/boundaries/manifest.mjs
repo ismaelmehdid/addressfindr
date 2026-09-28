@@ -112,7 +112,7 @@ export const DOMAINS = [
       'src/infra/external-apis/groq',
       'src/app/api/listings',
     ],
-    schemas: [],
+    schemas: ['src/infra/database/schema/listing-feedback-schema'],
     public: [
       'src/application/listing/extract-listing',
       'src/application/listing/dto',
