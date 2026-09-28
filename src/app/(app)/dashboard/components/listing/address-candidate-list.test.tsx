@@ -229,10 +229,27 @@ describe('AddressCandidateList card', () => {
 
   it('reads the score band inside the card button', () => {
     render({});
+    const band = onlyCard().querySelector('button .sr-only');
 
-    expect(onlyCard().querySelector('button .sr-only')?.textContent).toMatch(
-      /^Correspondance /,
-    );
+    expect(band?.textContent).toMatch(/^Correspondance /);
+    expect(band?.closest('[aria-hidden="true"], [hidden]')).toBeNull();
+  });
+
+  it('keeps a dimmed card in the tab order', () => {
+    render({
+      candidates: [TOP, SECOND],
+      selectedDpeNumber: TOP.record.dpeNumber,
+    });
+    const [, dimmed] = cards();
+    const button = dimmed?.querySelector('button');
+
+    expect(classes(dimmed ?? null)).toContain('lg:opacity-60');
+    expect(button?.tabIndex).toBe(0);
+    expect(button?.closest('[inert], [aria-hidden="true"]')).toBeNull();
+    act(() => {
+      button?.focus();
+    });
+    expect(document.activeElement).toBe(button);
   });
 
   it('rings the selected card and dims the others only while one is selected', () => {
