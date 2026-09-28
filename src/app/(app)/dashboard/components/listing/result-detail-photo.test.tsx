@@ -85,6 +85,26 @@ describe('ResultDetailPhoto', () => {
     expect(link?.textContent).toContain('Explorer le panorama');
   });
 
+  // why: the panel clips an outer ring and the absolutely positioned photo
+  // covers an inset outline, so the focus ring is drawn on a pseudo-element
+  // stacked above the photo.
+  it('draws the panorama link focus ring above the photo', () => {
+    render({});
+
+    const linkClasses = container.querySelector('a')?.className.split(/\s+/);
+    expect(linkClasses).toEqual(
+      expect.arrayContaining([
+        'after:pointer-events-none',
+        'after:absolute',
+        'after:inset-0',
+        'after:z-10',
+        'focus-visible:after:ring-2',
+        'focus-visible:after:ring-inset',
+        'focus-visible:after:ring-charcoal',
+      ]),
+    );
+  });
+
   it('falls back from Street View to the orthophoto, then to the placeholder', () => {
     render({});
 

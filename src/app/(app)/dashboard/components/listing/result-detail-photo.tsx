@@ -79,14 +79,19 @@ export function ResultDetailPhoto({
   }
 
   // why: the Google key stays on the server, so the interactive panorama
-  // opens on Google Maps in a new tab rather than inside the panel.
+  // opens on Google Maps in a new tab rather than inside the panel. The panel
+  // clips an outer focus ring and the positioned photo covers an inset
+  // outline, so the ring is a pseudo-element stacked above the photo.
   return (
     <a
       href={streetViewPanoramaUrl(photo.point)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('detailStreetViewOpen')}
-      className={PHOTO_AREA_CLASS}
+      className={cn(
+        PHOTO_AREA_CLASS,
+        'after:pointer-events-none after:absolute after:inset-0 after:z-10 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-charcoal',
+      )}
     >
       {image}
       <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">

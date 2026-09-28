@@ -161,8 +161,13 @@ function CandidateCard({
       className={cn(
         // why: the primitive's data-[size=sm] spacing outranks a plain override
         'gap-0 py-0 data-[size=sm]:gap-0 data-[size=sm]:py-0 transition-[opacity,background-color,box-shadow]',
+        // why: the Card clips the button's own focus ring (overflow-hidden,
+        // no padding), so the focus outline is drawn on the Card, outside
+        // the clip and clear of the selected card's score ring.
+        'has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-charcoal',
         selected && 'bg-(--score-tint) ring-2 ring-(--score)',
-        dimmed && 'lg:opacity-60 lg:hover:opacity-100',
+        dimmed &&
+          'lg:opacity-60 lg:hover:opacity-100 lg:has-focus-visible:opacity-100',
       )}
     >
       <button
@@ -171,7 +176,7 @@ function CandidateCard({
         onClick={() => {
           onSelect(record.dpeNumber);
         }}
-        className="group/candidate flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3 focus-visible:bg-foreground/5"
+        className="group/candidate flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3"
       >
         {photo.kind === 'none' ? (
           <div className="flex h-[172px] w-full items-center justify-center bg-mist">

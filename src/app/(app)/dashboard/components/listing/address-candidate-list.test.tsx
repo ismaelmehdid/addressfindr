@@ -243,13 +243,40 @@ describe('AddressCandidateList card', () => {
     const [, dimmed] = cards();
     const button = dimmed?.querySelector('button');
 
-    expect(classes(dimmed ?? null)).toContain('lg:opacity-60');
+    expect(classes(dimmed ?? null)).toEqual(
+      expect.arrayContaining([
+        'lg:opacity-60',
+        'lg:hover:opacity-100',
+        'lg:has-focus-visible:opacity-100',
+      ]),
+    );
     expect(button?.tabIndex).toBe(0);
     expect(button?.closest('[inert], [aria-hidden="true"]')).toBeNull();
     act(() => {
       button?.focus();
     });
     expect(document.activeElement).toBe(button);
+  });
+
+  // why: the Card clips its content (overflow-hidden, no padding), which hides
+  // any ring drawn on the button; an outline on the Card itself sits outside
+  // that clip and above the positioned photo.
+  it('outlines the whole card while its button has keyboard focus', () => {
+    render({});
+    const card = onlyCard();
+
+    expect(classes(card)).toEqual(
+      expect.arrayContaining([
+        'has-focus-visible:outline-2',
+        'has-focus-visible:outline-offset-2',
+        'has-focus-visible:outline-charcoal',
+      ]),
+    );
+    expect(
+      classes(card.querySelector('button')).filter((name) =>
+        name.startsWith('focus-visible:'),
+      ),
+    ).toEqual([]);
   });
 
   it('rings the selected card and dims the others only while one is selected', () => {
