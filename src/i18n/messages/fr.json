@@ -5,9 +5,7 @@
     "delete": "Supprimer"
   },
   "Meta": {
-    "signIn": "Connexion",
-    "dashboard": "Tableau de bord",
-    "settings": "Paramètres"
+    "dashboard": "Tableau de bord"
   },
   "Home": {
     "welcomeTitle": "Comment puis-je vous aider aujourd'hui ?",
@@ -71,7 +69,6 @@
     "analyzing": "Lecture de l'annonce…",
     "errorNotExtractable": "Impossible de lire cette annonce. Ce n'est peut-être pas un logement, ou la page masque les détails.",
     "errorRateLimited": "Trop d'analyses. Patientez un instant et réessayez.",
-    "errorSignedOut": "Votre session a expiré. Reconnectez-vous pour continuer.",
     "errorUnknown": "Une erreur est survenue pendant la lecture de l'annonce. Réessayez.",
     "addressHeading": "Emplacements probables",
     "addressSearching": "Recherche dans la base DPE…",
@@ -143,7 +140,7 @@
     "mapRegionLabel": "Carte",
     "linkVilledereve": "Villederêve",
     "linkVilledereveHint": "Vie de la commune",
-    "photoSatellite": "Satellite",
+    "photoSatellite": "Satellite · IGN",
     "aerialAlt": "Photo aérienne autour de {address}",
     "cardVerify": "Vérifier cette adresse →",
     "addressFloor": "Étage {floor}",

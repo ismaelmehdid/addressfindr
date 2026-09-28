@@ -91,7 +91,7 @@ describe('ResultDetailPhoto', () => {
     failPhoto();
     expect(photo()?.src).toBe(AERIAL_SRC);
     expect(container.querySelector('a')).toBeNull();
-    expect(container.textContent).toContain('Satellite');
+    expect(container.textContent).toContain('Satellite · IGN');
 
     failPhoto();
     expect(photo()).toBeNull();

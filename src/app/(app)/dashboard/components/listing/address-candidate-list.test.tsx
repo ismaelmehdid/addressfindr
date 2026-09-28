@@ -160,7 +160,7 @@ describe('AddressCandidateList photo', () => {
 
     failPhoto(card);
     expect(photo(card)?.src).toBe(AERIAL_SRC);
-    expect(card.textContent).toContain('Satellite');
+    expect(card.textContent).toContain('Satellite · IGN');
 
     failPhoto(card);
     expect(photo(card)).toBeNull();
@@ -274,5 +274,30 @@ describe('AddressCandidateList card', () => {
     );
     expect(classes(second ?? null)).toContain('lg:opacity-60');
     expect(classes(second ?? null)).not.toContain('ring-(--score)');
+  });
+});
+
+describe('AddressCandidateList score colour', () => {
+  it('writes the rank and the score in whichever of white or ink contrasts more', () => {
+    render({
+      candidates: [
+        candidate({}, 1),
+        candidate({ dpeNumber: '2369E0000002B' }, 0.74),
+      ],
+    });
+    const [darkGreen, lightYellow] = cards();
+
+    expect(darkGreen?.style.getPropertyValue('--score-ink')).toBe('#ffffff');
+    expect(lightYellow?.style.getPropertyValue('--score-ink')).toBe('#2d2f2a');
+    for (const card of cards()) {
+      const onScore = [...card.querySelectorAll('[data-slot="badge"]')].filter(
+        (badge) => classes(badge).includes('bg-(--score)'),
+      );
+      expect(onScore).toHaveLength(2);
+      for (const badge of onScore) {
+        expect(classes(badge)).toContain('text-(--score-ink)');
+        expect(classes(badge)).not.toContain('text-white');
+      }
+    }
   });
 });

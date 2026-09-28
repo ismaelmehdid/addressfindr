@@ -42,6 +42,8 @@ This app is a production tool, not a marketing page. The interface is built for 
 | Danger Soft | `#F4E0DD` | `--color-danger-soft` | Destructive callout fill, error toast background. |
 | Info | `#5C5B55` | `--color-info` | Informational icons (reuses Basalt for cohesion). |
 
+Data-encoding colours (the official DPE/GES label colours, the score ramp, the verify-link hues) are not accents: the hue carries a value, not an action, so they are exempt from the single-accent rule.
+
 ## Tokens — Typography
 
 ### Inter — Primary UI typeface · `--font-inter`

@@ -3,6 +3,7 @@ import {
   scoreBand,
   scoreColour,
   scoreFromConfidence,
+  scoreInk,
   scoreTint,
 } from './score-scale';
 
@@ -72,5 +73,21 @@ describe('scoreBand', () => {
 
   it('never calls a score that is not a number reliable', () => {
     expect(scoreBand(Number.NaN)).toBe('unreliable');
+  });
+});
+
+describe('scoreInk', () => {
+  it('writes white on the dark green of a top score', () => {
+    expect(scoreInk(100)).toBe('white');
+  });
+
+  // why: white on the yellow stop (score 74) is about 2:1, below WCAG AA.
+  it('writes ink on the light yellow of a middling score', () => {
+    expect(scoreInk(74)).toBe('ink');
+  });
+
+  it('decides on the clamped colour for out-of-range scores', () => {
+    expect(scoreInk(140)).toBe(scoreInk(100));
+    expect(scoreInk(10)).toBe(scoreInk(52));
   });
 });

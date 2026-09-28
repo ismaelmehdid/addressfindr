@@ -5,9 +5,7 @@
     "delete": "Delete"
   },
   "Meta": {
-    "signIn": "Sign in",
-    "dashboard": "Dashboard",
-    "settings": "Settings"
+    "dashboard": "Dashboard"
   },
   "Home": {
     "welcomeTitle": "How can I help you today?",
@@ -71,7 +69,6 @@
     "analyzing": "Reading the listing…",
     "errorNotExtractable": "Couldn't read this listing. It may not be a home, or the page hides the details.",
     "errorRateLimited": "Too many analyses. Wait a moment and try again.",
-    "errorSignedOut": "Your session expired. Sign in again to continue.",
     "errorUnknown": "Something went wrong reading that listing. Try again.",
     "addressHeading": "Likely locations",
     "addressSearching": "Searching the DPE register…",
@@ -143,7 +140,7 @@
     "mapRegionLabel": "Map",
     "linkVilledereve": "Villederêve",
     "linkVilledereveHint": "Life in the commune",
-    "photoSatellite": "Satellite",
+    "photoSatellite": "Satellite · IGN",
     "aerialAlt": "Aerial photo around {address}",
     "cardVerify": "Check this address →",
     "addressFloor": "Floor {floor}",

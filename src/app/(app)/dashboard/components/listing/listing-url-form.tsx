@@ -27,16 +27,11 @@ const REJECTION_KEY = {
   'unsupported-portal': 'errorUnsupportedPortal',
 } as const satisfies Record<ListingUrlRejection, string>;
 
-type ExtractionFailure =
-  | 'not-extractable'
-  | 'rate-limited'
-  | 'signed-out'
-  | 'unknown';
+type ExtractionFailure = 'not-extractable' | 'rate-limited' | 'unknown';
 
 const FAILURE_KEY = {
   'not-extractable': 'errorNotExtractable',
   'rate-limited': 'errorRateLimited',
-  'signed-out': 'errorSignedOut',
   unknown: 'errorUnknown',
 } as const satisfies Record<ExtractionFailure, string>;
 
@@ -82,7 +77,6 @@ function toFailure(body: unknown): ExtractionFailure {
   const code = errorCode(body);
   if (code === 'validation') return 'not-extractable';
   if (code === 'rate_limited') return 'rate-limited';
-  if (code === 'unauthorized' || code === 'forbidden') return 'signed-out';
   return 'unknown';
 }
 

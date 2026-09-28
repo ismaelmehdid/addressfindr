@@ -40,8 +40,8 @@ Make the results view carry everything precisement's does for a candidate — li
 
 ## 5. Candidate card
 
-- **Photo** 172 px high, full width: Street View when available (exists); otherwise an **IGN orthophoto** of ±40 m around the trusted point (Géoplateforme WMS `ORTHOIMAGERY.ORTHOPHOTOS`, free, keyless) with the chip "Satellite"; a result without a trusted point shows a placeholder (house icon), never a photo. The Street View chip reads "Street View".
-- **Overlays on the photo:** rank badge top-left (circle, white number) and score pill top-right (`{score}/100`), both in the **score colour** (§7). Without a photo they sit in the card header.
+- **Photo** 172 px high, full width: Street View when available (exists); otherwise an **IGN orthophoto** of ±40 m around the trusted point (Géoplateforme WMS `ORTHOIMAGERY.ORTHOPHOTOS`, free, keyless) with the chip "Satellite · IGN"; a result without a trusted point shows a placeholder (house icon), never a photo. The Street View chip reads "Street View".
+- **Overlays on the photo:** rank badge top-left (circle, number in ink or white, whichever contrasts more with the score colour) and score pill top-right (`{score}/100`), both in the **score colour** (§7). Without a photo they sit in the card header.
 - **Body:** street line (bold when selected); score bar in the score colour on a tinted track; meta line `{city} · {type} · {surface} m²` + ` · Étage {n}` only if the ADEME floor is ≥ 1 + ` · Terrain {x} m²` when known + ` · Construit en {year}` (`Construite en` for a maison).
 - **Top card only:** full-width CTA "Vérifier cette adresse →" opening its detail.
 - **States:** selected card has a ring in the score colour and a tinted background; while a card is selected, the other cards drop to 60 % opacity on `lg` and up. Clicking anywhere on a card, pressing Enter on it or its CTA opens its detail and flies the map (exists).
@@ -49,7 +49,7 @@ Make the results view carry everything precisement's does for a candidate — li
 ## 6. Detail panel
 
 - **Header (44 px):** "Résultat {n}", the same wrap-around pager `‹ n / N ›`, close button (aria "Fermer le détail"). Keyboard: `Esc` closes, `←`/`→` previous/next candidate.
-- **Photo area:** fixed 320 px, does not scroll with the content. Street View when available with chip "Street View" bottom-left and a chip "Explorer le panorama" bottom-right (rotate icon); clicking the photo opens the interactive panorama in a new tab (we keep the key server-side, so no embedded panorama). Otherwise the IGN orthophoto with chip "Satellite"; no trusted point → placeholder "Image indisponible".
+- **Photo area:** fixed 320 px, does not scroll with the content. Street View when available with chip "Street View" bottom-left and a chip "Explorer le panorama" bottom-right (rotate icon); clicking the photo opens the interactive panorama in a new tab (we keep the key server-side, so no embedded panorama). Otherwise the IGN orthophoto with chip "Satellite · IGN"; no trusted point → placeholder "Image indisponible".
 - **Score line:** rank circle + `{score}` (score colour) `/100` + "score de correspondance"; sr text with the score label (§7).
 - **Address:** h2 street line + `{postalCode} {city}` below; copy button copies `"{street line}, {postalCode} {city}"`, shows a check icon and "Adresse copiée" for 2 s (tooltip "Copier l'adresse"); a failed copy says so.
 - **DPE / GES badges** with the letter in a square in precisement's official colours — DPE A `#00a06d` B `#52b153` C `#cbd934` D `#f4e70f` E `#f0b40f` F `#eb8235` G `#d7221f`; GES A `#f2e9fb` B `#e0c7f7` C `#cda6f2` D `#ba85ee` E `#a663e9` F `#9341e5` G `#7f1fe0`. Never check-marked.

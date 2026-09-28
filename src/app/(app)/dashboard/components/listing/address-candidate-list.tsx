@@ -72,7 +72,7 @@ export function AddressCandidateList({
 
 function RankBadge({ rank }: { rank: number }) {
   return (
-    <Badge className="size-6 rounded-full bg-(--score) p-0 text-[12px] font-semibold text-white tabular-nums shadow-sm">
+    <Badge className="size-6 rounded-full bg-(--score) p-0 text-[12px] font-semibold text-(--score-ink) tabular-nums shadow-sm">
       {rank}
     </Badge>
   );
@@ -82,7 +82,7 @@ function ScorePill({ score }: { score: number }) {
   const t = useTranslations('Listing');
 
   return (
-    <Badge className="h-6 rounded-full bg-(--score) px-2 text-[12px] font-semibold text-white tabular-nums shadow-sm">
+    <Badge className="h-6 rounded-full bg-(--score) px-2 text-[12px] font-semibold text-(--score-ink) tabular-nums shadow-sm">
       {t.rich('addressScore', {
         score,
         muted: (chunks) => <span className="font-medium">{chunks}</span>,

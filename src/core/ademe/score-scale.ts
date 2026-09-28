@@ -78,3 +78,35 @@ export function scoreTint(score: number): string {
 export function scoreBand(score: number): ScoreBand {
   return BANDS.find(({ from }) => score >= from)?.band ?? 'unreliable';
 }
+
+const INK_RGB: Rgb = [45, 47, 42];
+const WHITE_RGB: Rgb = [255, 255, 255];
+
+function channelLuminance(value: number): number {
+  const channel = value / 255;
+  return channel <= 0.03928
+    ? channel / 12.92
+    : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
+function luminance([red, green, blue]: Rgb): number {
+  return (
+    0.2126 * channelLuminance(red) +
+    0.7152 * channelLuminance(green) +
+    0.0722 * channelLuminance(blue)
+  );
+}
+
+function contrast(first: number, second: number): number {
+  return (Math.max(first, second) + 0.05) / (Math.min(first, second) + 0.05);
+}
+
+// why: the score colour runs from dark green to light yellow, so white text
+// is only legible on part of the ramp; pick whichever contrasts more.
+export function scoreInk(score: number): 'white' | 'ink' {
+  const background = luminance(rampRgb(score));
+  return contrast(background, luminance(WHITE_RGB)) >=
+    contrast(background, luminance(INK_RGB))
+    ? 'white'
+    : 'ink';
+}

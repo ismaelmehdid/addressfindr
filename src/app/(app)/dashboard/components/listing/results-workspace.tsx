@@ -27,9 +27,11 @@ import { cn } from '@/lib/utils';
 import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
+import { MissingListingFeedback } from './missing-listing-feedback';
 import { ResultDetailPanel } from './result-detail-panel';
 import { ResultsPager } from './results-pager';
 import { useDetailShortcuts } from './use-detail-shortcuts';
+import { useSearchFeedback } from './use-search-feedback';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -108,6 +110,10 @@ export function ResultsWorkspace({
   const t = useTranslations('Listing');
   const isLg = useMediaQuery(LG_QUERY);
   const isXl = useMediaQuery(XL_QUERY);
+  const feedback = useSearchFeedback({
+    listingUrl: listing.fields.canonicalUrl,
+    candidates: match.candidates,
+  });
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const { candidates } = match;
   const total = candidates.length;
@@ -176,6 +182,7 @@ export function ResultsWorkspace({
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
       listing={listing.fields}
+      feedback={feedback}
     />
   );
 
@@ -240,6 +247,7 @@ export function ResultsWorkspace({
               onSelect={onSelect}
               streetViewEnabled={streetViewEnabled}
             />
+            <MissingListingFeedback feedback={feedback} />
           </div>
         </ScrollArea>
       </section>

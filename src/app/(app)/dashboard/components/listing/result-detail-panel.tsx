@@ -28,10 +28,12 @@ import type {
   HeatingEnergy,
 } from '@/core/listing/types';
 import { cn } from '@/lib/utils';
+import { ConfirmListingButton } from './confirm-listing-button';
 import { ResultDetailPhoto } from './result-detail-photo';
 import { ResultsPager } from './results-pager';
 import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
 import { useCopyAddress } from './use-copy-address';
+import type { SearchFeedback } from './use-search-feedback';
 import { VerifyElsewhere } from './verify-elsewhere';
 
 type LetterColour = { background: string; letter: 'ink' | 'white' };
@@ -94,6 +96,7 @@ export function ResultDetailPanel({
   onClose,
   streetViewEnabled,
   listing,
+  feedback,
 }: {
   candidate: AddressCandidate;
   rank: number;
@@ -103,6 +106,7 @@ export function ResultDetailPanel({
   onClose: () => void;
   streetViewEnabled: boolean;
   listing: DetailListing;
+  feedback: SearchFeedback;
 }) {
   const t = useTranslations('Listing');
 
@@ -146,6 +150,7 @@ export function ResultDetailPanel({
         candidate={candidate}
         rank={rank}
         listing={listing}
+        feedback={feedback}
       />
     </div>
   );
@@ -185,10 +190,12 @@ function ResultDetailBody({
   candidate,
   rank,
   listing,
+  feedback,
 }: {
   candidate: AddressCandidate;
   rank: number;
   listing: DetailListing;
+  feedback: SearchFeedback;
 }) {
   const t = useTranslations('Listing');
   const format = useFormatter();
@@ -270,7 +277,7 @@ function ResultDetailBody({
     <ScrollArea className="min-h-0 flex-1">
       <div className="flex flex-col gap-4 p-4" style={scoreStyle(score)}>
         <div className="flex items-center gap-2">
-          <Badge className="size-7 rounded-full bg-(--score) p-0 text-[13px] font-semibold text-white tabular-nums">
+          <Badge className="size-7 rounded-full bg-(--score) p-0 text-[13px] font-semibold text-(--score-ink) tabular-nums">
             {rank}
           </Badge>
           <span className="text-[20px] font-semibold tabular-nums text-(--score)">
@@ -376,6 +383,10 @@ function ResultDetailBody({
           </div>
         )}
         <VerifyElsewhere record={record} />
+        <ConfirmListingButton
+          feedback={feedback}
+          dpeNumber={record.dpeNumber}
+        />
       </div>
     </ScrollArea>
   );

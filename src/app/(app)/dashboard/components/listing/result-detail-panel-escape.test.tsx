@@ -72,6 +72,16 @@ function PanelWithShortcuts({ onClose }: { onClose: () => void }) {
         heatingEnergy: 'gas',
         dpeDate: '2022-04-14',
       }}
+      feedback={{
+        verdict: { kind: 'none' },
+        verdictStatus: 'idle',
+        verdictPending: null,
+        verdictFailure: null,
+        detailStatus: 'idle',
+        confirm: () => {},
+        reportNoneMatch: () => {},
+        sendDetail: () => {},
+      }}
     />
   );
 }

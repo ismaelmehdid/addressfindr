@@ -15,6 +15,7 @@ import { scoreColour } from '@/core/ademe/score-scale';
 import type { AddressCandidate, DpeRecord } from '@/core/ademe/types';
 import messages from '@/i18n/messages/fr.json';
 import { ResultDetailPanel } from './result-detail-panel';
+import type { SearchFeedback } from './use-search-feedback';
 
 // why: tells React that act() drives the updates, so it flushes them there.
 (
@@ -58,6 +59,19 @@ const LISTING: ComponentProps<typeof ResultDetailPanel>['listing'] = {
   heatingEnergy: 'gas',
   dpeDate: '2022-04-14',
 };
+
+const FEEDBACK: SearchFeedback = {
+  verdict: { kind: 'none' },
+  verdictStatus: 'idle',
+  verdictPending: null,
+  verdictFailure: null,
+  detailStatus: 'idle',
+  confirm: () => {},
+  reportNoneMatch: () => {},
+  sendDetail: () => {},
+};
+
+const TRUSTED_POINT = { latitude: 45.7578, longitude: 4.8515 };
 
 function candidate(record: Partial<DpeRecord>): AddressCandidate {
   return {
@@ -106,6 +120,7 @@ async function render(
           onClose={() => {}}
           streetViewEnabled={false}
           listing={LISTING}
+          feedback={FEEDBACK}
           {...props}
         />
       </NextIntlClientProvider>,
@@ -146,6 +161,14 @@ async function clickCopy(): Promise<void> {
   await act(async () => {
     copyButton().click();
   });
+}
+
+function confirmButton(): HTMLButtonElement {
+  const button = [...container.querySelectorAll('button')].find(
+    (element) => element.textContent === 'C’est ce logement',
+  );
+  if (button === undefined) throw new Error('no confirm button');
+  return button;
 }
 
 function badge(label: 'DPE' | 'GES'): HTMLElement {
@@ -192,6 +215,16 @@ describe('ResultDetailPanel score line', () => {
     expect(scoreLine?.querySelector('.text-\\(--score\\)')?.textContent).toBe(
       '82/100',
     );
+  });
+
+  it('writes the rank in whichever of white or ink contrasts more with it', async () => {
+    await render({});
+
+    const scored = container.querySelector<HTMLElement>('[style*="--score:"]');
+    expect(scored?.style.getPropertyValue('--score-ink')).toBe('#2d2f2a');
+    const rankCircle = scored?.querySelector('[data-slot="badge"]');
+    expect(rankCircle?.classList).toContain('text-(--score-ink)');
+    expect(rankCircle?.classList).not.toContain('text-white');
   });
 
   it('names the score band for screen readers', async () => {
@@ -336,16 +369,34 @@ describe('ResultDetailPanel verify elsewhere', () => {
     expect(container.querySelectorAll('a')).toHaveLength(0);
   });
 
-  it('ends the body with the outbound links around a trusted point', async () => {
-    await render({
-      candidate: candidate({
-        point: { latitude: 45.7578, longitude: 4.8515 },
-      }),
-    });
+  it('lists the outbound links around a trusted point', async () => {
+    await render({ candidate: candidate({ point: TRUSTED_POINT }) });
 
     const section = container.querySelector('section');
     expect(section?.querySelector('h3')?.textContent).toBe('Vérifier ailleurs');
-    expect(section?.parentElement?.lastElementChild).toBe(section);
     expect(section?.querySelectorAll('a')).toHaveLength(4);
+  });
+});
+
+describe('ResultDetailPanel confirmation', () => {
+  it('ends the body with "C’est ce logement", right after the outbound links', async () => {
+    await render({ candidate: candidate({ point: TRUSTED_POINT }) });
+
+    const section = container.querySelector('section');
+    const confirmation = section?.nextElementSibling;
+    expect(confirmation?.contains(confirmButton())).toBe(true);
+    expect(section?.parentElement?.lastElementChild).toBe(confirmation);
+  });
+
+  it('confirms the shown result even without a trusted point', async () => {
+    const confirm = vi.fn<SearchFeedback['confirm']>();
+    await render({ feedback: { ...FEEDBACK, confirm } });
+    expect(container.querySelector('section')).toBeNull();
+
+    await act(async () => {
+      confirmButton().click();
+    });
+
+    expect(confirm).toHaveBeenCalledExactlyOnceWith('2269E0000001A');
   });
 });
