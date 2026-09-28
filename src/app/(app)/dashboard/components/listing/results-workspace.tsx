@@ -258,8 +258,11 @@ export function ResultsWorkspace({
                 // (PANEL_CLEARANCE), so the bottom-right controls, the
                 // attribution among them, move clear of it. mapbox-gl.css is
                 // unlayered, so only an !important utility outranks its
-                // `right: 0`.
+                // `right: 0`. The stack also stops at the bottom-left Mapbox
+                // logo (its right edge sits near 94px, plus a 10px gap) so
+                // the two never overlap.
                 panelFloats && '[&_.mapboxgl-ctrl-bottom-right]:right-[424px]!',
+                panelFloats && '[&_.mapboxgl-ctrl-bottom-right]:left-[104px]!',
               )}
             >
               <MapErrorBoundary fallback={null} onError={onMapFailure}>
