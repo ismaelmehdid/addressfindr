@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  Info,
-  MapPin,
-  MapPinOff,
-  Search,
-} from 'lucide-react';
+import { ChevronDown, Info, MapPin, MapPinOff, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
@@ -36,6 +28,7 @@ import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
 import { ResultDetailPanel } from './result-detail-panel';
+import { ResultsPager } from './results-pager';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -116,14 +109,33 @@ export function ResultsWorkspace({
   const isXl = useMediaQuery(XL_QUERY);
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const { candidates } = match;
-  const index = candidates.findIndex(
-    (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
+  const total = candidates.length;
+  const index = Math.max(
+    0,
+    candidates.findIndex(
+      (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
+    ),
   );
-  const previous = candidates[index - 1];
-  const next = candidates[index + 1];
+  // why: the pagers wrap around, so as soon as there are two results every
+  // one of them has a neighbour on both sides.
+  const previous =
+    total > 1 ? candidates[(index - 1 + total) % total] : undefined;
+  const next = total > 1 ? candidates[(index + 1) % total] : undefined;
   const rank = index + 1;
   const detailOpen =
     detailPreference === 'default' ? isXl : detailPreference === 'open';
+  const selectPrevious =
+    previous === undefined
+      ? null
+      : (): void => {
+          onSelect(previous.record.dpeNumber);
+        };
+  const selectNext =
+    next === undefined
+      ? null
+      : (): void => {
+          onSelect(next.record.dpeNumber);
+        };
   const padding = isLg && !isXl && detailOpen ? PANEL_CLEARANCE : NO_CLEARANCE;
 
   // why: the search form is not part of this view, so keyboard focus would
@@ -147,20 +159,8 @@ export function ResultsWorkspace({
     <ResultDetailPanel
       candidate={shown}
       rank={rank}
-      onPrevious={
-        previous === undefined
-          ? null
-          : () => {
-              onSelect(previous.record.dpeNumber);
-            }
-      }
-      onNext={
-        next === undefined
-          ? null
-          : () => {
-              onSelect(next.record.dpeNumber);
-            }
-      }
+      onPrevious={selectPrevious}
+      onNext={selectNext}
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
       listing={listing.fields}
@@ -185,7 +185,7 @@ export function ResultsWorkspace({
               {t('resultsNewSearch')}
             </Button>
             <AnalysedListingCard listing={listing} />
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex min-h-7 items-center justify-between gap-2">
               <h2
                 id="results-heading"
                 ref={headingRef}
@@ -194,37 +194,14 @@ export function ResultsWorkspace({
               >
                 {t('addressHeading')}
               </h2>
-              <div className="flex items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('addressPrevious')}
-                  disabled={previous === undefined}
-                  focusableWhenDisabled
-                  onClick={() => {
-                    if (previous !== undefined) {
-                      onSelect(previous.record.dpeNumber);
-                    }
-                  }}
-                >
-                  <ChevronLeft />
-                </Button>
-                <span className="min-w-10 text-center text-[12px] tabular-nums text-muted-foreground">
-                  {t('addressPager', { index: rank, total: candidates.length })}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={t('addressNext')}
-                  disabled={next === undefined}
-                  focusableWhenDisabled
-                  onClick={() => {
-                    if (next !== undefined) onSelect(next.record.dpeNumber);
-                  }}
-                >
-                  <ChevronRight />
-                </Button>
-              </div>
+              {detailOpen && selectPrevious !== null && selectNext !== null && (
+                <ResultsPager
+                  rank={rank}
+                  total={total}
+                  onPrevious={selectPrevious}
+                  onNext={selectNext}
+                />
+              )}
             </div>
             {needsVerification(match) && (
               <Alert role="status">
