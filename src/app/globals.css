@@ -102,6 +102,7 @@
   --color-destructive: var(--destructive);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-ring: var(--ring);
 
   /* Design-token utilities (bg-charcoal, text-ink, border-stone, etc.) */
   --color-linen: var(--linen);
