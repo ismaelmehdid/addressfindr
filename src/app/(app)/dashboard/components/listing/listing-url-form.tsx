@@ -1,31 +1,25 @@
 'use client';
 
-import { ArrowRight, MapPin, MapPinOff } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type FormEvent, useRef, useState } from 'react';
+import { type FormEvent, useEffect, useRef, useState } from 'react';
 import * as v from 'valibot';
 import { AddressMatchSchema } from '@/application/ademe/dto';
 import { ExtractedListingSchema } from '@/application/listing/dto';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { candidateOnMap, mapOverview } from '@/core/ademe/candidate-on-map';
-import type { AddressCandidate, AddressMatch } from '@/core/ademe/types';
-import type { GeoPoint } from '@/core/geo/types';
-import {
-  EXTRACTED_FIELD_NAMES,
-  type ExtractedListing,
-} from '@/core/listing/types';
+import { candidateOnMap } from '@/core/ademe/candidate-on-map';
+import type { AddressMatch } from '@/core/ademe/types';
+import type { ExtractedListing } from '@/core/listing/types';
 import {
   type ListingUrlRejection,
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
-import { AddressCandidateList } from './address-candidate-list';
 import {
-  AddressResultsMap,
-  MAP_LAYOUT_CLASS,
-  SEARCH_OVERLAY_CLASS,
-} from './address-results-map';
+  type DetailPreference,
+  mapAvailability,
+  ResultsWorkspace,
+} from './results-workspace';
 
 const REJECTION_KEY = {
   empty: 'errorEmpty',
@@ -33,16 +27,11 @@ const REJECTION_KEY = {
   'unsupported-portal': 'errorUnsupportedPortal',
 } as const satisfies Record<ListingUrlRejection, string>;
 
-type ExtractionFailure =
-  | 'not-extractable'
-  | 'rate-limited'
-  | 'signed-out'
-  | 'unknown';
+type ExtractionFailure = 'not-extractable' | 'rate-limited' | 'unknown';
 
 const FAILURE_KEY = {
   'not-extractable': 'errorNotExtractable',
   'rate-limited': 'errorRateLimited',
-  'signed-out': 'errorSignedOut',
   unknown: 'errorUnknown',
 } as const satisfies Record<ExtractionFailure, string>;
 
@@ -88,7 +77,6 @@ function toFailure(body: unknown): ExtractionFailure {
   const code = errorCode(body);
   if (code === 'validation') return 'not-extractable';
   if (code === 'rate_limited') return 'rate-limited';
-  if (code === 'unauthorized' || code === 'forbidden') return 'signed-out';
   return 'unknown';
 }
 
@@ -146,50 +134,15 @@ async function requestMatch(listing: ExtractedListing): Promise<MatchOutcome> {
   return { ok: true, match: parsed.output };
 }
 
-const NAME_WIDTH = 16;
-const VALUE_WIDTH = 24;
+type FoundResult = { listing: ExtractedListing; match: AddressMatch };
 
-function formatExtraction(listing: ExtractedListing): string {
-  const header = [
-    `${'portal'.padEnd(NAME_WIDTH)}${listing.fields.portal}`,
-    `${'canonicalUrl'.padEnd(NAME_WIDTH)}${listing.fields.canonicalUrl}`,
-  ];
-  const rows = EXTRACTED_FIELD_NAMES.map((name) => {
-    const value = listing.fields[name];
-    const printed = value === null ? 'null' : String(value);
-    return `${name.padEnd(NAME_WIDTH)}${printed.padEnd(VALUE_WIDTH)}${listing.sources[name]}`;
-  });
-  return [...header, '', ...rows].join('\n');
-}
-
-type MappedResult = {
-  listing: ExtractedListing;
-  match: AddressMatch;
-  overview: GeoPoint;
-};
-
-// why: the fullscreen map only opens when it can show something reliable: a
-// Mapbox token, a map this browser can draw, candidates, and at least one
-// geocoded point among them. Otherwise the list shows alone, without a map.
-function mappedResult({
-  status,
-  mapboxAccessToken,
-  mapFailed,
-}: {
-  status: Status;
-  mapboxAccessToken: string;
-  mapFailed: boolean;
-}): MappedResult | null {
-  if (mapboxAccessToken.length === 0 || mapFailed) return null;
+function foundResult(status: Status): FoundResult | null {
   if (status.kind !== 'extracted' || status.match.kind !== 'found') {
     return null;
   }
-
   const { match } = status.match;
-  if (match.refusedFor !== null) return null;
-  const overview = mapOverview(match.candidates);
-  if (overview === null) return null;
-  return { listing: status.listing, match, overview };
+  if (match.refusedFor !== null || match.candidates.length === 0) return null;
+  return { listing: status.listing, match };
 }
 
 type Selection = { dpeNumber: string | null; request: number };
@@ -198,6 +151,7 @@ const INITIAL_SELECTION: Selection = { dpeNumber: null, request: 0 };
 
 const COLUMN_LAYOUT_CLASS =
   'flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8';
+const WORKSPACE_LAYOUT_CLASS = 'relative flex min-h-0 flex-1 flex-col';
 
 export function ListingUrlForm({
   mapboxAccessToken,
@@ -211,8 +165,31 @@ export function ListingUrlForm({
   const [rejection, setRejection] = useState<ListingUrlRejection | null>(null);
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const [selection, setSelection] = useState<Selection>(INITIAL_SELECTION);
+  const [detailPreference, setDetailPreference] =
+    useState<DetailPreference>('default');
   const [mapFailed, setMapFailed] = useState(false);
+  const [searchFocusRequest, setSearchFocusRequest] = useState(0);
   const latestSubmission = useRef(0);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (searchFocusRequest > 0) inputRef.current?.focus();
+  }, [searchFocusRequest]);
+
+  function resetResult(): void {
+    setSelection(INITIAL_SELECTION);
+    setDetailPreference('default');
+    setMapFailed(false);
+  }
+
+  function startNewSearch(): void {
+    latestSubmission.current += 1;
+    resetResult();
+    setUrl('');
+    setRejection(null);
+    setStatus({ kind: 'idle' });
+    setSearchFocusRequest((current) => current + 1);
+  }
 
   async function handleSubmit(
     event: FormEvent<HTMLFormElement>,
@@ -231,8 +208,7 @@ export function ListingUrlForm({
     latestSubmission.current += 1;
     const submission = latestSubmission.current;
     setRejection(null);
-    setSelection(INITIAL_SELECTION);
-    setMapFailed(false);
+    resetResult();
     setStatus({ kind: 'pending' });
 
     const outcome = await requestExtraction(validated.canonicalUrl);
@@ -269,52 +245,57 @@ export function ListingUrlForm({
           ? t('analyzing')
           : null;
 
-  const mapped = mappedResult({ status, mapboxAccessToken, mapFailed });
+  const found = foundResult(status);
   const shown =
-    mapped === null
+    found === null
       ? null
-      : candidateOnMap(mapped.match.candidates, selection.dpeNumber);
-  const onMap = mapped !== null && shown !== null;
+      : candidateOnMap(found.match.candidates, selection.dpeNumber);
 
-  // why: the form keeps the same place in the React tree in both layouts.
-  // Remounting it on each switch would lose keyboard focus.
+  // why: the live region is the last child of the same root element in both
+  // layouts, so it never unmounts and the result is announced when it lands.
   return (
-    <div className={onMap ? MAP_LAYOUT_CLASS : COLUMN_LAYOUT_CLASS}>
-      {onMap && (
-        <AddressResultsMap
-          match={mapped.match}
-          overview={mapped.overview}
+    <div
+      className={
+        found !== null && shown !== null
+          ? WORKSPACE_LAYOUT_CLASS
+          : COLUMN_LAYOUT_CLASS
+      }
+    >
+      {found !== null && shown !== null ? (
+        <ResultsWorkspace
+          listing={found.listing}
+          match={found.match}
           shown={shown}
           focusRequest={selection.request}
+          detailPreference={detailPreference}
+          map={mapAvailability({
+            candidates: found.match.candidates,
+            mapboxAccessToken,
+            mapFailed,
+          })}
+          accessToken={mapboxAccessToken}
+          streetViewEnabled={streetViewEnabled}
           onSelect={(dpeNumber) => {
             setSelection((current) => ({
               dpeNumber,
               request: current.request + 1,
             }));
+            setDetailPreference('open');
+          }}
+          onCloseDetail={() => {
+            setDetailPreference('closed');
           }}
           onMapFailure={() => {
             setMapFailed(true);
           }}
-          accessToken={mapboxAccessToken}
-          extraction={formatExtraction(mapped.listing)}
-          streetViewEnabled={streetViewEnabled}
+          onNewSearch={startNewSearch}
         />
-      )}
-      <div className={onMap ? SEARCH_OVERLAY_CLASS : 'w-full max-w-xl'}>
-        {!onMap && (
+      ) : (
+        <div className="w-full max-w-xl">
           <h1 className="text-center text-[22px] font-semibold leading-[1.3] tracking-[-0.18px] text-ink">
             {t('heading')}
           </h1>
-        )}
-        <Card
-          size="sm"
-          className={
-            onMap
-              ? 'gap-0 py-2 shadow-md'
-              : 'mt-6 gap-0 overflow-visible rounded-none bg-transparent py-0 ring-0'
-          }
-        >
-          <CardContent className={onMap ? 'px-2' : 'px-0'}>
+          <div className="mt-6">
             <form
               onSubmit={(event) => {
                 void handleSubmit(event);
@@ -323,6 +304,7 @@ export function ListingUrlForm({
             >
               <div className="flex-1">
                 <Input
+                  ref={inputRef}
                   type="url"
                   inputMode="url"
                   autoComplete="off"
@@ -331,8 +313,6 @@ export function ListingUrlForm({
                   onChange={(event) => {
                     setUrl(event.target.value);
                     setRejection(null);
-                    // why: typing a new URL does not discard the result on screen;
-                    // only a new submission replaces it.
                     setStatus((current) =>
                       current.kind === 'failed' ? { kind: 'idle' } : current,
                     );
@@ -369,47 +349,17 @@ export function ListingUrlForm({
                 {message}
               </p>
             )}
-            {onMap && (
-              <p
-                aria-live="polite"
-                className="mt-2 flex items-start gap-1.5 px-0.5 text-[12px] leading-[1.4] text-muted-foreground"
-              >
-                {shown.record.point === null ? (
-                  <MapPinOff className="mt-px size-3.5 shrink-0" aria-hidden />
-                ) : (
-                  <MapPin className="mt-px size-3.5 shrink-0" aria-hidden />
-                )}
-                {shown.record.point === null
-                  ? t('mapNoTrustedPoint', { address: shown.record.address })
-                  : t('mapPinned', { address: shown.record.address })}
-              </p>
-            )}
-          </CardContent>
-        </Card>
-        {!onMap && status.kind === 'extracted' && (
-          <>
-            <AddressSection
-              state={status.match}
-              mapboxAccessToken={mapboxAccessToken}
-              mapFailed={mapFailed}
-              streetViewEnabled={streetViewEnabled}
-            />
-            <section aria-live="polite" className="mt-6">
-              <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
-                {t('resultHeading')}
-              </h2>
-              <pre className="mt-2 overflow-x-auto rounded-lg border border-border bg-card p-3 font-mono text-[12px] leading-[1.6] text-ink">
-                {formatExtraction(status.listing)}
-              </pre>
-            </section>
-          </>
-        )}
-      </div>
+          </div>
+          {status.kind === 'extracted' && (
+            <AddressSection state={status.match} />
+          )}
+        </div>
+      )}
       <p className="sr-only" aria-live="polite">
-        {onMap
+        {found !== null
           ? t('addressFoundAnnouncement', {
-              count: mapped.match.candidates.length,
-              address: firstAddress(mapped.match.candidates),
+              count: found.match.candidates.length,
+              address: found.match.candidates[0]?.record.address ?? '',
             })
           : ''}
       </p>
@@ -417,21 +367,7 @@ export function ListingUrlForm({
   );
 }
 
-function firstAddress(candidates: readonly AddressCandidate[]): string {
-  return candidates[0]?.record.address ?? '';
-}
-
-function AddressSection({
-  state,
-  mapboxAccessToken,
-  mapFailed,
-  streetViewEnabled,
-}: {
-  state: MatchState;
-  mapboxAccessToken: string;
-  mapFailed: boolean;
-  streetViewEnabled: boolean;
-}) {
+function AddressSection({ state }: { state: MatchState }) {
   const t = useTranslations('Listing');
 
   return (
@@ -450,71 +386,12 @@ function AddressSection({
         </p>
       )}
       {state.kind === 'found' && (
-        <UnmappedAddressList
-          match={state.match}
-          mapboxAccessToken={mapboxAccessToken}
-          mapFailed={mapFailed}
-          streetViewEnabled={streetViewEnabled}
-        />
+        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
+          {state.match.refusedFor === 'insufficient-evidence'
+            ? t('addressInsufficientEvidence')
+            : t('addressNone')}
+        </p>
       )}
     </section>
-  );
-}
-
-function UnmappedAddressList({
-  match,
-  mapboxAccessToken,
-  mapFailed,
-  streetViewEnabled,
-}: {
-  match: AddressMatch;
-  mapboxAccessToken: string;
-  mapFailed: boolean;
-  streetViewEnabled: boolean;
-}) {
-  const t = useTranslations('Listing');
-
-  if (match.refusedFor === 'insufficient-evidence') {
-    return (
-      <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-        {t('addressInsufficientEvidence')}
-      </p>
-    );
-  }
-
-  const [first] = match.candidates;
-  if (first === undefined) {
-    return (
-      <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-        {t('addressNone')}
-      </p>
-    );
-  }
-
-  const mapNotice =
-    mapboxAccessToken.length === 0
-      ? t('mapUnavailable')
-      : mapFailed
-        ? t('mapFailed')
-        : t('mapNoTrustedPoint', { address: first.record.address });
-
-  return (
-    <>
-      <p className="mt-2 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {mapNotice}
-      </p>
-      <div className="mt-3">
-        <AddressCandidateList
-          candidates={match.candidates}
-          shownDpeNumber={first.record.dpeNumber}
-          streetViewEnabled={streetViewEnabled}
-        />
-      </div>
-      <p className="mt-3 text-[12px] tracking-[-0.08px] text-slate-neutral">
-        {match.truncated
-          ? t('addressTruncated', { inspected: match.inspected })
-          : t('addressInspected', { inspected: match.inspected })}
-      </p>
-    </>
   );
 }

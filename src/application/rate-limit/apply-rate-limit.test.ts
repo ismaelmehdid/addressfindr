@@ -40,6 +40,7 @@ beforeEach(() => {
   (globalThis as Record<string, unknown>).uploadRatelimit = undefined;
   (globalThis as Record<string, unknown>).listingExtractRatelimit = undefined;
   (globalThis as Record<string, unknown>).streetViewRatelimit = undefined;
+  (globalThis as Record<string, unknown>).listingFeedbackRatelimit = undefined;
   limiters.prefixes = [];
 });
 
@@ -73,5 +74,20 @@ describe('applyRateLimit', () => {
       'app:ratelimit:listing-extract',
       'app:ratelimit:street-view',
     ]);
+  });
+
+  it('keys listing feedback on its own counter', async () => {
+    envMock.NODE_ENV = 'production';
+    vi.mocked(getRedisClient).mockReturnValue(
+      {} as ReturnType<typeof getRedisClient>,
+    );
+
+    const r = await applyRateLimit({
+      identifier: 'ip:203.0.113.7',
+      limit: 'listing-feedback',
+    });
+
+    expect(r.success).toBe(true);
+    expect(limiters.prefixes).toEqual(['app:ratelimit:listing-feedback']);
   });
 });

@@ -6,7 +6,7 @@ This is a real system with real users.
 > Build code that is **correct, simple, and maintainable**.
 > **Correctness > cleverness · Simplicity > abstraction · Explicitness > magic · Consistency > preference.**
 
-Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth and file upload + RAG indexing. **The product is built on top of that base — it does not replace it.**
+Single Next.js app, built on a reusable startup boilerplate. The boilerplate provides auth and file upload + RAG indexing. **The product is built on top of that base — it does not replace it.** The app shows no account UI: auth and billing stay in the codebase, dormant, and the tool is the home page.
 
 The user-facing brand is still undecided, so **never hard-code a product name in user-visible copy**; everything user-facing goes through `next-intl`.
 
@@ -48,8 +48,8 @@ This is why, throughout the `listing` domain:
 
 ### Current state
 
-- **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring over both DPE registers, via data.ademe.fr), and the dashboard UI that chains extract → match.
-- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area), the BAN geocoder of the IGN Géoplateforme (`data.geopf.fr/geocodage`, to verify addresses ADEME never geocoded). All free, public, keyless. Display only: Mapbox (map) and Google Street View (card photos), both keyed and billed. Otherwise the BAN is consumed through ADEME's `*_ban` columns.
+- **Built:** the whole pipeline. `listing` (ingestion + extraction, `URL → normalised fields + per-field provenance`), `commune` (postal code / INSEE → commune, via geo.api.gouv.fr), `ademe` (candidate generation + scoring over both DPE registers, via data.ademe.fr), and the dashboard UI that chains extract → match, and a feedback loop: "C'est ce logement" / "Aucun emplacement ne correspond" stored in the `listing_feedback` table through `/api/listings/feedback` (no personal data; one verdict per displayed result, idempotent).
+- **Sources:** ADEME (both DPE registers), geo.api.gouv.fr (commune), BDNB/CSTB (building year and floors), DGFiP cadastre via apicarto IGN (plot area), the BAN geocoder of the IGN Géoplateforme (`data.geopf.fr/geocodage`, to verify addresses ADEME never geocoded). All free, public, keyless. Display only: Mapbox (map) and Google Street View (card photos), both keyed and billed, and the IGN Géoplateforme orthophoto (WMS `ORTHOIMAGERY.ORTHOPHOTOS`, free, keyless) as the photo fallback around a trusted point. Outbound link only: villedereve.fr ("Vie de la commune", a municipal arrondissement links to its parent commune). Otherwise the BAN is consumed through ADEME's `*_ban` columns.
 - **Ground truth:** `pnpm eval:address` runs the pipeline over live pap.fr listings, hides their published street and reports at what rank it comes back. It hits Firecrawl, Groq and the public APIs for real, so it is excluded from `pnpm test` and from CI. Last run: 6/6 correctly refused for lack of a discriminating signal — **but that run predates the Groq schema fix below, so the model never answered; re-measure it.**
 - **Market benchmark:** `pnpm eval:precisement` runs the listings in `test/fixtures/precisement-benchmark-urls.txt` through our pipeline and through precisement.fr's public search API, and reports whether both return the same first address. Scraped pages and their answers are cached in `.benchmark/` (gitignored), so reruns cost no Firecrawl credit and send them no request. Manual only, never in CI. Model quotes are cached there too, so a rerun spends Groq tokens only on sources it has not read. Last complete run (2026-09-24, 25 leboncoin listings): **21/25 same #1**, up from 6/25 — with 6 extractions lost to the Groq schema failure below, since retried. Later runs that day were invalidated by a data.ademe.fr outage and then by the exhausted Groq daily quota.
 - **Not started:** the `__NUXT__` mapping for the two lefigaro portals. Needs one real listing URL to inspect — Firecrawl only ever returns lefigaro's search page as nav chrome, so the payload paths cannot be mapped without one.
@@ -113,7 +113,7 @@ Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`,
 - **Métropole has sentinels too.** 24 Lyon rows sit at `-5.98,-1.36` (Atlantic off Ghana) with `adresse_ban = null` and `score_ban = 0.88`. 0.5% of all rows fall outside France.
 - The gate that follows lives in `core/geo/resolve-mappable-point.ts`: status, then overseas postal code, then a métropole bounding box. **No pin beats a wrong pin.**
 - **The map speaks for the top-ranked candidate only** (`core/ademe/candidate-on-map.ts`). When #1 has no trusted point, no pin is shown — pinning #2 by default would put a different address on the map than the answer. Another candidate is pinned only when the user picks it, and the pinned address is always named above the map. A picked candidate without a trusted point is honoured too: the pin disappears and the map rests on the commune (`mapOverview`), it never stays on the previous address.
-- **The results view is a fullscreen map** with the candidate cards overlaid on the right (stacked below the map under `md`). It only opens when a token is set, WebGL works and at least one candidate has a trusted point; otherwise the list shows alone.
+- **The results view is a three-panel workspace** matching precisement.fr: the analysed listing and the ranked cards on the left, the map, and the selected result's detail (photo, score, address, energy labels, fact tiles with ✓ only when the value agrees with the listing's own (surface within 1 m²), verify-elsewhere links, "C'est ce logement") on the right; the detail floats over the map between `lg` and `xl` and becomes a bottom sheet below `lg`. It never shows how a candidate was scored. There are no accounts in the UI. When no map can be drawn the map region shows a notice and the rest works.
 - **Street View photos only ever point at a trusted point.** A candidate without one gets no photo. The free metadata call runs first, so an image is only billed when a panorama exists within 50 m; without `heading`, Google aims the camera at the point.
 
 ---
@@ -176,7 +176,7 @@ Measured on 25 live leboncoin listings (Lyon, Bordeaux, Nantes, houses around To
 
 - **Runtime**: Next.js 16 (App Router) · React 19 · TypeScript 6
 - **DB / data**: Drizzle ORM + Postgres · Supabase Storage (file objects) · ZeroEntropy (RAG vector store) · Upstash Redis (rate-limit / cache)
-- **Auth**: Better Auth (Google + Microsoft OAuth)
+- **Auth**: Better Auth (Google + Microsoft OAuth) — server side only, dormant: the app has no sign-in, settings or paywall UI
 - **Validation**: **valibot 1.x** (schemas at every boundary)
 - **Errors**: **neverthrow** `Result<T, AppError>`
 - **i18n**: **next-intl** — keys in `src/i18n/messages/{en,fr}.json`; `t('missing.key')` is a compile error via `IntlMessages` augmentation in `src/global.d.ts`
@@ -209,8 +209,8 @@ src/
     external-apis/   Mastra agents + tools, OpenAI, ZeroEntropy, Brave, …
     auth/            Better Auth (server + client)
   app/               Next.js App Router UI
-    (public)/        unauthenticated routes
-    (app)/           authenticated routes (gated by layout.tsx)
+    (public)/        `/` (redirects to `/dashboard`) and the public error pages
+    (app)/           the dashboard — the tool itself, open to anonymous visitors
     api/             route handlers — the ONLY server entry point (chat stream, files, conversations, cron, …)
     auth/[...all]/   Better Auth handler
   shared/            logger, env, telemetry, errors-http, utils
@@ -282,7 +282,7 @@ Domains and their tables:
 | `indexing` | `zeroentropy_*`, `failed_sync_operation` | `entity-sync-orchestrator`, `query-snippets` |
 | `chat` | none (Mastra runtime owns its PG tables) | — |
 | `transcription` / `url-fetch` / `web-search` | none | their single `application/<domain>/*` use case |
-| `listing` | none | `application/listing/*` use cases, `core/listing/types` |
+| `listing` | `listing_feedback` | `application/listing/*` use cases, `core/listing/types` |
 | `commune` | none | `application/commune/resolve-commune`, `core/commune/types` |
 | `ademe` | none | `application/ademe/find-address-candidates`, `application/ademe/dto`, `core/ademe/types` |
 | `street-view` | none | `core/street-view/links` (the UI builds the `/api/street-view` photo URL and the outbound Google Maps panorama link) |
@@ -326,7 +326,7 @@ Rules the checker enforces:
 
 ### UI
 
-- **Sidebar stays collapsed (icon-rail only)** in this app — deliberate stylistic choice, never propose expanding it.
+- **No sidebar and no account UI.** The dashboard layout is a plain full-height `<main>`; there is no sign-in page, sign-out, settings, profile, paywall or language switcher. Auth and billing stay in the backend, dormant — do not add account UI back unless asked.
 - shadcn primitives in `src/components/ui/*` — copy patterns from there. Reuse `cn()` from `src/lib/utils.ts`.
 - Design language lives in `DESIGN.md` — light-mode, layered off-whites, one accent color.
 - No emojis in code/files unless the user asks.
@@ -351,7 +351,7 @@ Rules the checker enforces:
 
 ## i18n
 
-- Default `fr`, fallback `en`. No `[locale]` in URLs — locale comes from `LOCALE` cookie.
+- Default `fr`, fallback `en`. No `[locale]` in URLs — locale comes from `LOCALE` cookie. Nothing in the UI sets it (there is no language switcher); `/api/locale` still does if called.
 - **Type-source-of-truth: `src/i18n/messages/en.json`.** All other locales must mirror its shape.
 - `IntlMessages` augmentation in `src/global.d.ts` turns missing keys into compile errors.
 

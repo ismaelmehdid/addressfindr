@@ -1,48 +1,24 @@
 'use client';
 
-import { ArrowUpRight, MapPinOff } from 'lucide-react';
+import { House, MapPinOff } from 'lucide-react';
 import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import type { AddressCandidate, MatchSignal } from '@/core/ademe/types';
-import {
-  streetViewImagePath,
-  streetViewPanoramaUrl,
-} from '@/core/street-view/links';
+import { reliableFloor, streetLine } from '@/core/ademe/record-facts';
+import { scoreBand, scoreFromConfidence } from '@/core/ademe/score-scale';
+import type { AddressCandidate } from '@/core/ademe/types';
 import { cn } from '@/lib/utils';
-
-const SIGNAL_KEY = {
-  surfaceM2: 'signalSurface',
-  dpeClass: 'signalDpeClass',
-  gesClass: 'signalGesClass',
-  dpeKwhM2Year: 'signalDpeValue',
-  gesKgCo2M2Year: 'signalGesValue',
-  heatingEnergy: 'signalHeating',
-  yearBuilt: 'signalYearBuilt',
-  buildingFloors: 'signalBuildingFloors',
-  landSurfaceM2: 'signalLandSurface',
-  floor: 'signalFloor',
-  annualEnergyCost: 'signalEnergyCost',
-  dpeDate: 'signalDpeDate',
-  pinDistance: 'signalPin',
-} as const satisfies Record<MatchSignal, string>;
+import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
+import { useCandidatePhoto } from './use-candidate-photo';
 
 type CardOptions = {
-  shownDpeNumber: string | null;
-  onSelect?: (dpeNumber: string) => void;
+  selectedDpeNumber: string | null;
+  onSelect: (dpeNumber: string) => void;
   streetViewEnabled: boolean;
 };
 
@@ -94,46 +70,61 @@ export function AddressCandidateList({
   );
 }
 
+function RankBadge({ rank }: { rank: number }) {
+  return (
+    <Badge className="size-6 rounded-full bg-(--score) p-0 text-[12px] font-semibold text-(--score-ink) tabular-nums shadow-sm">
+      {rank}
+    </Badge>
+  );
+}
+
+function ScorePill({ score }: { score: number }) {
+  const t = useTranslations('Listing');
+
+  return (
+    <Badge className="h-6 rounded-full bg-(--score) px-2 text-[12px] font-semibold text-(--score-ink) tabular-nums shadow-sm">
+      {t.rich('addressScore', {
+        score,
+        muted: (chunks) => <span className="font-medium">{chunks}</span>,
+      })}
+      <span className="sr-only">{t(SCORE_LABEL_KEY[scoreBand(score)])}</span>
+    </Badge>
+  );
+}
+
 function CandidateCard({
   candidate,
   rank,
-  shownDpeNumber,
+  selectedDpeNumber,
   onSelect,
   streetViewEnabled,
 }: CardOptions & { candidate: AddressCandidate; rank: number }) {
   const t = useTranslations('Listing');
   const format = useFormatter();
   const cardRef = useRef<HTMLDivElement | null>(null);
-  const [photoFailed, setPhotoFailed] = useState(false);
   const { record } = candidate;
-  const isShown = record.dpeNumber === shownDpeNumber;
-  const emphasised = rank === 1 || isShown;
-  const selectable = onSelect !== undefined;
-  const score = Math.round(candidate.confidence * 100);
-
-  const wasShown = useRef(isShown);
+  const { photo, onPhotoError } = useCandidatePhoto({
+    point: record.point,
+    streetViewEnabled,
+  });
+  const selected = record.dpeNumber === selectedDpeNumber;
+  const dimmed = selectedDpeNumber !== null && !selected;
+  const score = scoreFromConfidence(candidate.confidence);
+  const floor = reliableFloor(record);
+  const wasSelected = useRef(selected);
 
   // why: scroll only when the selection arrives on this card. On first render
   // the top card is already at the top; scrolling would hide the section title
   // on a phone, where a card is taller than the panel.
   useEffect(() => {
-    if (isShown && !wasShown.current && selectable) {
+    if (selected && !wasSelected.current) {
       cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     }
-    wasShown.current = isShown;
-  }, [isShown, selectable]);
+    wasSelected.current = selected;
+  }, [selected]);
 
-  const title =
-    record.street === null
-      ? record.address
-      : [record.streetNumber, record.street]
-          .filter((part) => part !== null)
-          .join(' ');
-  const place = [record.postalCode, record.city]
-    .filter((part) => part !== null)
-    .join(' ');
-  const facts = [
-    place.length > 0 ? place : null,
+  const meta = [
+    record.city,
     record.propertyType === 'apartment'
       ? t('addressPropertyApartment')
       : record.propertyType === 'house'
@@ -146,115 +137,129 @@ function CandidateCard({
             maximumFractionDigits: 1,
           }),
         }),
+    floor === null ? null : t('addressFloor', { floor }),
+    record.landSurfaceM2 === null
+      ? null
+      : t('addressLand', {
+          surface: format.number(record.landSurfaceM2, {
+            maximumFractionDigits: 0,
+          }),
+        }),
     record.yearBuilt === null
       ? null
-      : t('addressYearBuilt', { year: String(record.yearBuilt) }),
+      : t('cardYearBuilt', {
+          year: String(record.yearBuilt),
+          type: record.propertyType ?? 'unknown',
+        }),
   ].filter((fact) => fact !== null);
-
-  const body = (
-    <>
-      {streetViewEnabled && record.point !== null && !photoFailed && (
-        <div className="relative aspect-[2/1]">
-          <Skeleton className="absolute inset-0 rounded-none" />
-          <Image
-            unoptimized
-            fill
-            sizes="400px"
-            src={streetViewImagePath(record.point)}
-            alt={t('streetViewAlt', { address: record.address })}
-            onError={() => {
-              setPhotoFailed(true);
-            }}
-            className={cn('object-cover', !emphasised && 'saturate-50')}
-          />
-          <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
-            {t('streetViewBadge')}
-          </Badge>
-        </div>
-      )}
-      <CardHeader className="pt-3">
-        <CardTitle className="flex items-center gap-2 text-[15px] font-semibold">
-          <Badge variant={emphasised ? 'default' : 'secondary'}>{rank}</Badge>
-          {title}
-        </CardTitle>
-        {facts.length > 0 && (
-          <CardDescription>{facts.join(' · ')}</CardDescription>
-        )}
-        <CardAction>
-          <Badge variant="outline" className="tabular-nums">
-            {t.rich('addressScore', {
-              score,
-              muted: (chunks) => (
-                <span className="text-muted-foreground">{chunks}</span>
-              ),
-            })}
-          </Badge>
-        </CardAction>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-2 pb-3">
-        <Progress value={score} aria-hidden />
-        <p className="text-[12px] leading-[1.5] text-muted-foreground">
-          {t('addressSupport', { count: candidate.supportingRecords })}
-          {' · '}
-          {t('addressMatchedOn', {
-            signals: candidate.matched
-              .map((signal) => t(SIGNAL_KEY[signal]))
-              .join(', '),
-          })}
-        </p>
-        {candidate.diverged.length > 0 && (
-          <p className="text-[12px] leading-[1.5] text-destructive">
-            {t('addressDivergedOn', {
-              signals: candidate.diverged
-                .map((signal) => t(SIGNAL_KEY[signal]))
-                .join(', '),
-            })}
-          </p>
-        )}
-        {record.point === null && (
-          <p className="flex items-center gap-1 text-[12px] text-muted-foreground">
-            <MapPinOff className="size-3 shrink-0" aria-hidden />
-            {t('addressNoPoint')}
-          </p>
-        )}
-      </CardContent>
-    </>
-  );
 
   return (
     <Card
       ref={cardRef}
       size="sm"
-      className={cn('gap-0 py-0', isShown && 'ring-2 ring-primary')}
+      style={scoreStyle(score)}
+      className={cn(
+        // why: the primitive's data-[size=sm] spacing outranks a plain override
+        'gap-0 py-0 data-[size=sm]:gap-0 data-[size=sm]:py-0 transition-[opacity,background-color,box-shadow]',
+        // why: the Card clips the button's own focus ring (overflow-hidden,
+        // no padding), so the focus outline is drawn on the Card, outside
+        // the clip and clear of the selected card's score ring.
+        'has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-charcoal',
+        selected && 'bg-(--score-tint) ring-2 ring-(--score)',
+        dimmed &&
+          'lg:opacity-60 lg:hover:opacity-100 lg:has-focus-visible:opacity-100',
+      )}
     >
-      {onSelect === undefined ? (
-        body
-      ) : (
-        <button
-          type="button"
-          aria-current={isShown ? 'true' : undefined}
-          onClick={() => {
-            onSelect(record.dpeNumber);
-          }}
-          className="flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-muted/50 focus-visible:bg-muted"
-        >
-          {body}
-        </button>
-      )}
-      {isShown && record.point !== null && (
-        <CardFooter className="border-t-0 bg-transparent pt-0">
-          <a
-            href={streetViewPanoramaUrl(record.point)}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={t('addressVerifyLabel', { address: record.address })}
-            className={buttonVariants({ size: 'lg', className: 'w-full' })}
+      <button
+        type="button"
+        aria-current={selected ? 'true' : undefined}
+        onClick={() => {
+          onSelect(record.dpeNumber);
+        }}
+        className="group/candidate flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3"
+      >
+        {photo.kind === 'none' ? (
+          <div className="flex h-[172px] w-full items-center justify-center bg-mist">
+            <House
+              aria-hidden
+              className="size-8 text-pebble"
+              strokeWidth={1.25}
+            />
+          </div>
+        ) : (
+          <div className="relative h-[172px] w-full overflow-hidden bg-mist">
+            <Skeleton className="absolute inset-0 rounded-none" />
+            <Image
+              key={photo.src}
+              unoptimized
+              fill
+              sizes="360px"
+              src={photo.src}
+              alt={
+                photo.kind === 'street-view'
+                  ? t('streetViewAlt', { address: record.address })
+                  : t('aerialAlt', { address: record.address })
+              }
+              onError={onPhotoError}
+              className="object-cover"
+            />
+            <span className="absolute top-2.5 left-2.5">
+              <RankBadge rank={rank} />
+            </span>
+            <span className="absolute top-2.5 right-2.5">
+              <ScorePill score={score} />
+            </span>
+            <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
+              {photo.kind === 'street-view'
+                ? t('streetViewBadge')
+                : t('photoSatellite')}
+            </Badge>
+          </div>
+        )}
+        <CardHeader className="pt-3">
+          {photo.kind === 'none' && (
+            <div className="mb-1 flex items-center justify-between gap-2">
+              <RankBadge rank={rank} />
+              <ScorePill score={score} />
+            </div>
+          )}
+          <CardTitle
+            className={cn(
+              'text-[15px] leading-snug text-ink group-data-[size=sm]/card:text-[15px]',
+              selected ? 'font-semibold' : 'font-medium',
+            )}
           >
-            {t('addressVerify')}
-            <ArrowUpRight aria-hidden />
-          </a>
-        </CardFooter>
-      )}
+            {streetLine(record)}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-2 pt-2 pb-3">
+          <Progress
+            value={score}
+            aria-hidden
+            className="[&_[data-slot=progress-indicator]]:bg-(--score) [&_[data-slot=progress-track]]:bg-(--score)/20"
+          />
+          {meta.length > 0 && (
+            <p className="text-[12px] text-muted-foreground">
+              {meta.join(' · ')}
+            </p>
+          )}
+          {record.point === null && (
+            <p className="flex items-center gap-1 text-[12px] text-muted-foreground">
+              <MapPinOff className="size-3 shrink-0" aria-hidden />
+              {t('addressNoPoint')}
+            </p>
+          )}
+          {rank === 1 && (
+            <span
+              className={buttonVariants({
+                className: 'mt-1 w-full group-hover/candidate:bg-charcoal-deep',
+              })}
+            >
+              {t('cardVerify')}
+            </span>
+          )}
+        </CardContent>
+      </button>
     </Card>
   );
 }

@@ -13,7 +13,7 @@ const TRACKING_PARAMS = new Set([
   'ln',
 ]);
 
-function isTrackingParam(key: string): boolean {
+export function isTrackingParam(key: string): boolean {
   const k = key.toLowerCase();
   if (TRACKING_PARAMS.has(k)) return true;
   return TRACKING_PARAM_PREFIXES.some((p) => k.startsWith(p));

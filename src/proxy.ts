@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from 'next/server';
 const SESSION_COOKIE = 'better-auth.session_token';
 const SECURE_SESSION_COOKIE = '__Secure-better-auth.session_token';
 
-const PROTECTED_PREFIXES = ['/dashboard/settings'];
+// why: the app has no account UI, so no page requires a session.
+const PROTECTED_PREFIXES: readonly string[] = [];
 const SIGN_IN_PATH = '/sign-in';
 
 function hasSession(req: NextRequest): boolean {

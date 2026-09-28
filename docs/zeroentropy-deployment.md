@@ -201,6 +201,6 @@ Filter for `ZeroEntropy:` and `Cron retry`.
 To remove the feature cleanly:
 
 1. Drop the cron from `vercel.json`.
-2. Disable the `/dashboard/files` link in [`dashboard-sidebar.tsx`](../src/app/(app)/dashboard/components/dashboard-sidebar.tsx) (or hard-remove the page).
+2. Remove the `/dashboard/files` page if one exists (the app has no sidebar, so there is no navigation link to disable).
 3. Remove the `searchUserFiles` tool from the chat agent in [`mastra/instance.ts`](../src/infra/external-apis/mastra/instance.ts) (the agent will stop calling it; ZE collections remain intact).
 4. Optionally drop the four tables and the ZE collections — but keeping them around costs nothing and preserves indexed history for a future re-enable.

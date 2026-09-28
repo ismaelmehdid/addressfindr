@@ -18,6 +18,7 @@ const globalForRateLimit = globalThis as unknown as {
   listingExtractRatelimit: Ratelimit | null | undefined;
   listingMatchRatelimit: Ratelimit | null | undefined;
   streetViewRatelimit: Ratelimit | null | undefined;
+  listingFeedbackRatelimit: Ratelimit | null | undefined;
 };
 
 // why: Upstash keys a counter on prefix + identifier + window. With a shared
@@ -94,13 +95,26 @@ function getStreetViewRatelimit(): Ratelimit | null {
   return limiter;
 }
 
+// why: a displayed result sends at most two feedback calls, the verdict and
+// its detail. 20 a minute absorbs retries without letting one caller flood
+// the table.
+function getListingFeedbackRatelimit(): Ratelimit | null {
+  if (globalForRateLimit.listingFeedbackRatelimit !== undefined) {
+    return globalForRateLimit.listingFeedbackRatelimit;
+  }
+  const limiter = buildRatelimit('listing-feedback', 20, '1 m');
+  globalForRateLimit.listingFeedbackRatelimit = limiter;
+  return limiter;
+}
+
 export type RateLimitBucket =
   | 'default'
   | 'upload'
   | 'transcribe'
   | 'listing-extract'
   | 'listing-match'
-  | 'street-view';
+  | 'street-view'
+  | 'listing-feedback';
 
 function getLimiter(bucket: RateLimitBucket): Ratelimit | null {
   if (bucket === 'upload') return getUploadRatelimit();
@@ -108,6 +122,7 @@ function getLimiter(bucket: RateLimitBucket): Ratelimit | null {
   if (bucket === 'listing-extract') return getListingExtractRatelimit();
   if (bucket === 'listing-match') return getListingMatchRatelimit();
   if (bucket === 'street-view') return getStreetViewRatelimit();
+  if (bucket === 'listing-feedback') return getListingFeedbackRatelimit();
   return getDefaultRatelimit();
 }
 

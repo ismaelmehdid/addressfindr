@@ -6,8 +6,6 @@ export const DOMAINS = [
       'src/application/me',
       'src/application/settings',
       'src/app/auth',
-      'src/app/(public)/sign-in',
-      'src/app/(app)/dashboard/settings',
     ],
     schemas: ['src/infra/database/schema/auth-schema'],
     public: [
@@ -110,9 +108,10 @@ export const DOMAINS = [
       'src/app/(app)/dashboard/components/listing',
       'src/infra/external-apis/firecrawl',
       'src/infra/external-apis/groq',
+      'src/infra/data-access/listing-feedback',
       'src/app/api/listings',
     ],
-    schemas: [],
+    schemas: ['src/infra/database/schema/listing-feedback-schema'],
     public: [
       'src/application/listing/extract-listing',
       'src/application/listing/dto',
@@ -135,6 +134,9 @@ export const DOMAINS = [
       'src/application/ademe/dto',
       'src/core/ademe/types',
       'src/core/ademe/candidate-on-map',
+      'src/core/ademe/needs-verification',
+      'src/core/ademe/record-facts',
+      'src/core/ademe/score-scale',
     ],
   },
   {
@@ -165,8 +167,8 @@ export const DOMAINS = [
     public: ['src/core/street-view/links'],
   },
   {
-    // Coordonnees et confiance geographique, sans dependance a une source.
-    // ademe y passe ses lignes brutes, l'UI y lit le point a afficher.
+    // Coordinates and geographic trust, independent of any source.
+    // ademe feeds it raw rows; the UI reads the point to display from it.
     name: 'geo',
     dirs: [
       'src/core/geo',
@@ -177,6 +179,8 @@ export const DOMAINS = [
     public: [
       'src/core/geo/types',
       'src/core/geo/resolve-mappable-point',
+      'src/core/geo/outbound-links',
+      'src/core/geo/aerial-image',
       'src/application/geo/verify-raw-address',
     ],
   },
@@ -241,7 +245,6 @@ export const DOMAINS = [
       'src/core/billing',
       'src/application/billing',
       'src/infra/external-apis/autumn',
-      'src/app/(app)/paywall',
       'src/app/api/autumn',
       'src/app/api/billing',
     ],

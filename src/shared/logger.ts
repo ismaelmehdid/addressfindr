@@ -138,9 +138,11 @@ class GenericLogger {
 }
 
 export class DbLogger implements Logger {
+  // why: bound parameters carry user input (feedback comments, session
+  // tokens), so only their count reaches the logs.
   logQuery(query: string, params: unknown[]): void {
     if (isProduction) {
-      logger.debug({ query, params }, 'Database query');
+      logger.debug({ query, paramCount: params.length }, 'Database query');
     }
   }
 }
