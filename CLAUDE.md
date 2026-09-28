@@ -349,6 +349,17 @@ Rules the checker enforces:
 
 ---
 
+## Always use swarm orchestration patterns (TeamCreate, Task with team_name, SendMessage, TaskCreate/TaskUpdate) when work is best executed by parallel specialist agents.
+
+This means:
+
+- Spawning teams with specialized teammates for parallelizable work
+- Using the task list for coordination and progress tracking
+- Leveraging SendMessage for inter-agent communication
+- Preferring concurrent execution over sequential when tasks are independent
+
+---
+
 ## i18n
 
 - Default `fr`, fallback `en`. No `[locale]` in URLs — locale comes from `LOCALE` cookie. Nothing in the UI sets it (there is no language switcher); `/api/locale` still does if called.
