@@ -19,6 +19,9 @@ const isSecure = isProduction || e.NEXT_PUBLIC_APP_URL.startsWith('https://');
 const trustedOrigins = [e.NEXT_PUBLIC_APP_URL];
 if (!isProduction) trustedOrigins.push('http://localhost:3000');
 
+// why: dormant auth: sign-in only; the id-token path ignores disableSignUp.
+const signInOnly = { disableSignUp: true, disableIdTokenSignIn: true } as const;
+
 const microsoftClientId = e.MICROSOFT_CLIENT_ID;
 const microsoftClientSecret = e.MICROSOFT_CLIENT_SECRET;
 export const isMicrosoftAuthEnabled =
@@ -55,6 +58,7 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: false },
   socialProviders: {
     google: {
+      ...signInOnly,
       clientId: e.GOOGLE_CLIENT_ID,
       clientSecret: e.GOOGLE_CLIENT_SECRET,
       accessType: 'offline',
@@ -71,6 +75,7 @@ export const auth = betterAuth({
     ...(isMicrosoftAuthEnabled && microsoftClientId && microsoftClientSecret
       ? {
           microsoft: {
+            ...signInOnly,
             clientId: microsoftClientId,
             clientSecret: microsoftClientSecret,
             tenantId: e.MICROSOFT_TENANT_ID,

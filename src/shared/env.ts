@@ -9,6 +9,14 @@ import { BUCKETS } from '@/core/storage/types/bucket';
 const NodeEnv = v.picklist(['development', 'test', 'production']);
 const VercelEnv = v.picklist(['development', 'preview', 'production']);
 
+const DailyCap = v.pipe(
+  v.string(),
+  v.transform((s) => Number(s)),
+  v.number(),
+  v.integer(),
+  v.minValue(1),
+);
+
 const EnvSchema = v.object({
   NODE_ENV: v.optional(NodeEnv, 'development'),
   VERCEL_ENV: v.optional(VercelEnv, 'development'),
@@ -207,6 +215,12 @@ const EnvSchema = v.object({
 
   UPSTASH_REDIS_REST_URL: v.optional(v.pipe(v.string(), v.url())),
   UPSTASH_REDIS_REST_TOKEN: v.optional(v.pipe(v.string(), v.minLength(1))),
+
+  // why: Groq's on_demand tier allows about 110 extractions a day; the cap
+  // keeps every caller together under it.
+  RATE_LIMIT_DAILY_LISTING_EXTRACT: v.optional(DailyCap, '100'),
+  RATE_LIMIT_DAILY_LISTING_MATCH: v.optional(DailyCap, '500'),
+  RATE_LIMIT_DAILY_STREET_VIEW: v.optional(DailyCap, '1000'),
 
   // Payments (Autumn). Optional locally (use the dev paywall-skip); required in
   // production — enforced by assertBillingConfigured below.

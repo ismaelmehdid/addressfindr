@@ -7,8 +7,10 @@ const CODE_TO_STATUS: Record<AppErrorCode, number> = {
   not_found: 404,
   conflict: 409,
   validation: 400,
+  unsupported_media_type: 415,
   rate_limited: 429,
   external_api: 502,
+  service_unavailable: 503,
   db_error: 500,
   unknown: 500,
 };
