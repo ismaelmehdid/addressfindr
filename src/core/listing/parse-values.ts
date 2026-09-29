@@ -39,11 +39,11 @@ export function parseSurfaceM2(raw: string): number | null {
 // has. Living area and plot area read alike, and one sentence often carries
 // both ("maison de 120 m² sur un terrain de 800 m²"): comparing a living room
 // to a parcel would penalise the true house. So only an area attached to the
-// word naming the plot counts, and a quote naming the living area, its
-// footprint or levels, a garden or a terrace is refused outright.
+// word naming the plot counts, and a quote naming the living area, a garden or
+// a terrace is refused outright.
 const LAND_SUBJECT = /terrain|parcelle/gi;
 const LAND_EXCLUSIONS =
-  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine|au sol|emprise|plain[\s-]?pied|niveaux/i;
+  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine/i;
 
 const SQUARE_METRES_PER_ARE = 100;
 const SQUARE_METRES_PER_HECTARE = 10_000;
@@ -67,8 +67,12 @@ const LAND_AREAS: readonly (readonly [RegExp, number])[] = [
 const LAND_LEAD_IN = /^[^\d.;!?\n]{0,40}$/;
 const LAND_LEAD_IN_OWNED = /(?:\bde\s+|\bd['’]\s*)$/i;
 const OTHER_BUILT_SUBJECT =
-  /maison|appartement|villa|pavillon|logement|habitation|b[aâ]ti|d[ée]pendance|hangar|grange|atelier|pi[èe]ce|chambre|salon/i;
+  /maison|appartement|villa|pavillon|logement|habitation|b[aâ]ti|d[ée]pendance|hangar|grange|atelier|pi[èe]ce|chambre|salon|emprise|au sol/i;
 const LAND_TRAILER = /^\s*d(?:e\s+|['’]\s*)(?:terrain|parcelle)/i;
+// why: "120 m² au sol" or "110 m² sur deux niveaux" is the house. The words
+// disqualify the area they follow, never the plot area in the same quote.
+const BUILT_AREA_TRAILER =
+  /^\s*(?:au sol|d['’]emprise|de plain[\s-]?pied|habitables?|sur \S+ niveaux)/i;
 
 type LandArea = { start: number; end: number; squareMetres: number };
 
@@ -89,7 +93,9 @@ function landAreas(text: string): LandArea[] {
 }
 
 function isAttachedToLand(text: string, area: LandArea): boolean {
-  if (LAND_TRAILER.test(text.slice(area.end))) return true;
+  const trailer = text.slice(area.end);
+  if (BUILT_AREA_TRAILER.test(trailer)) return false;
+  if (LAND_TRAILER.test(trailer)) return true;
   for (const subject of text.matchAll(LAND_SUBJECT)) {
     const subjectEnd = subject.index + subject[0].length;
     if (subjectEnd > area.start) break;

@@ -92,6 +92,26 @@ describe('parseLandSurfaceM2', () => {
   it('refuses a footprint or level count even without a comma', () => {
     expect(parseLandSurfaceM2('Terrain arboré 120 m² au sol')).toBeNull();
     expect(parseLandSurfaceM2('Terrain avec emprise de 90 m²')).toBeNull();
+    expect(parseLandSurfaceM2('terrain avec 120 m² au sol')).toBeNull();
+  });
+
+  // why: "plain-pied", "niveaux" and "au sol" describe the house. They
+  // disqualify the area they qualify, never the plot area in the same quote.
+  it('keeps the plot area when the quote also describes the house', () => {
+    expect(
+      parseLandSurfaceM2('Maison de plain-pied sur un terrain de 1000 m²'),
+    ).toBe(1000);
+    expect(
+      parseLandSurfaceM2('Maison sur deux niveaux, terrain de 800 m²'),
+    ).toBe(800);
+    expect(parseLandSurfaceM2('plain-pied, terrain clos de 650 m²')).toBe(650);
+    expect(
+      parseLandSurfaceM2('Maison de 120 m² au sol sur terrain de 900 m²'),
+    ).toBe(900);
+    expect(
+      parseLandSurfaceM2('terrain de 1 200 m² avec maison sur 2 niveaux'),
+    ).toBe(1200);
+    expect(parseLandSurfaceM2('Plain pied sur terrain de 700 m²')).toBe(700);
   });
 
   it('keeps the plot area when another area follows it', () => {
