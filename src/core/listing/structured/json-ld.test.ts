@@ -81,4 +81,97 @@ describe('mapJsonLdToValues', () => {
     expect(values.postalCode).toBe('78250');
     expect(values.propertyType).toBe('apartment');
   });
+
+  it.each([
+    ['T2 45 m² 72000 € Hardricourt (78250)', '78250'],
+    ['Vente maison 5 pièces 120 m² 89000 € Lyon (69001)', '69001'],
+  ])('takes only the parenthesised code from the title %s, never a price', (title, expected) => {
+    const values = mapJsonLdToValues([
+      { '@type': 'RealEstateListing', name: title },
+    ]);
+    expect(values.postalCode).toBe(expected);
+  });
+
+  it('leaves the postal code absent when the title has no parenthesised code', () => {
+    const values = mapJsonLdToValues([
+      {
+        '@type': 'RealEstateListing',
+        name: 'Appartement 3 pièces 65 m² 72000 € Le Mans',
+      },
+    ]);
+    expect(values.postalCode).toBeUndefined();
+    expect(values.propertyType).toBe('apartment');
+  });
+
+  it.each([
+    '0',
+    '2500',
+  ])('drops an out-of-bounds floorSize of %s and keeps the rest of the listing', (floorSize) => {
+    const values = mapJsonLdToValues([
+      {
+        '@type': 'Apartment',
+        floorSize: { '@type': 'QuantitativeValue', value: floorSize },
+        numberOfRooms: '3',
+      },
+      { '@type': 'Offer', price: '249900' },
+    ]);
+    expect(values.surfaceM2).toBeUndefined();
+    expect(values.rooms).toBe(3);
+    expect(values.priceEur).toBe(249900);
+  });
+
+  it.each([
+    ['rooms', { numberOfRooms: '45' }],
+    ['bedrooms', { numberOfBedrooms: '40' }],
+    ['yearBuilt', { yearBuilt: '1066' }],
+  ] as const)('drops an out-of-bounds %s', (field, node) => {
+    const values = mapJsonLdToValues([
+      { '@type': 'Apartment', floorSize: '60', ...node },
+    ]);
+    expect(values[field]).toBeUndefined();
+    expect(values.surfaceM2).toBe(60);
+  });
+
+  it('drops an out-of-bounds offer price', () => {
+    const values = mapJsonLdToValues([
+      { '@type': 'Apartment', floorSize: '60' },
+      { '@type': 'Offer', price: '5' },
+    ]);
+    expect(values.priceEur).toBeUndefined();
+    expect(values.surfaceM2).toBe(60);
+  });
+
+  it('drops an out-of-bounds surface from additionalProperty', () => {
+    const values = mapJsonLdToValues([
+      {
+        '@type': 'Product',
+        additionalProperty: [
+          { name: 'Surface', value: '2500' },
+          { name: 'Nombre de pièces', value: 99 },
+          { name: 'Type de bien', value: 'Appartement' },
+        ],
+      },
+    ]);
+    expect(values.surfaceM2).toBeUndefined();
+    expect(values.rooms).toBeUndefined();
+    expect(values.propertyType).toBe('apartment');
+  });
+
+  it.each([
+    ['Surface du terrain', '850'],
+    ['Surface du jardin', '300'],
+    ['Surface de la parcelle', '1200'],
+    ['Surface du balcon', '8'],
+  ])('never reads the living surface from a "%s" property', (name, value) => {
+    const values = mapJsonLdToValues([
+      {
+        '@type': 'Product',
+        additionalProperty: [
+          { name, value },
+          { name: 'Surface', value: '45' },
+        ],
+      },
+    ]);
+    expect(values.surfaceM2).toBe(45);
+  });
 });
