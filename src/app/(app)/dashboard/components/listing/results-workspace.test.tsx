@@ -183,6 +183,44 @@ function ClosableWorkspace(props: Partial<WorkspaceProps>) {
   );
 }
 
+// why: mirrors the dashboard, where picking a result shows it in the detail.
+function BrowsableWorkspace({
+  first,
+  others,
+  ...props
+}: Partial<WorkspaceProps> & {
+  first: AddressCandidate;
+  others: readonly AddressCandidate[];
+}) {
+  const candidates = [first, ...others];
+  const [shown, setShown] = useState(first);
+  return (
+    <ResultsWorkspace
+      {...DEFAULT_PROPS}
+      {...props}
+      match={match(candidates)}
+      shown={shown}
+      onSelect={(dpeNumber) => {
+        setShown(
+          candidates.find(
+            (candidate) => candidate.record.dpeNumber === dpeNumber,
+          ) ?? first,
+        );
+      }}
+    />
+  );
+}
+
+function withTrustedPoint(shown: AddressCandidate): AddressCandidate {
+  return {
+    ...shown,
+    record: {
+      ...shown.record,
+      point: { latitude: 45.7578, longitude: 4.8515 },
+    },
+  };
+}
+
 // why: the scroll area measures itself in a microtask after mounting; an
 // async act() flushes that update too.
 async function mount(workspace: ReactElement): Promise<void> {
@@ -564,6 +602,49 @@ describe('ResultsWorkspace detail shortcuts', () => {
     expect(onSelect).not.toHaveBeenCalled();
     expect(onCloseDetail).not.toHaveBeenCalled();
   });
+
+  // why: the photo is keyed on the shown result, so paging from the Street
+  // View panorama would discard it and drop focus to <body>. The results here
+  // page for real, as on the dashboard.
+  it('leaves the arrow keys to the Street View panorama instead of paging away from it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+      ),
+    );
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    await mount(
+      <BrowsableWorkspace
+        first={withTrustedPoint(FIRST)}
+        others={[SECOND, THIRD]}
+        streetViewEnabled
+        streetViewEmbedKey="browser-embed-key"
+      />,
+    );
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'aside button[aria-label="Explorer le panorama Street View"]',
+        )
+        ?.click();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    const back = document.activeElement;
+    if (back === null) throw new Error('nothing focused');
+    expect(back.textContent).toBe('Retour à la photo');
+
+    pressKey('ArrowRight', back);
+    pressKey('ArrowLeft', back);
+
+    expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 1');
+    expect(container.querySelector('aside iframe')).not.toBeNull();
+    expect(document.activeElement).toBe(back);
+  });
 });
 
 describe('ResultsWorkspace detail sheet below lg', () => {
@@ -626,6 +707,83 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(document.activeElement).toBe(card);
     expect(scroll).not.toHaveBeenCalled();
+  });
+
+  // why: Base UI closes the sheet on any Escape inside it; the one that
+  // leaves the Street View panorama is already handled and must not.
+  it('leaves the Street View panorama on Escape without closing the sheet', async () => {
+    onScreen(40);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+      ),
+    );
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    const shown: AddressCandidate = {
+      ...FIRST,
+      record: {
+        ...FIRST.record,
+        point: { latitude: 45.7578, longitude: 4.8515 },
+      },
+    };
+    await renderClosable({
+      match: match([shown, SECOND, THIRD]),
+      shown,
+      streetViewEnabled: true,
+      streetViewEmbedKey: 'browser-embed-key',
+    });
+    // why: the opening sheet moves focus into itself a frame later.
+    await act(async () => {
+      await nextFrame();
+    });
+    const trigger = (): HTMLButtonElement | null =>
+      sheetContent().querySelector<HTMLButtonElement>(
+        'button[aria-label="Explorer le panorama Street View"]',
+      );
+    await act(async () => {
+      trigger()?.click();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    const back = document.activeElement;
+    expect(back?.textContent).toBe('Retour à la photo');
+    expect(sheetContent().querySelector('iframe')).not.toBeNull();
+
+    await act(async () => {
+      back?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(
+      resultsColumn().querySelector('button[aria-current="true"]'),
+    ).not.toBeNull();
+    expect(sheetContent().querySelector('iframe')).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+
+    await act(async () => {
+      trigger()?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(
+      resultsColumn().querySelector('button[aria-current="true"]'),
+    ).toBeNull();
   });
 });
 

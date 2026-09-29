@@ -34,7 +34,7 @@ const PER_CALLER_PER_MINUTE: Record<RateLimitBucket, number> = {
   'listing-extract': 10,
   'listing-match': 20,
   // why: a search shows up to 10 addresses, so 10 photos, plus one free
-  // panorama lookup per Street View dialog opened. 60 a minute leaves about
+  // panorama lookup per photo explored. 60 a minute leaves about
   // five searches a minute without opening the billed key to abuse.
   'street-view': 60,
   // why: a displayed result sends at most two feedback calls, the verdict and

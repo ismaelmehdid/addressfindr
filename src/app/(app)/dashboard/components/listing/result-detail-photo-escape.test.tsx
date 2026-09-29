@@ -32,41 +32,61 @@ function PhotoWithShortcuts(shortcuts: Shortcuts) {
   );
 }
 
-async function press(target: Element, key: string): Promise<void> {
-  await act(async () => {
-    target.dispatchEvent(
-      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
-    );
+async function press(
+  target: Element,
+  key: string,
+  modifiers: KeyboardEventInit = {},
+): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...modifiers,
   });
+  await act(async () => {
+    target.dispatchEvent(event);
+  });
+  return event;
 }
 
-function dialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[role="dialog"]');
-}
-
-async function openPanorama(trigger: HTMLButtonElement): Promise<Element> {
-  await act(async () => {
-    trigger.click();
-  });
-  const close = dialog()?.querySelector(
-    'button[aria-label="Fermer le panorama"]',
+function panoramaTrigger(): HTMLButtonElement {
+  const trigger = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="Explorer le panorama Street View"]',
   );
-  if (close === undefined || close === null) {
-    throw new Error('no panorama dialog');
-  }
-  return close;
+  if (trigger === null) throw new Error('no panorama trigger');
+  return trigger;
+}
+
+async function explore(): Promise<Element> {
+  await act(async () => {
+    panoramaTrigger().click();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+  const back = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Retour à la photo',
+  );
+  if (back === undefined) throw new Error('no panorama shown');
+  return back;
+}
+
+function openInMaps(): HTMLAnchorElement {
+  const link = document.querySelector<HTMLAnchorElement>('a[target="_blank"]');
+  if (link === null) throw new Error('no Google Maps link');
+  return link;
 }
 
 // why: Next.js mounts React on `document`, where the detail shortcuts listen
-// too; the dialog's popup stops Escape and the arrow keys in its portal before
-// they get there, and a key that lands on <body> while it is open is ignored.
-// It must be the file's only root: React skips listening on a document an
-// earlier root already marked.
-it('keeps the detail shortcuts away from keys pressed while the panorama dialog is open', async () => {
-  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+// too, so nothing the panorama does can stop a key reaching them; it marks the
+// key handled instead. Every root in this file is mounted on `document`:
+// React skips listening on a document an earlier container root marked.
+async function mountOnDocument(shortcuts: Shortcuts): Promise<void> {
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => new Promise<Response>(() => {})),
+    vi.fn(async () =>
+      Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+    ),
   );
   const root = createRoot(document);
   onTestFinished(() => {
@@ -90,29 +110,58 @@ it('keeps the detail shortcuts away from keys pressed while the panorama dialog 
       </html>,
     );
   });
-  const trigger = document.querySelector<HTMLButtonElement>(
-    'button[aria-label="Explorer le panorama Street View"]',
-  );
-  if (trigger === null) throw new Error('no panorama trigger');
+}
 
-  const close = await openPanorama(trigger);
-  await press(close, 'ArrowLeft');
-  await press(close, 'ArrowRight');
-  expect(dialog()).not.toBeNull();
+it('leaves the panorama on Escape without closing the detail, which the next Escape closes', async () => {
+  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+  await mountOnDocument(shortcuts);
+
+  const back = await explore();
+  expect(document.activeElement).toBe(back);
+  expect(document.querySelector('iframe')).not.toBeNull();
+
+  await press(back, 'Escape');
+  expect(shortcuts.onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('iframe')).toBeNull();
+  expect(document.activeElement).toBe(panoramaTrigger());
+
+  await press(panoramaTrigger(), 'Escape');
+  expect(shortcuts.onClose).toHaveBeenCalledOnce();
+});
+
+// why: Street View is turned with the arrow keys. Paging to another result
+// from the panorama would remount the photo, discarding the panorama and
+// dropping focus to <body>, so the arrow keys page again only once the photo
+// is back.
+it('keeps the arrow keys from paging the results while the panorama is explored', async () => {
+  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+  await mountOnDocument(shortcuts);
+
+  const back = await explore();
+  const claimed = [
+    await press(back, 'ArrowLeft'),
+    await press(back, 'ArrowRight'),
+    await press(openInMaps(), 'ArrowLeft'),
+    await press(openInMaps(), 'ArrowRight'),
+  ];
+
+  expect(claimed.map((event) => event.defaultPrevented)).toEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
   expect(shortcuts.onPrevious).not.toHaveBeenCalled();
   expect(shortcuts.onNext).not.toHaveBeenCalled();
+  expect(document.querySelector('iframe')).not.toBeNull();
+  expect(document.activeElement).toBe(back);
 
-  await press(close, 'Escape');
-  expect(dialog()).toBeNull();
-  expect(shortcuts.onClose).not.toHaveBeenCalled();
+  // why: a modified arrow is no shortcut, and Alt+Left is the browser's Back.
+  expect(
+    (await press(back, 'ArrowLeft', { altKey: true })).defaultPrevented,
+  ).toBe(false);
 
-  await openPanorama(trigger);
-  await press(document.body, 'ArrowRight');
-  await press(document.body, 'Escape');
-  expect(shortcuts.onNext).not.toHaveBeenCalled();
-  expect(shortcuts.onClose).not.toHaveBeenCalled();
-  expect(dialog()).toBeNull();
-
-  await press(trigger, 'Escape');
-  expect(shortcuts.onClose).toHaveBeenCalledOnce();
+  await press(back, 'Escape');
+  await press(panoramaTrigger(), 'ArrowRight');
+  expect(shortcuts.onNext).toHaveBeenCalledOnce();
 });
