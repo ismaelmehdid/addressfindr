@@ -32,4 +32,30 @@ describe('parseLandSurfaceM2', () => {
   it('refuses a quote with no area at all', () => {
     expect(parseLandSurfaceM2('terrain constructible')).toBeNull();
   });
+
+  // why: a house listing states the house and the plot in one sentence, the
+  // house first. Land area weighs 3 in scoring, so the first area would
+  // penalise the true house.
+  it('takes the area attached to the plot, not the first one', () => {
+    expect(
+      parseLandSurfaceM2(
+        'Maison de 5 pièces de 120 m² sur un terrain de 800 m²',
+      ),
+    ).toBe(800);
+    expect(parseLandSurfaceM2('Maison de 120 m² sur 800 m² de terrain')).toBe(
+      800,
+    );
+    expect(parseLandSurfaceM2('Maison 120 m², terrain 12 ares')).toBe(1200);
+  });
+
+  it('refuses a quote whose only area belongs to something else', () => {
+    expect(parseLandSurfaceM2('Maison de 120 m² avec terrain')).toBeNull();
+    expect(parseLandSurfaceM2('Terrain avec une maison de 120 m²')).toBeNull();
+  });
+
+  it('refuses a quote attaching two different areas to the plot', () => {
+    expect(
+      parseLandSurfaceM2('terrain de 800 m², parcelle de 650 m²'),
+    ).toBeNull();
+  });
 });

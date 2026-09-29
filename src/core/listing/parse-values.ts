@@ -35,43 +35,86 @@ export function parseSurfaceM2(raw: string): number | null {
   return parseFrenchNumber(match[1]);
 }
 
-// why: une annonce de maison chiffre son terrain, et l'ADEME n'a pas cette
-// donnee — le cadastre si. Mais surface habitable et surface de terrain se
-// ressemblent dans un texte : confondre les deux ferait comparer un salon a
-// une parcelle. Le libelle doit donc nommer la parcelle, et ne nommer ni
-// l'habitable, ni un jardin, ni une terrasse, qui ne sont pas le terrain.
-const LAND_SUBJECT = /terrain|parcelle/i;
+// why: a house listing states its plot, which ADEME lacks and the cadastre
+// has. Living area and plot area read alike, and one sentence often carries
+// both ("maison de 120 m² sur un terrain de 800 m²"): comparing a living room
+// to a parcel would penalise the true house. So only an area attached to the
+// word naming the plot counts, and a quote naming the living area, a garden or
+// a terrace is refused outright.
+const LAND_SUBJECT = /terrain|parcelle/gi;
 const LAND_EXCLUSIONS =
   /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine/i;
-const LAND_M2_PATTERN = /(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:m²|m2|M²|M2)/;
-const LAND_ARE_PATTERN = /(\d{1,5}(?:[.,]\d{1,2})?)\s*ares?\b/i;
-const LAND_HECTARE_PATTERN = /(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:hectares?|ha)\b/i;
 
 const SQUARE_METRES_PER_ARE = 100;
 const SQUARE_METRES_PER_HECTARE = 10_000;
 
+// why: the lookbehind refuses the tail of "1.200 m²", a dotted thousands
+// group no parser here can read safely.
+const LAND_AREAS: readonly (readonly [RegExp, number])[] = [
+  [/(?<![\d.,])(\d{1,6}(?:[.,]\d{1,2})?)\s*(?:m²|m2)/gi, 1],
+  [/(?<![\d.,])(\d{1,5}(?:[.,]\d{1,2})?)\s*ares?\b/gi, SQUARE_METRES_PER_ARE],
+  [
+    /(?<![\d.,])(\d{1,4}(?:[.,]\d{1,3})?)\s*(?:hectares?|ha)\b/gi,
+    SQUARE_METRES_PER_HECTARE,
+  ],
+];
+
+// why: between the plot word and its area there may only be words — no other
+// number, no sentence break, and no other building the area could belong to.
+const LAND_LEAD_IN = /^[^\d.,;!?\n]{0,40}$/;
+const OTHER_BUILT_SUBJECT =
+  /maison|appartement|villa|pavillon|logement|habitation|b[aâ]ti|d[ée]pendance|hangar|grange|atelier|pi[èe]ce|chambre|salon/i;
+const LAND_TRAILER = /^\s*d(?:e\s+|['’]\s*)(?:terrain|parcelle)/i;
+
+type LandArea = { start: number; end: number; squareMetres: number };
+
+function landAreas(text: string): LandArea[] {
+  const areas: LandArea[] = [];
+  for (const [pattern, factor] of LAND_AREAS) {
+    for (const match of text.matchAll(pattern)) {
+      const value = match[1] ? parseFrenchNumber(match[1]) : null;
+      if (value === null) continue;
+      areas.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        squareMetres: Math.round(value * factor),
+      });
+    }
+  }
+  return areas;
+}
+
+function isAttachedToLand(text: string, area: LandArea): boolean {
+  if (LAND_TRAILER.test(text.slice(area.end))) return true;
+  for (const subject of text.matchAll(LAND_SUBJECT)) {
+    const subjectEnd = subject.index + subject[0].length;
+    if (subjectEnd > area.start) break;
+    const leadIn = text.slice(subjectEnd, area.start);
+    if (LAND_LEAD_IN.test(leadIn) && !OTHER_BUILT_SUBJECT.test(leadIn)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function parseLandSurfaceM2(raw: string): number | null {
-  if (!LAND_SUBJECT.test(raw)) return null;
   if (LAND_EXCLUSIONS.test(raw)) return null;
 
   const text = joinDigitGroups(raw);
-  for (const [pattern, factor] of [
-    [LAND_HECTARE_PATTERN, SQUARE_METRES_PER_HECTARE],
-    [LAND_ARE_PATTERN, SQUARE_METRES_PER_ARE],
-    [LAND_M2_PATTERN, 1],
-  ] as const) {
-    const match = pattern.exec(text);
-    if (!match?.[1]) continue;
-    const value = parseFrenchNumber(match[1]);
-    if (value === null) continue;
-    return Math.round(value * factor);
-  }
-  return null;
+  const attached = new Set(
+    landAreas(text)
+      .filter((area) => isAttachedToLand(text, area))
+      .map((area) => area.squareMetres),
+  );
+  if (attached.size !== 1) return null;
+  const [only] = [...attached];
+  return only ?? null;
 }
 
 const DPE_CONTEXT = /\bdpe\b|consommation|[ée]nerg/i;
 const GES_CONTEXT = /\bges\b|effet de serre|[ée]mission/i;
-const STANDALONE_LETTER = /(?<![\p{L}])([A-Ga-g])(?![\p{L}])/gu;
+// why: the apostrophe lookahead drops the elided "d'" and "c'" of French prose.
+const STANDALONE_LETTER = /(?<![\p{L}])([A-Ga-g])(?![\p{L}'’])/gu;
 
 export function parseEnergyClass(
   raw: string,
@@ -247,6 +290,77 @@ export function parseRoomCount(raw: string): number | null {
 export function parseBedroomCount(raw: string): number | null {
   if (!BEDROOMS_SUBJECT.test(raw)) return null;
   return parseCount(raw);
+}
+
+// why: the floor, the building height and a room count share one phrase
+// ("3 pièces au 2e étage sur 5"), so each number is read from its own slot,
+// never as the first number of the quote. Folding turns "2ème", "2ᵉ" and
+// "ÉTAGE" into plain ASCII before matching.
+function foldFloorText(raw: string): string {
+  return raw
+    .normalize('NFKD')
+    .replace(/\p{Diacritic}/gu, '')
+    .replace(/’/g, "'")
+    .toLowerCase();
+}
+
+function singleCapturedCount(
+  text: string,
+  patterns: readonly RegExp[],
+): number | null {
+  const found = new Set<number>();
+  for (const pattern of patterns) {
+    for (const match of text.matchAll(pattern)) {
+      if (match[1]) found.add(Number.parseInt(match[1], 10));
+    }
+  }
+  if (found.size !== 1) return null;
+  const [only] = [...found];
+  return only ?? null;
+}
+
+// why: "rez-de-chaussée" also names a house's ground level, so it has never
+// resolved to a floor.
+const GROUND_FLOOR = /\brez[\s-]*de\b|\brdc\b/;
+const FLOOR_RANGE =
+  /\d\s*(?:er|ere|re|eme|ieme|e)\s+(?:au|a|et)\s+\d{1,2}\s*(?:er|ere|re|eme|ieme|e)\b/;
+const FLOOR_ORDINAL =
+  /(?<![\p{L}\d])(\d{1,2})\s*(?:er|ere|re|eme|ieme|e)\s*(?:et\s+dernier\s+)?etage(?!s)/gu;
+const FLOOR_LABEL = /(?<![\p{L}'])etage\s*:\s*(\d{1,2})(?!\d)/gu;
+const FLOOR_LABEL_BARE = /(?<![\p{L}'])etage\s+(\d{1,2})\s*(?:$|\/|sur\s+\d)/gu;
+
+export function parseFloor(raw: string): number | null {
+  const text = foldFloorText(raw);
+  if (GROUND_FLOOR.test(text) || FLOOR_RANGE.test(text)) return null;
+  return singleCapturedCount(text, [
+    FLOOR_ORDINAL,
+    FLOOR_LABEL,
+    FLOOR_LABEL_BARE,
+  ]);
+}
+
+const STOREYS_ABOVE_FLOOR = /etage\s+sur\s+(\d{1,2})(?!\d)(?!\s*niveau)/g;
+const STOREYS_OF_LABEL =
+  /(?<![\p{L}'])etage\s*:?\s*\d{1,2}\s*(?:\/|sur)\s*(\d{1,2})(?!\d)(?!\s*niveau)/gu;
+const STOREY_COUNT_LABEL = /nombre\s+d'\s*etages?\s*:?\s*(\d{1,2})(?!\d)/g;
+// why: "sur 2 étages" and "duplex de 2 étages" count the dwelling's own
+// levels, not the building's.
+const STOREY_COUNT = /(?<![\p{L}\d.,])(?<!sur\s+)(\d{1,2})\s*etages\b/gu;
+const DWELLING_SPANS_LEVELS = /duplex|triplex/;
+const BUILDING_STOREY_PATTERNS = [
+  STOREYS_ABOVE_FLOOR,
+  STOREYS_OF_LABEL,
+  STOREY_COUNT_LABEL,
+];
+
+export function parseBuildingFloors(raw: string): number | null {
+  const text = foldFloorText(raw);
+  return singleCapturedCount(
+    text,
+    DWELLING_SPANS_LEVELS.test(text)
+      ? BUILDING_STOREY_PATTERNS
+      : [...BUILDING_STOREY_PATTERNS, STOREY_COUNT],
+  );
 }
 
 export function parseYear(raw: string): number | null {
