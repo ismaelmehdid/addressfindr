@@ -6,17 +6,14 @@ import type { IStreetViewImagery } from '@/core/street-view/ports/street-view-im
 import type { StreetViewImage } from '@/core/street-view/types';
 import { googleStreetViewImagery } from '@/infra/external-apis/google-street-view/google-street-view-imagery';
 import { log } from '@/shared/logger';
-import {
-  type GetStreetViewImageInput,
-  GetStreetViewImageInputSchema,
-} from './dto';
+import { type StreetViewPointInput, StreetViewPointInputSchema } from './dto';
 
 export async function getStreetViewImage(
-  input: GetStreetViewImageInput,
+  input: StreetViewPointInput,
   deps: { imagery?: IStreetViewImagery } = {},
 ): Promise<Result<StreetViewImage | null, AppError>> {
   const parsed = parseInput(
-    GetStreetViewImageInputSchema,
+    StreetViewPointInputSchema,
     input,
     'Invalid Street View point',
   );

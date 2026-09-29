@@ -5,7 +5,10 @@ import * as v from 'valibot';
 import { type AppError, externalApi } from '@/core/errors';
 import type { GeoPoint } from '@/core/geo/types';
 import type { IStreetViewImagery } from '@/core/street-view/ports/street-view-imagery.port';
-import type { StreetViewImage } from '@/core/street-view/types';
+import type {
+  NearestPanorama,
+  StreetViewImage,
+} from '@/core/street-view/types';
 import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
 
@@ -13,7 +16,21 @@ const PROVIDER = 'google-street-view';
 const IMAGE_SIZE = '640x320';
 const SEARCH_RADIUS_M = '50';
 
-const MetadataSchema = v.object({ status: v.string() });
+// why: the photo only needs `status`; a panorama field Google leaves out or
+// garbles fails the panorama lookup alone, never the photo.
+const MetadataSchema = v.object({
+  status: v.string(),
+  pano_id: v.fallback(
+    v.optional(v.pipe(v.string(), v.minLength(1))),
+    undefined,
+  ),
+  location: v.fallback(
+    v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    undefined,
+  ),
+});
+
+type Metadata = v.InferOutput<typeof MetadataSchema>;
 
 const NO_IMAGERY_STATUSES = new Set(['ZERO_RESULTS', 'NOT_FOUND']);
 
@@ -36,11 +53,12 @@ async function get(url: URL): Promise<Response> {
 }
 
 // why: the metadata request is free, the image is billed. An image is only
-// paid for when a panorama exists within 50 m of the point.
-async function panoramaExists(
+// paid for when a panorama exists within 50 m of the point. The photo and the
+// embedded panorama both come from this answer, so they show the same place.
+async function nearestPanoramaMetadata(
   point: GeoPoint,
   key: string,
-): Promise<Result<boolean, AppError>> {
+): Promise<Result<Metadata | null, AppError>> {
   const response = await get(endpoint('/metadata', point, key));
   if (!response.ok) {
     return err(
@@ -54,23 +72,37 @@ async function panoramaExists(
   }
 
   const { status } = parsed.output;
-  if (status === 'OK') return ok(true);
-  if (NO_IMAGERY_STATUSES.has(status)) return ok(false);
+  if (status === 'OK') return ok(parsed.output);
+  if (NO_IMAGERY_STATUSES.has(status)) return ok(null);
   return err(externalApi(PROVIDER, `Metadata answered ${status}`));
 }
 
-async function imageToward(
-  point: GeoPoint,
-): Promise<Result<StreetViewImage | null, AppError>> {
+async function withKey<T>(
+  call: (key: string) => Promise<Result<T, AppError>>,
+): Promise<Result<T, AppError>> {
   const key = env().GOOGLE_MAPS_API_KEY;
   if (key === undefined) {
     return err(externalApi(PROVIDER, 'Street View is not configured'));
   }
 
   try {
-    const exists = await panoramaExists(point, key);
-    if (exists.isErr()) return err(exists.error);
-    if (!exists.value) return ok(null);
+    return await call(key);
+  } catch (e) {
+    log.warn('street_view.fetch.failed', {
+      provider: PROVIDER,
+      reason: e instanceof Error ? e.name : 'unknown',
+    });
+    return err(externalApi(PROVIDER, 'Street View did not answer'));
+  }
+}
+
+function imageToward(
+  point: GeoPoint,
+): Promise<Result<StreetViewImage | null, AppError>> {
+  return withKey(async (key) => {
+    const found = await nearestPanoramaMetadata(point, key);
+    if (found.isErr()) return err(found.error);
+    if (found.value === null) return ok(null);
 
     const url = endpoint('', point, key);
     url.searchParams.set('size', IMAGE_SIZE);
@@ -89,13 +121,29 @@ async function imageToward(
     }
 
     return ok({ bytes: await response.arrayBuffer(), contentType });
-  } catch (e) {
-    log.warn('street_view.fetch.failed', {
-      provider: PROVIDER,
-      reason: e instanceof Error ? e.name : 'unknown',
-    });
-    return err(externalApi(PROVIDER, 'Street View did not answer'));
-  }
+  });
 }
 
-export const googleStreetViewImagery: IStreetViewImagery = { imageToward };
+function panoramaNear(
+  point: GeoPoint,
+): Promise<Result<NearestPanorama | null, AppError>> {
+  return withKey(async (key) => {
+    const found = await nearestPanoramaMetadata(point, key);
+    if (found.isErr()) return err(found.error);
+    if (found.value === null) return ok(null);
+
+    const { pano_id: panoId, location } = found.value;
+    if (panoId === undefined || location === undefined) {
+      return err(externalApi(PROVIDER, 'Metadata names no panorama'));
+    }
+    return ok({
+      panoId,
+      location: { latitude: location.lat, longitude: location.lng },
+    });
+  });
+}
+
+export const googleStreetViewImagery: IStreetViewImagery = {
+  imageToward,
+  panoramaNear,
+};

@@ -2,6 +2,7 @@
 
 import { ArrowUpRight, X } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { useState } from 'react';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
   Dialog,
@@ -10,11 +11,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import type { GeoPoint } from '@/core/geo/types';
 import {
   streetViewEmbedUrl,
   streetViewPanoramaUrl,
 } from '@/core/street-view/links';
+import { cn } from '@/lib/utils';
+import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
+import { useStreetViewPanorama } from './use-street-view-panorama';
+
+const FRAME_CLASS = 'min-h-0 w-full flex-1 border-0 bg-mist';
 
 export function StreetViewPanoramaDialog({
   point,
@@ -28,14 +35,17 @@ export function StreetViewPanoramaDialog({
   triggerClassName: string;
 }) {
   const t = useTranslations('Listing');
+  const [open, setOpen] = useState(false);
+  const lookup = useStreetViewPanorama({ point, enabled: open });
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
         aria-label={t('detailStreetViewExplore')}
         className={triggerClassName}
       />
       <DialogContent
+        {...SUSPENDS_DETAIL_SHORTCUTS}
         showCloseButton={false}
         className="flex h-svh max-w-none flex-col gap-0 overflow-hidden rounded-none p-0 sm:h-[85svh] sm:max-w-[min(92vw,1280px)] sm:rounded-xl"
       >
@@ -66,15 +76,23 @@ export function StreetViewPanoramaDialog({
             <X />
           </DialogClose>
         </div>
-        {/* why: the key is restricted by referrer, so Google must receive this origin. */}
-        <iframe
-          title={t('streetViewDialogFrame')}
-          src={streetViewEmbedUrl(point, apiKey)}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
-          className="min-h-0 w-full flex-1 border-0 bg-mist"
-        />
+        {lookup.kind === 'locating' ? (
+          <Skeleton className={cn(FRAME_CLASS, 'rounded-none')} />
+        ) : (
+          // why: the key is restricted by referrer, so Google must receive this origin.
+          <iframe
+            title={t('streetViewDialogFrame')}
+            src={streetViewEmbedUrl({
+              point,
+              apiKey,
+              panorama: lookup.panorama,
+            })}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            className={FRAME_CLASS}
+          />
+        )}
       </DialogContent>
     </Dialog>
   );

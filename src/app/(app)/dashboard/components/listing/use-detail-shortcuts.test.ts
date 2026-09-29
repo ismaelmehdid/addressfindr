@@ -8,6 +8,7 @@ const PLAIN = {
   shiftKey: false,
   defaultPrevented: false,
   targetOwnsKeys: false,
+  overlayOpen: false,
 };
 
 const SHORTCUT_KEYS = ['Escape', 'ArrowLeft', 'ArrowRight'] as const;
@@ -39,6 +40,12 @@ describe('shortcutAction', () => {
 
   it.each(SHORTCUT_KEYS)('leaves %s to an element that owns the key', (key) => {
     expect(shortcutAction({ ...PLAIN, key, targetOwnsKeys: true })).toBeNull();
+  });
+
+  it.each(
+    SHORTCUT_KEYS,
+  )('ignores %s while a dialog is open over the results', (key) => {
+    expect(shortcutAction({ ...PLAIN, key, overlayOpen: true })).toBeNull();
   });
 
   it.each([

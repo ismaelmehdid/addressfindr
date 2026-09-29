@@ -157,11 +157,12 @@ export function ResultsWorkspace({
   // why: closing the detail (close button, or the mobile Sheet's
   // onOpenChange(false)) can unmount the panel that held focus. Moving focus
   // to the results heading right after the close renders keeps it from
-  // dropping to <body>.
+  // dropping to <body>, without scrolling the list away from the result it
+  // centred.
   function closeDetail(): void {
     onCloseDetail();
     requestAnimationFrame(() => {
-      headingRef.current?.focus();
+      headingRef.current?.focus({ preventScroll: true });
     });
   }
 

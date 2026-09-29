@@ -304,6 +304,48 @@ async function pressKey(key: string, target: HTMLElement): Promise<void> {
   });
 }
 
+// why: every way a search in the dialog can end without new results.
+const SEARCH_FAILURES: [string, () => Promise<void>, string][] = [
+  [
+    'the link is rejected',
+    async () => {
+      await searchInDialog('https://example.com/annonce/1');
+    },
+    messages.Listing.errorUnsupportedPortal,
+  ],
+  [
+    'the listing cannot be read',
+    async () => {
+      await searchInDialog(SECOND_URL);
+      await answer(EXTRACT, 422, { error: 'validation' });
+    },
+    messages.Listing.errorNotExtractable,
+  ],
+  [
+    'the register search fails',
+    async () => {
+      await searchInDialog(SECOND_URL);
+      await answer(EXTRACT, 200, listing(SECOND_URL));
+      await answer(MATCH, 502, { error: 'external_api' });
+    },
+    messages.Listing.errorMatchUnavailable,
+  ],
+  [
+    'no address can be named',
+    async () => {
+      await searchInDialog(SECOND_URL);
+      await answer(EXTRACT, 200, listing(SECOND_URL));
+      await answer(MATCH, 200, {
+        candidates: [],
+        inspected: 30,
+        truncated: false,
+        refusedFor: 'insufficient-evidence',
+      });
+    },
+    messages.Listing.addressInsufficientEvidence,
+  ],
+];
+
 describe('New search dialog', () => {
   it('opens over the results with an empty, focused link field', async () => {
     await showFirstResult();
@@ -358,46 +400,9 @@ describe('New search dialog', () => {
     );
   });
 
-  it.each([
-    [
-      'the link is rejected',
-      async () => {
-        await searchInDialog('https://example.com/annonce/1');
-      },
-      messages.Listing.errorUnsupportedPortal,
-    ],
-    [
-      'the listing cannot be read',
-      async () => {
-        await searchInDialog(SECOND_URL);
-        await answer(EXTRACT, 422, { error: 'validation' });
-      },
-      messages.Listing.errorNotExtractable,
-    ],
-    [
-      'the register search fails',
-      async () => {
-        await searchInDialog(SECOND_URL);
-        await answer(EXTRACT, 200, listing(SECOND_URL));
-        await answer(MATCH, 502, { error: 'external_api' });
-      },
-      messages.Listing.errorMatchUnavailable,
-    ],
-    [
-      'no address can be named',
-      async () => {
-        await searchInDialog(SECOND_URL);
-        await answer(EXTRACT, 200, listing(SECOND_URL));
-        await answer(MATCH, 200, {
-          candidates: [],
-          inspected: 30,
-          truncated: false,
-          refusedFor: 'insufficient-evidence',
-        });
-      },
-      messages.Listing.addressInsufficientEvidence,
-    ],
-  ])('keeps the results and explains in the dialog when %s', async (_, fail, message) => {
+  it.each(
+    SEARCH_FAILURES,
+  )('keeps the results and explains in the dialog when %s', async (_, fail, message) => {
     await showFirstResult();
     await pressNewSearch();
 
@@ -426,6 +431,57 @@ describe('New search dialog', () => {
 
     expect(dialog()).toBeNull();
     expect(resultsColumn().textContent).toContain(SECOND_STREET);
+  });
+
+  it.each(
+    SEARCH_FAILURES,
+  )('clears the outcome once the link is edited after %s', async (_, fail) => {
+    await showFirstResult();
+    await pressNewSearch();
+    await fail();
+
+    typeInto(dialogInput(), FIRST_URL);
+
+    expect(dialogStatus()).toBe('');
+    expect(dialogInput().getAttribute('aria-invalid')).toBe('false');
+  });
+
+  it('keeps the submit button focusable while the search runs', async () => {
+    await showFirstResult();
+    await pressNewSearch();
+    await searchInDialog(SECOND_URL);
+
+    const button = openDialog().querySelector<HTMLButtonElement>(
+      'button[type="submit"]',
+    );
+    if (button === null) throw new Error('no submit button');
+    expect(button.hasAttribute('disabled')).toBe(false);
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+
+    await submit(openDialog());
+    expect(held.filter((request) => request.path === EXTRACT)).toHaveLength(1);
+
+    act(() => {
+      button.focus();
+    });
+    await pressKey('Escape', button);
+    expect(dialog()).toBeNull();
+    await answer(EXTRACT, 200, listing(SECOND_URL));
+    expect(resultsColumn().textContent).toContain(FIRST_STREET);
+  });
+
+  // why: focus can fall to <body> inside the dialog; a key pressed there is
+  // outside its portal and must still leave the results behind it alone.
+  it('keeps a key that lands on the page from paging or closing the results behind it', async () => {
+    await showFirstResult();
+    await pressNewSearch();
+
+    await pressKey('ArrowRight', document.body);
+    await pressKey('Escape', document.body);
+
+    expect(container.querySelector('aside')?.getAttribute('aria-label')).toBe(
+      'Résultat 1',
+    );
   });
 
   it('ignores the answer of a search abandoned with Escape', async () => {
@@ -520,5 +576,73 @@ describe('New search dialog', () => {
     expect(
       buttonNamed(newDetail, messages.ListingFeedback.confirm),
     ).toBeDefined();
+  });
+});
+
+describe('Home search form', () => {
+  function homeInput(): HTMLInputElement {
+    const input = container.querySelector('input');
+    if (input === null) throw new Error('no link field on the home page');
+    return input;
+  }
+
+  it('never shows the addresses of a search superseded by a newer one', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+
+    typeInto(homeInput(), SECOND_URL);
+    await submit(container);
+    await answer(MATCH, 200, FIRST_MATCH);
+    expect(
+      container.querySelector('section[aria-labelledby="results-heading"]'),
+    ).toBeNull();
+
+    await answer(EXTRACT, 200, listing(SECOND_URL));
+    await answer(MATCH, 200, SECOND_MATCH);
+    expect(resultsColumn().textContent).toContain(SECOND_STREET);
+    expect(resultsColumn().textContent).not.toContain(FIRST_STREET);
+  });
+
+  it('shows the address outcome under its heading until the link is edited', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+    await answer(MATCH, 502, { error: 'external_api' });
+
+    expect(container.textContent).toContain(messages.Listing.addressHeading);
+    expect(container.textContent).toContain(
+      messages.Listing.errorMatchUnavailable,
+    );
+
+    typeInto(homeInput(), SECOND_URL);
+
+    expect(container.textContent).not.toContain(
+      messages.Listing.addressHeading,
+    );
+    expect(container.textContent).not.toContain(
+      messages.Listing.errorMatchUnavailable,
+    );
+  });
+
+  it('marks the link invalid on a reading failure, and clears it once edited', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 422, { error: 'validation' });
+
+    expect(homeInput().getAttribute('aria-invalid')).toBe('true');
+    expect(container.textContent).toContain(
+      messages.Listing.errorNotExtractable,
+    );
+
+    typeInto(homeInput(), SECOND_URL);
+
+    expect(homeInput().getAttribute('aria-invalid')).toBe('false');
+    expect(container.textContent).not.toContain(
+      messages.Listing.errorNotExtractable,
+    );
   });
 });

@@ -6,8 +6,10 @@ import {
   type ExtractedListing,
 } from '@/core/listing/types';
 import {
+  addressMessage,
   isSearching,
   type ListingSearchStatus,
+  linkMessage,
   searchMessage,
 } from './use-listing-search';
 
@@ -132,5 +134,47 @@ describe('searchMessage', () => {
         rejection: null,
       }),
     ).toEqual({ key: 'addressNone', tone: 'neutral' });
+  });
+});
+
+// why: the home page shows the link's own line and the address outcome in
+// two places, and a rejected link can sit beside a search still matching.
+describe('linkMessage and addressMessage', () => {
+  const matching: ListingSearchStatus = {
+    kind: 'extracted',
+    listing: LISTING,
+    match: { kind: 'pending' },
+  };
+
+  it('keeps a rejected link and the address search apart', () => {
+    expect(linkMessage({ status: matching, rejection: 'malformed' })).toEqual({
+      key: 'errorMalformed',
+      tone: 'error',
+    });
+    expect(addressMessage(matching)).toEqual({
+      key: 'addressSearching',
+      tone: 'neutral',
+    });
+  });
+
+  it('says nothing about the link once it has been read', () => {
+    expect(linkMessage({ status: matching, rejection: null })).toBe(null);
+  });
+
+  it('says nothing about an address before the listing is read', () => {
+    expect(addressMessage({ kind: 'pending' })).toBe(null);
+    expect(addressMessage({ kind: 'failed', failure: 'unknown' })).toBe(null);
+  });
+
+  it('describes reading the link and failing to read it', () => {
+    expect(
+      linkMessage({ status: { kind: 'pending' }, rejection: null }),
+    ).toEqual({ key: 'analyzing', tone: 'neutral' });
+    expect(
+      linkMessage({
+        status: { kind: 'failed', failure: 'rate-limited' },
+        rejection: null,
+      }),
+    ).toEqual({ key: 'errorRateLimited', tone: 'error' });
   });
 });

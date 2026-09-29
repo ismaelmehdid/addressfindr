@@ -44,17 +44,36 @@ function dialog(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[role="dialog"]');
 }
 
+async function openPanorama(trigger: HTMLButtonElement): Promise<Element> {
+  await act(async () => {
+    trigger.click();
+  });
+  const close = dialog()?.querySelector(
+    'button[aria-label="Fermer le panorama"]',
+  );
+  if (close === undefined || close === null) {
+    throw new Error('no panorama dialog');
+  }
+  return close;
+}
+
 // why: Next.js mounts React on `document`, where the detail shortcuts listen
 // too; the dialog's popup stops Escape and the arrow keys in its portal before
-// they get there. It must be the file's only root: React skips listening on a
-// document an earlier root already marked.
-it('keeps the detail shortcuts away from keys pressed in the panorama dialog', async () => {
+// they get there, and a key that lands on <body> while it is open is ignored.
+// It must be the file's only root: React skips listening on a document an
+// earlier root already marked.
+it('keeps the detail shortcuts away from keys pressed while the panorama dialog is open', async () => {
   const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => new Promise<Response>(() => {})),
+  );
   const root = createRoot(document);
   onTestFinished(() => {
     act(() => {
       root.unmount();
     });
+    vi.unstubAllGlobals();
   });
   await act(async () => {
     root.render(
@@ -76,16 +95,7 @@ it('keeps the detail shortcuts away from keys pressed in the panorama dialog', a
   );
   if (trigger === null) throw new Error('no panorama trigger');
 
-  await act(async () => {
-    trigger.click();
-  });
-  const close = dialog()?.querySelector(
-    'button[aria-label="Fermer le panorama"]',
-  );
-  if (close === undefined || close === null) {
-    throw new Error('no panorama dialog');
-  }
-
+  const close = await openPanorama(trigger);
   await press(close, 'ArrowLeft');
   await press(close, 'ArrowRight');
   expect(dialog()).not.toBeNull();
@@ -95,6 +105,13 @@ it('keeps the detail shortcuts away from keys pressed in the panorama dialog', a
   await press(close, 'Escape');
   expect(dialog()).toBeNull();
   expect(shortcuts.onClose).not.toHaveBeenCalled();
+
+  await openPanorama(trigger);
+  await press(document.body, 'ArrowRight');
+  await press(document.body, 'Escape');
+  expect(shortcuts.onNext).not.toHaveBeenCalled();
+  expect(shortcuts.onClose).not.toHaveBeenCalled();
+  expect(dialog()).toBeNull();
 
   await press(trigger, 'Escape');
   expect(shortcuts.onClose).toHaveBeenCalledOnce();

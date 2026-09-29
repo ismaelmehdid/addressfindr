@@ -11,7 +11,7 @@ import {
   validateListingUrl,
 } from '@/core/listing/validate-listing-url';
 
-export const REJECTION_KEY = {
+const REJECTION_KEY = {
   empty: 'errorEmpty',
   malformed: 'errorMalformed',
   'unsupported-portal': 'errorUnsupportedPortal',
@@ -19,7 +19,7 @@ export const REJECTION_KEY = {
 
 type ExtractionFailure = 'not-extractable' | 'rate-limited' | 'unknown';
 
-export const FAILURE_KEY = {
+const FAILURE_KEY = {
   'not-extractable': 'errorNotExtractable',
   'rate-limited': 'errorRateLimited',
   unknown: 'errorUnknown',
@@ -31,14 +31,14 @@ type MatchFailure =
   | 'unavailable'
   | 'unknown';
 
-export const MATCH_FAILURE_KEY = {
+const MATCH_FAILURE_KEY = {
   'not-enough-signal': 'errorMatchNotEnoughSignal',
   'rate-limited': 'errorMatchRateLimited',
   unavailable: 'errorMatchUnavailable',
   unknown: 'errorMatchUnknown',
 } as const satisfies Record<MatchFailure, string>;
 
-export type MatchState =
+type MatchState =
   | { kind: 'pending' }
   | { kind: 'found'; match: AddressMatch }
   | { kind: 'failed'; failure: MatchFailure };
@@ -170,26 +170,33 @@ function matchMessage(state: MatchState): SearchMessage {
   };
 }
 
-export function searchMessage({
-  status,
-  rejection,
-}: {
+type SearchMessageInput = {
   status: ListingSearchStatus;
   rejection: ListingUrlRejection | null;
-}): SearchMessage | null {
+};
+
+export function linkMessage({
+  status,
+  rejection,
+}: SearchMessageInput): SearchMessage | null {
   if (rejection !== null) {
     return { key: REJECTION_KEY[rejection], tone: 'error' };
   }
-  switch (status.kind) {
-    case 'idle':
-      return null;
-    case 'pending':
-      return { key: 'analyzing', tone: 'neutral' };
-    case 'failed':
-      return { key: FAILURE_KEY[status.failure], tone: 'error' };
-    case 'extracted':
-      return matchMessage(status.match);
+  if (status.kind === 'pending') return { key: 'analyzing', tone: 'neutral' };
+  if (status.kind === 'failed') {
+    return { key: FAILURE_KEY[status.failure], tone: 'error' };
   }
+  return null;
+}
+
+export function addressMessage(
+  status: ListingSearchStatus,
+): SearchMessage | null {
+  return status.kind === 'extracted' ? matchMessage(status.match) : null;
+}
+
+export function searchMessage(input: SearchMessageInput): SearchMessage | null {
+  return linkMessage(input) ?? addressMessage(input.status);
 }
 
 export type ListingSearch = {
@@ -214,12 +221,12 @@ export function useListingSearch({
   const [status, setStatus] = useState<ListingSearchStatus>({ kind: 'idle' });
   const latestSubmission = useRef(0);
 
+  // why: a settled outcome describes the link that was searched, not the one
+  // being typed; only a search still in flight keeps its status.
   function changeUrl(next: string): void {
     setUrl(next);
     setRejection(null);
-    setStatus((current) =>
-      current.kind === 'failed' ? { kind: 'idle' } : current,
-    );
+    setStatus((current) => (isSearching(current) ? current : { kind: 'idle' }));
   }
 
   function reset(): void {

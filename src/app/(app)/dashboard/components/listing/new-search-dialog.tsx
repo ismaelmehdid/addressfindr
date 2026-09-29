@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
 import {
   isSearching,
   type ListingSearchResult,
@@ -56,6 +57,7 @@ export function NewSearchDialog({
         {t('resultsNewSearch')}
       </DialogTrigger>
       <DialogContent
+        {...SUSPENDS_DETAIL_SHORTCUTS}
         showCloseButton={false}
         initialFocus={inputRef}
         className="sm:max-w-[480px]"
@@ -90,11 +92,13 @@ export function NewSearchDialog({
               aria-describedby="new-search-status"
               className="h-9 flex-1"
             />
+            {/* why: a disabled button drops focus to <body>, outside the modal. */}
             <Button
               type="submit"
               size="sm"
               loading={searching}
-              className="h-9 shrink-0"
+              focusableWhenDisabled
+              className="h-9 shrink-0 aria-disabled:opacity-50"
             >
               {t('submit')}
               <ArrowRight className="size-3.5" />

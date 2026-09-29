@@ -20,6 +20,18 @@ function ownsKeys(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(KEY_OWNERS) !== null;
 }
 
+// why: a dialog over the results owns the keyboard. Its popup stops the keys
+// pressed inside it, but focus can still fall to <body> (a control disabled
+// under the pointer), and a key pressed there must not page or close the
+// detail behind the dialog. Spread onto the popup of every such dialog.
+export const SUSPENDS_DETAIL_SHORTCUTS = {
+  'data-suspends-detail-shortcuts': '',
+} as const;
+
+function suspendingOverlayOpen(): boolean {
+  return document.querySelector('[data-suspends-detail-shortcuts]') !== null;
+}
+
 export function shortcutAction(input: {
   key: string;
   altKey: boolean;
@@ -28,8 +40,11 @@ export function shortcutAction(input: {
   shiftKey: boolean;
   defaultPrevented: boolean;
   targetOwnsKeys: boolean;
+  overlayOpen: boolean;
 }): ShortcutAction | null {
-  if (input.defaultPrevented || input.targetOwnsKeys) return null;
+  if (input.defaultPrevented || input.targetOwnsKeys || input.overlayOpen) {
+    return null;
+  }
   if (input.altKey || input.ctrlKey || input.metaKey || input.shiftKey) {
     return null;
   }
@@ -65,6 +80,7 @@ export function useDetailShortcuts({
       shiftKey: event.shiftKey,
       defaultPrevented: event.defaultPrevented,
       targetOwnsKeys: ownsKeys(event.target),
+      overlayOpen: suspendingOverlayOpen(),
     });
     if (action === null) return;
     const handlers = { close: onClose, previous: onPrevious, next: onNext };

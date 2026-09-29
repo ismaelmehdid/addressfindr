@@ -12,11 +12,10 @@ import {
   ResultsWorkspace,
 } from './results-workspace';
 import {
-  FAILURE_KEY,
+  addressMessage,
   type ListingSearchResult,
-  MATCH_FAILURE_KEY,
-  type MatchState,
-  REJECTION_KEY,
+  linkMessage,
+  type SearchMessage,
   useListingSearch,
 } from './use-listing-search';
 
@@ -59,15 +58,9 @@ export function ListingUrlForm({
     onFound: showResult,
   });
 
-  const isError = rejection !== null || status.kind === 'failed';
-  const message =
-    rejection !== null
-      ? t(REJECTION_KEY[rejection])
-      : status.kind === 'failed'
-        ? t(FAILURE_KEY[status.failure])
-        : status.kind === 'pending'
-          ? t('analyzing')
-          : null;
+  const message = linkMessage({ status, rejection });
+  const isError = message?.tone === 'error';
+  const address = addressMessage(status);
 
   const shown =
     found === null
@@ -167,13 +160,11 @@ export function ListingUrlForm({
                     : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
                 }
               >
-                {message}
+                {t(message.key)}
               </p>
             )}
           </div>
-          {status.kind === 'extracted' && (
-            <AddressSection state={status.match} />
-          )}
+          {address !== null && <AddressSection message={address} />}
         </div>
       )}
       <p className="sr-only" aria-live="polite">
@@ -188,7 +179,7 @@ export function ListingUrlForm({
   );
 }
 
-function AddressSection({ state }: { state: MatchState }) {
+function AddressSection({ message }: { message: SearchMessage }) {
   const t = useTranslations('Listing');
 
   return (
@@ -196,23 +187,15 @@ function AddressSection({ state }: { state: MatchState }) {
       <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
         {t('addressHeading')}
       </h2>
-      {state.kind === 'pending' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-          {t('addressSearching')}
-        </p>
-      )}
-      {state.kind === 'failed' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-destructive">
-          {t(MATCH_FAILURE_KEY[state.failure])}
-        </p>
-      )}
-      {state.kind === 'found' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-          {state.match.refusedFor === 'insufficient-evidence'
-            ? t('addressInsufficientEvidence')
-            : t('addressNone')}
-        </p>
-      )}
+      <p
+        className={
+          message.tone === 'error'
+            ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'
+            : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
+        }
+      >
+        {t(message.key)}
+      </p>
     </section>
   );
 }

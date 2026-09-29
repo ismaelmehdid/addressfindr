@@ -214,6 +214,26 @@ describe('ResultsWorkspace detail header', () => {
     expect(document.activeElement).toBe(close);
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
   });
+
+  // why: selecting a result centres it in the list, behind the bottom sheet on
+  // a phone; focusing the heading on close must not scroll the list back up.
+  it('moves focus to the results heading on close without scrolling the list', async () => {
+    await render({});
+    const heading = container.querySelector<HTMLElement>('#results-heading');
+    if (heading === null) throw new Error('no results heading');
+    const focus = vi.spyOn(heading, 'focus');
+
+    await act(async () => {
+      detailButton('Fermer le détail').click();
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => {
+          resolve();
+        });
+      });
+    });
+
+    expect(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+  });
 });
 
 function pressKey(key: string, target: Element = document.body): void {

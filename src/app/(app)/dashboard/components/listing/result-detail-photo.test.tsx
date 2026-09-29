@@ -2,11 +2,12 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { aerialImageUrl } from '@/core/geo/aerial-image';
 import {
   streetViewEmbedUrl,
   streetViewImagePath,
+  streetViewPanoramaLookupPath,
   streetViewPanoramaUrl,
 } from '@/core/street-view/links';
 import messages from '@/i18n/messages/fr.json';
@@ -28,11 +29,20 @@ const RECORD = {
   point: TRUSTED_POINT,
 };
 const EMBED_KEY = 'browser-embed-key';
+const PANORAMA = { panoId: 'CAoSLEFGMVFpcE1', heading: 212 };
 
 let container: HTMLDivElement;
 let root: Root;
+let lookup: ReturnType<typeof vi.fn<typeof fetch>>;
+
+function answerLookupWith(response: () => Response): void {
+  lookup.mockImplementation(async () => response());
+}
 
 beforeEach(() => {
+  lookup = vi.fn<typeof fetch>();
+  answerLookupWith(() => Response.json(PANORAMA));
+  vi.stubGlobal('fetch', lookup);
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -43,6 +53,7 @@ afterEach(() => {
     root.unmount();
   });
   container.remove();
+  vi.unstubAllGlobals();
 });
 
 function render(
@@ -74,6 +85,30 @@ function panoramaTrigger(): HTMLButtonElement | null {
 
 function dialog(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[role="dialog"]');
+}
+
+function openedDialog(): HTMLElement {
+  const opened = dialog();
+  if (opened === null) throw new Error('no panorama dialog open');
+  return opened;
+}
+
+// why: the dialog looks the panorama up once it opens, then shows the frame.
+async function openPanorama(): Promise<void> {
+  const trigger = panoramaTrigger();
+  if (trigger === null) throw new Error('no panorama trigger');
+  await act(async () => {
+    trigger.click();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  });
+}
+
+function frame(): HTMLIFrameElement {
+  const element = openedDialog().querySelector('iframe');
+  if (element === null) throw new Error('no panorama frame');
+  return element;
 }
 
 function photo(): HTMLImageElement | null {
@@ -122,34 +157,27 @@ describe('ResultDetailPhoto', () => {
     );
   });
 
-  it('opens the panorama in a dialog inside the app with an embed key', () => {
+  it('opens the panorama in a dialog inside the app with an embed key', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     expect(container.querySelector('a')).toBeNull();
-    const trigger = panoramaTrigger();
-    expect(trigger?.textContent).toBe('');
+    expect(panoramaTrigger()?.textContent).toBe('');
     expect(container.textContent).toContain('Explorer le panorama');
     expect(dialog()).toBeNull();
 
-    act(() => {
-      trigger?.click();
-    });
+    await openPanorama();
 
-    const opened = dialog();
-    expect(opened?.textContent).toContain(`Street View · ${RECORD.address}`);
-    const frame = opened?.querySelector('iframe');
-    expect(frame?.getAttribute('src')).toBe(
-      streetViewEmbedUrl(TRUSTED_POINT, EMBED_KEY),
-    );
-    expect(frame?.getAttribute('title')).toBe(
+    const opened = openedDialog();
+    expect(opened.textContent).toContain(`Street View · ${RECORD.address}`);
+    expect(frame().getAttribute('title')).toBe(
       'Panorama Street View interactif',
     );
-    expect(frame?.hasAttribute('allowfullscreen')).toBe(true);
-    expect(frame?.getAttribute('loading')).toBe('lazy');
-    expect(frame?.getAttribute('referrerpolicy')).toBe(
+    expect(frame().hasAttribute('allowfullscreen')).toBe(true);
+    expect(frame().getAttribute('loading')).toBe('lazy');
+    expect(frame().getAttribute('referrerpolicy')).toBe(
       'strict-origin-when-cross-origin',
     );
-    const outbound = opened?.querySelector('a');
+    const outbound = opened.querySelector('a');
     expect(outbound?.getAttribute('href')).toBe(
       streetViewPanoramaUrl(TRUSTED_POINT),
     );
@@ -159,17 +187,73 @@ describe('ResultDetailPhoto', () => {
     );
   });
 
-  it('closes the panorama dialog from its close button', () => {
+  // why: the screenshot is the panorama nearest the point, aimed at it; the
+  // explorable view must continue from that image, not from another one.
+  it("opens the embed on the photo's panorama, facing the point", async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
-    act(() => {
-      panoramaTrigger()?.click();
-    });
-    const close = dialog()?.querySelector<HTMLButtonElement>(
+
+    expect(lookup).not.toHaveBeenCalled();
+    await openPanorama();
+
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(lookup.mock.calls[0]?.[0]).toBe(
+      streetViewPanoramaLookupPath(TRUSTED_POINT),
+    );
+    expect(frame().getAttribute('src')).toBe(
+      streetViewEmbedUrl({
+        point: TRUSTED_POINT,
+        apiKey: EMBED_KEY,
+        panorama: PANORAMA,
+      }),
+    );
+  });
+
+  it.each<[string, () => Response]>([
+    ['finds no panorama', () => Response.json({}, { status: 404 })],
+    ['answers something else', () => Response.json({ panoId: '', heading: 0 })],
+    [
+      'fails',
+      () => {
+        throw new TypeError('Failed to fetch');
+      },
+    ],
+  ])('falls back to the outdoor panorama nearest the point when the lookup %s', async (_, response) => {
+    answerLookupWith(response);
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await openPanorama();
+
+    expect(frame().getAttribute('src')).toBe(
+      streetViewEmbedUrl({
+        point: TRUSTED_POINT,
+        apiKey: EMBED_KEY,
+        panorama: null,
+      }),
+    );
+  });
+
+  it('shows no frame while the panorama is being located', async () => {
+    lookup.mockImplementation(() => new Promise<Response>(() => {}));
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await openPanorama();
+
+    expect(openedDialog().querySelector('iframe')).toBeNull();
+    expect(
+      openedDialog().querySelector('[data-slot="skeleton"]'),
+    ).not.toBeNull();
+  });
+
+  it('closes the panorama dialog from its close button', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    await openPanorama();
+    const close = openedDialog().querySelector<HTMLButtonElement>(
       'button[aria-label="Fermer le panorama"]',
     );
+    if (close === null) throw new Error('no close button in the dialog');
 
     act(() => {
-      close?.click();
+      close.click();
     });
 
     expect(dialog()).toBeNull();
