@@ -5,7 +5,6 @@ import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -183,7 +182,7 @@ function CandidateCard({
           onSelect(record.dpeNumber);
           setCenterRequest((current) => current + 1);
         }}
-        className="group/candidate flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3"
+        className="flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3"
       >
         {photo.kind === 'none' ? (
           <div className="flex h-[172px] w-full items-center justify-center bg-mist">
@@ -255,15 +254,6 @@ function CandidateCard({
               <MapPinOff className="size-3 shrink-0" aria-hidden />
               {t('addressNoPoint')}
             </p>
-          )}
-          {rank === 1 && (
-            <span
-              className={buttonVariants({
-                className: 'mt-1 w-full group-hover/candidate:bg-charcoal-deep',
-              })}
-            >
-              {t('cardVerify')}
-            </span>
           )}
         </CardContent>
       </button>

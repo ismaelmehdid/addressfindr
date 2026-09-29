@@ -231,7 +231,7 @@ describe('AddressCandidateList card', () => {
     ]);
   });
 
-  it('keeps the top card call to action inside its single button', () => {
+  it('selects the top card through its single button, with no call to action', () => {
     const onSelect = vi.fn();
     render({ candidates: [TOP, SECOND], onSelect });
     const [top, second] = cards();
@@ -239,7 +239,7 @@ describe('AddressCandidateList card', () => {
 
     expect(topButtons).toHaveLength(1);
     expect(top?.querySelectorAll('a, button button')).toHaveLength(0);
-    expect(topButtons[0]?.textContent).toContain('Vérifier cette adresse →');
+    expect(top?.textContent).not.toContain('Vérifier cette adresse');
     expect(second?.textContent).not.toContain('Vérifier cette adresse');
 
     act(() => {
