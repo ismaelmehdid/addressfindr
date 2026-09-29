@@ -240,15 +240,25 @@ describe('revealInScrollArea', () => {
   // why: the card draws its button's focus ring 2px wide, 2px outside its own
   // edge (outline-2 outline-offset-2); a card 2px inside the viewport has its
   // ring clipped although the card itself fits.
-  it('centres a card whose focus ring is cut by an edge of the viewport', () => {
+  it.each([
+    { edge: 'top', cardTop: VIEWPORT.top + 2, expectedTop: 552 },
+    {
+      edge: 'bottom',
+      cardTop: VIEWPORT.top + VIEWPORT.height - 302,
+      expectedTop: 648,
+    },
+  ])('centres a card whose focus ring is cut by the $edge edge of the viewport', ({
+    cardTop,
+    expectedTop,
+  }) => {
     const { scroll, element } = list(RESULT_CARD);
-    place(element('[data-slot="card"]'), VIEWPORT.top + 2, 300);
-    place(element('button'), VIEWPORT.top + 2, 300);
+    place(element('[data-slot="card"]'), cardTop, 300);
+    place(element('button'), cardTop, 300);
 
     revealInScrollArea(element('button'));
 
     expect(scroll).toHaveBeenCalledExactlyOnceWith({
-      top: 552,
+      top: expectedTop,
       behavior: 'smooth',
     });
   });
