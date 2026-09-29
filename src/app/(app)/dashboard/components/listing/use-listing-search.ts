@@ -221,12 +221,14 @@ export function useListingSearch({
   const [status, setStatus] = useState<ListingSearchStatus>({ kind: 'idle' });
   const latestSubmission = useRef(0);
 
-  // why: a settled outcome describes the link that was searched, not the one
-  // being typed; only a search still in flight keeps its status.
+  // why: an outcome describes the link that was searched, not the one being
+  // typed. Editing the link also abandons a search in flight, so its late
+  // answer never shows and the edited link can be searched at once.
   function changeUrl(next: string): void {
+    latestSubmission.current += 1;
     setUrl(next);
     setRejection(null);
-    setStatus((current) => (isSearching(current) ? current : { kind: 'idle' }));
+    setStatus({ kind: 'idle' });
   }
 
   function reset(): void {

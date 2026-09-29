@@ -41,6 +41,7 @@ const FEEDBACK = '/api/listings/feedback';
 
 const FIRST_URL = 'https://www.leboncoin.fr/ad/ventes_immobilieres/1';
 const SECOND_URL = 'https://www.leboncoin.fr/ad/ventes_immobilieres/2';
+const MISTYPED_URL = 'https://www.leboncoin.fr/ad/ventes_immobilieres/20';
 const FIRST_STREET = 'Rue Lavoisier';
 const SECOND_STREET = 'Rue Garibaldi';
 
@@ -250,6 +251,12 @@ function dialogStatus(): string {
   return openDialog().querySelector('[aria-live="polite"]')?.textContent ?? '';
 }
 
+function submitLoading(scope: ParentNode): boolean {
+  const button = scope.querySelector('button[type="submit"]');
+  if (button === null) throw new Error('no submit button');
+  return button.hasAttribute('data-loading');
+}
+
 async function showFirstResult(): Promise<void> {
   await renderForm();
   const input = container.querySelector('input');
@@ -433,6 +440,49 @@ describe('New search dialog', () => {
     expect(resultsColumn().textContent).toContain(SECOND_STREET);
   });
 
+  // why: a link corrected while its search runs is the one the user wants;
+  // the old search must neither block it nor answer in its place.
+  it('abandons the search in flight when the link is edited, so the edited link is searched at once', async () => {
+    await showFirstResult();
+    await pressNewSearch();
+    await searchInDialog(MISTYPED_URL);
+
+    typeInto(dialogInput(), SECOND_URL);
+    expect(dialogStatus()).toBe('');
+    expect(submitLoading(openDialog())).toBe(false);
+
+    await submit(openDialog());
+    expect(held.map((request) => request.body)).toEqual([
+      { url: MISTYPED_URL },
+      { url: SECOND_URL },
+    ]);
+    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+
+    await answer(EXTRACT, 200, listing(MISTYPED_URL));
+    expect(held.map((request) => request.body)).toEqual([{ url: SECOND_URL }]);
+    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+
+    await answer(EXTRACT, 200, listing(SECOND_URL));
+    await answer(MATCH, 200, SECOND_MATCH);
+    expect(dialog()).toBeNull();
+    expect(resultsColumn().textContent).toContain(SECOND_STREET);
+  });
+
+  it('never shows the answer of a search abandoned by editing the link while it matches', async () => {
+    await showFirstResult();
+    await pressNewSearch();
+    await searchInDialog(MISTYPED_URL);
+    await answer(EXTRACT, 200, listing(MISTYPED_URL));
+
+    typeInto(dialogInput(), SECOND_URL);
+    await answer(MATCH, 200, SECOND_MATCH);
+
+    expect(dialogStatus()).toBe('');
+    expect(dialogInput().value).toBe(SECOND_URL);
+    expect(resultsColumn().textContent).toContain(FIRST_STREET);
+    expect(resultsColumn().textContent).not.toContain(SECOND_STREET);
+  });
+
   it.each(
     SEARCH_FAILURES,
   )('clears the outcome once the link is edited after %s', async (_, fail) => {
@@ -604,6 +654,48 @@ describe('Home search form', () => {
     await answer(MATCH, 200, SECOND_MATCH);
     expect(resultsColumn().textContent).toContain(SECOND_STREET);
     expect(resultsColumn().textContent).not.toContain(FIRST_STREET);
+  });
+
+  it('abandons the search in flight when the link is edited, so the edited link is searched at once', async () => {
+    await renderForm();
+    typeInto(homeInput(), MISTYPED_URL);
+    await submit(container);
+    expect(container.textContent).toContain(messages.Listing.analyzing);
+
+    typeInto(homeInput(), SECOND_URL);
+    expect(container.textContent).not.toContain(messages.Listing.analyzing);
+    expect(submitLoading(container)).toBe(false);
+
+    await submit(container);
+    expect(held.map((request) => request.body)).toEqual([
+      { url: MISTYPED_URL },
+      { url: SECOND_URL },
+    ]);
+
+    await answer(EXTRACT, 200, listing(MISTYPED_URL));
+    expect(held.map((request) => request.body)).toEqual([{ url: SECOND_URL }]);
+
+    await answer(EXTRACT, 200, listing(SECOND_URL));
+    await answer(MATCH, 200, SECOND_MATCH);
+    expect(resultsColumn().textContent).toContain(SECOND_STREET);
+  });
+
+  it('never shows the answer of a search abandoned by editing the link while it matches', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+
+    typeInto(homeInput(), SECOND_URL);
+    await answer(MATCH, 200, FIRST_MATCH);
+
+    expect(
+      container.querySelector('section[aria-labelledby="results-heading"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain(
+      messages.Listing.addressSearching,
+    );
+    expect(homeInput().value).toBe(SECOND_URL);
   });
 
   it('shows the address outcome under its heading until the link is edited', async () => {
