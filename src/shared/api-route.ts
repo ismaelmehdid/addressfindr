@@ -8,6 +8,7 @@ import {
   type RateLimitRefusal,
 } from '@/application/rate-limit/apply-rate-limit';
 import {
+  forbidden,
   serviceUnavailable,
   unauthorized,
   unsupportedMediaType,
@@ -72,6 +73,45 @@ export type RouteCaller = {
   userId: string | null;
 };
 
+const ACCEPTED_FETCH_SITES: ReadonlySet<string> = new Set([
+  'same-origin',
+  'none',
+]);
+
+function firstListValue(header: string | null): string | null {
+  const first = header?.split(',')[0]?.trim();
+  return first ? first : null;
+}
+
+// why: req.url can carry the server's own bind host; behind the Vercel proxy
+// the public host is x-forwarded-host, as in Next's server-action origin check.
+function requestHost(req: Request): string {
+  const host =
+    firstListValue(req.headers.get('x-forwarded-host')) ??
+    req.headers.get('host') ??
+    new URL(req.url).host;
+  return host.toLowerCase();
+}
+
+function originHost(origin: string): string | null {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return null;
+  }
+}
+
+// why: an <img> or a text/plain POST from another site needs no preflight, so
+// without this any page could spend paid credit from its visitors' browsers.
+// A request with neither header comes from a non-browser client.
+function isSameOriginRequest(req: Request): boolean {
+  const fetchSite = req.headers.get('sec-fetch-site');
+  if (fetchSite !== null) return ACCEPTED_FETCH_SITES.has(fetchSite);
+  const origin = req.headers.get('origin');
+  if (origin === null) return true;
+  return originHost(origin) === requestHost(req);
+}
+
 // Same shape as requireAuthedRoute for a route that also serves anonymous
 // callers: no identity is demanded, but the rate limit still applies, keyed on
 // the client address when there is no user to key on.
@@ -82,6 +122,17 @@ export async function openRoute(args: {
 }): Promise<
   { ok: true; caller: RouteCaller } | { ok: false; response: Response }
 > {
+  if (!isSameOriginRequest(args.req)) {
+    log.warn(`${args.event}.cross_site_refused`, {
+      fetchSite: args.req.headers.get('sec-fetch-site'),
+      origin: args.req.headers.get('origin'),
+    });
+    return {
+      ok: false,
+      response: jsonError(forbidden('Cross-site request refused')),
+    };
+  }
+
   const me = await getCurrentUser();
   const userId = me.isOk() ? me.value.id : null;
   const rl = await applyRateLimit({

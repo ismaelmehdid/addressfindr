@@ -132,6 +132,102 @@ describe('openRoute — anonymous access with a rate limit', () => {
   });
 });
 
+describe('openRoute — same-origin check', () => {
+  beforeEach(() => {
+    mockedUser.mockResolvedValue(err(unauthorized('no session')));
+  });
+
+  async function statusFor(headers: Record<string, string>): Promise<number> {
+    const result = await openRoute({
+      req: extractRequest(headers),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+    return result.ok ? 200 : result.response.status;
+  }
+
+  it('refuses a cross-site request before spending any quota', async () => {
+    expect(await statusFor({ 'sec-fetch-site': 'cross-site' })).toBe(403);
+    expect(mockedRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('refuses a same-site request from a sibling host', async () => {
+    expect(await statusFor({ 'sec-fetch-site': 'same-site' })).toBe(403);
+  });
+
+  it('accepts a same-origin request', async () => {
+    expect(await statusFor({ 'sec-fetch-site': 'same-origin' })).toBe(200);
+  });
+
+  it('accepts a request the user typed into the address bar', async () => {
+    expect(await statusFor({ 'sec-fetch-site': 'none' })).toBe(200);
+  });
+
+  it('trusts Sec-Fetch-Site over a matching Origin', async () => {
+    expect(
+      await statusFor({
+        'sec-fetch-site': 'cross-site',
+        origin: 'https://app.test',
+      }),
+    ).toBe(403);
+  });
+
+  it('refuses a mismatched Origin when Sec-Fetch-Site is absent', async () => {
+    expect(await statusFor({ origin: 'https://evil.example' })).toBe(403);
+    expect(mockedRateLimit).not.toHaveBeenCalled();
+  });
+
+  it('refuses an opaque null Origin', async () => {
+    expect(await statusFor({ origin: 'null' })).toBe(403);
+  });
+
+  it('accepts an Origin that matches the request host', async () => {
+    expect(await statusFor({ origin: 'https://app.test' })).toBe(200);
+  });
+
+  // why: behind the Vercel proxy the public host arrives in x-forwarded-host,
+  // while req.url may carry an internal host.
+  it('compares the Origin with the forwarded host first', async () => {
+    const req = new Request('http://localhost:3000/api/listings/extract', {
+      method: 'POST',
+      headers: {
+        origin: 'https://www.app.fr',
+        'x-forwarded-host': 'www.app.fr',
+      },
+    });
+
+    const result = await openRoute({
+      req,
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it('refuses an Origin that only matches req.url when the forwarded host differs', async () => {
+    const req = new Request('https://app.test/api/listings/extract', {
+      method: 'POST',
+      headers: { origin: 'https://app.test', 'x-forwarded-host': 'www.app.fr' },
+    });
+
+    const result = await openRoute({
+      req,
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(403);
+  });
+
+  it('accepts a request with neither header, from a non-browser client', async () => {
+    expect(await statusFor({})).toBe(200);
+    expect(mockedRateLimit).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('openRoute — limiter unavailable', () => {
   it('answers 503 when a paid bucket fails closed', async () => {
     mockedUser.mockResolvedValue(err(unauthorized('no session')));
