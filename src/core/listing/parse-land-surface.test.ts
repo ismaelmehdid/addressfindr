@@ -65,7 +65,43 @@ describe('parseLandSurfaceM2', () => {
     ).toBe(1000);
   });
 
+  // why: after a comma the next area usually describes the house, not the
+  // plot — the bug 3 failure again, through punctuation.
+  it('refuses an area after a comma unless the lead-in hands it to the plot', () => {
+    expect(parseLandSurfaceM2('Terrain arboré, 120 m² au sol')).toBeNull();
+    expect(parseLandSurfaceM2('Terrain clos, 120 m² de plain-pied')).toBeNull();
+    expect(
+      parseLandSurfaceM2('Terrain arboré, 110 m² sur deux niveaux'),
+    ).toBeNull();
+    expect(
+      parseLandSurfaceM2('Terrain constructible, emprise au sol 90 m²'),
+    ).toBeNull();
+    expect(
+      parseLandSurfaceM2('sur terrain arboré, beaux volumes : 140 m²'),
+    ).toBeNull();
+  });
+
+  it('accepts a comma when an elided "d\'" hands the area to the plot', () => {
+    const apostrophe = String.fromCharCode(0x2019);
+    const typographic = `Terrain plat, arboré d${apostrophe}1 hectare`;
+    expect(typographic).toContain(apostrophe);
+    expect(parseLandSurfaceM2(typographic)).toBe(10000);
+    expect(parseLandSurfaceM2("Terrain plat, arboré d'1 hectare")).toBe(10000);
+  });
+
+  it('refuses a footprint or level count even without a comma', () => {
+    expect(parseLandSurfaceM2('Terrain arboré 120 m² au sol')).toBeNull();
+    expect(parseLandSurfaceM2('Terrain avec emprise de 90 m²')).toBeNull();
+  });
+
+  it('keeps the plot area when another area follows it', () => {
+    expect(parseLandSurfaceM2('Terrain de 600 m², maison de 90 m²')).toBe(600);
+  });
+
   it('still refuses an area a comma hands to another building', () => {
+    expect(parseLandSurfaceM2('Terrain, garage, 150 m² habitables')).toBeNull();
+    expect(parseLandSurfaceM2('terrain clos, piscine de 32 m²')).toBeNull();
+    expect(parseLandSurfaceM2('Terrain arboré, 4 chambres, 120 m²')).toBeNull();
     expect(
       parseLandSurfaceM2('Sur un terrain, une maison de 120 m²'),
     ).toBeNull();

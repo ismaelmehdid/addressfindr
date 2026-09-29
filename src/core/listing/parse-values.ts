@@ -39,11 +39,11 @@ export function parseSurfaceM2(raw: string): number | null {
 // has. Living area and plot area read alike, and one sentence often carries
 // both ("maison de 120 m² sur un terrain de 800 m²"): comparing a living room
 // to a parcel would penalise the true house. So only an area attached to the
-// word naming the plot counts, and a quote naming the living area, a garden or
-// a terrace is refused outright.
+// word naming the plot counts, and a quote naming the living area, its
+// footprint or levels, a garden or a terrace is refused outright.
 const LAND_SUBJECT = /terrain|parcelle/gi;
 const LAND_EXCLUSIONS =
-  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine/i;
+  /habitable|carrez|jardin|terrasse|balcon|s[ée]jour|cave|garage|piscine|au sol|emprise|plain[\s-]?pied|niveaux/i;
 
 const SQUARE_METRES_PER_ARE = 100;
 const SQUARE_METRES_PER_HECTARE = 10_000;
@@ -59,10 +59,13 @@ const LAND_AREAS: readonly (readonly [RegExp, number])[] = [
   ],
 ];
 
-// why: between the plot word and its area there may only be words and commas
-// ("terrain plat, clos et arboré de") — no other number, no sentence break, and
-// no other building the area could belong to.
+// why: between the plot word and its area there may only be words — no other
+// number, no sentence break, and no other building the area could belong to.
+// After a comma the next area usually describes the house, so a comma is
+// accepted only when the lead-in hands the area back to the plot with "de"
+// ("terrain plat, clos et arboré de 1000 m²").
 const LAND_LEAD_IN = /^[^\d.;!?\n]{0,40}$/;
+const LAND_LEAD_IN_OWNED = /(?:\bde\s+|\bd['’]\s*)$/i;
 const OTHER_BUILT_SUBJECT =
   /maison|appartement|villa|pavillon|logement|habitation|b[aâ]ti|d[ée]pendance|hangar|grange|atelier|pi[èe]ce|chambre|salon/i;
 const LAND_TRAILER = /^\s*d(?:e\s+|['’]\s*)(?:terrain|parcelle)/i;
@@ -90,12 +93,16 @@ function isAttachedToLand(text: string, area: LandArea): boolean {
   for (const subject of text.matchAll(LAND_SUBJECT)) {
     const subjectEnd = subject.index + subject[0].length;
     if (subjectEnd > area.start) break;
-    const leadIn = text.slice(subjectEnd, area.start);
-    if (LAND_LEAD_IN.test(leadIn) && !OTHER_BUILT_SUBJECT.test(leadIn)) {
-      return true;
-    }
+    if (isPlotLeadIn(text.slice(subjectEnd, area.start))) return true;
   }
   return false;
+}
+
+function isPlotLeadIn(leadIn: string): boolean {
+  if (!LAND_LEAD_IN.test(leadIn) || OTHER_BUILT_SUBJECT.test(leadIn)) {
+    return false;
+  }
+  return !leadIn.includes(',') || LAND_LEAD_IN_OWNED.test(leadIn);
 }
 
 export function parseLandSurfaceM2(raw: string): number | null {
