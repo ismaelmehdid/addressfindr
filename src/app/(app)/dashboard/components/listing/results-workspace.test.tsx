@@ -247,7 +247,8 @@ describe('ResultsWorkspace detail header', () => {
     await renderClosable({ shown: SECOND });
     const card = shownCardButton();
     const focus = vi.spyOn(card, 'focus');
-    const scroll = placeInList(card, { top: 50, height: 300 });
+    const scroll = placeInList(card, VIEWPORT.top + 50);
+    focusRingShows(card, true);
     const close = detailButton('Fermer le détail');
     act(() => {
       close.focus();
@@ -267,22 +268,52 @@ describe('ResultsWorkspace detail header', () => {
 
   // why: the close button is reached by tabbing past every later card, which
   // scrolls the list until the shown card is out of its view.
-  it("brings the shown result's card back into the list's view when it was scrolled away", async () => {
+  it("brings the shown result's card back into view when the keyboard closes the detail", async () => {
     await renderClosable({ shown: FIRST });
     const card = shownCardButton();
-    const scroll = placeInList(card, { top: -500, height: 300 });
+    const scroll = placeInList(card, VIEWPORT.top - 500);
+    focusRingShows(card, true);
     const close = detailButton('Fermer le détail');
     act(() => {
       close.focus();
     });
 
     await act(async () => {
-      close.click();
+      close.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
       await nextFrame();
     });
 
+    expect(container.querySelector('aside')).toBeNull();
     expect(document.activeElement).toBe(card);
-    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({
+      top: 50,
+      behavior: 'auto',
+    });
+  });
+
+  // why: the list only moves to show a focus ring, and focus a script moves
+  // after a pointer press shows none; the list stays where it was scrolled.
+  it('leaves the list where it was scrolled when a mouse closes the detail', async () => {
+    await renderClosable({ shown: FIRST });
+    const card = shownCardButton();
+    const scroll = placeInList(card, VIEWPORT.top - 500);
+    focusRingShows(card, false);
+    const close = detailButton('Fermer le détail');
+
+    await act(async () => {
+      clickWithMouse(close);
+      await nextFrame();
+    });
+
+    expect(container.querySelector('aside')).toBeNull();
+    expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
   });
 
   // why: a click does not focus a button in Safari, so focus can already sit
@@ -357,28 +388,63 @@ function rect(top: number, height: number): DOMRect {
   };
 }
 
-// why: jsdom lays nothing out. This gives the list a 400px viewport at the top
-// of the page and puts the card at the given place, then watches the viewport
-// scroll.
+// why: jsdom lays nothing out. The list's 400px viewport sits 120px down the
+// page, scrolled 600px into 2000px of content, so a mistake in the frame a
+// box is measured in moves the scroll target.
+const VIEWPORT = { top: 120, height: 400, scrollTop: 600, scrollHeight: 2000 };
+const CARD_HEIGHT = 300;
+
+// why: puts the given card at `top` in the page's frame, then watches the
+// viewport scroll. The card and its button share one box, as on screen.
 function placeInList(
-  card: HTMLElement,
-  place: { top: number; height: number },
+  cardButton: HTMLElement,
+  top: number,
 ): ReturnType<typeof vi.fn> {
   const viewport = resultsColumn().querySelector<HTMLElement>(
     '[data-slot="scroll-area-viewport"]',
   );
   if (viewport === null) throw new Error('no scroll area viewport');
-  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(rect(0, 400));
-  Object.defineProperty(viewport, 'clientHeight', {
-    configurable: true,
-    value: 400,
-  });
-  vi.spyOn(card, 'getBoundingClientRect').mockReturnValue(
-    rect(place.top, place.height),
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(
+    rect(VIEWPORT.top, VIEWPORT.height),
   );
+  for (const [property, value] of [
+    ['clientHeight', VIEWPORT.height],
+    ['scrollTop', VIEWPORT.scrollTop],
+    ['scrollHeight', VIEWPORT.scrollHeight],
+  ] as const) {
+    Object.defineProperty(viewport, property, { configurable: true, value });
+  }
+  const card = cardButton.closest<HTMLElement>('[data-slot="card"]');
+  if (card === null) throw new Error('no card around the button');
+  for (const element of [card, cardButton]) {
+    vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(
+      rect(top, CARD_HEIGHT),
+    );
+  }
   const scroll = vi.fn();
   viewport.scrollTo = scroll;
   return scroll;
+}
+
+// why: whether focus moved by a script shows its ring is the browser's call
+// (after a key press it does, after a pointer press it does not), and jsdom's
+// heuristic ignores the key press. This gives the browser's answer.
+function focusRingShows(element: HTMLElement, shows: boolean): void {
+  const matches = element.matches.bind(element);
+  vi.spyOn(element, 'matches').mockImplementation((selector: string) =>
+    selector === ':focus-visible'
+      ? shows && document.activeElement === element
+      : matches(selector),
+  );
+}
+
+function clickWithMouse(target: HTMLElement): void {
+  target.focus();
+  for (const type of ['mousedown', 'mouseup', 'click']) {
+    target.dispatchEvent(
+      new MouseEvent(type, { bubbles: true, cancelable: true, detail: 1 }),
+    );
+  }
 }
 
 function shownCardButton(): HTMLButtonElement {
@@ -516,6 +582,8 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     await renderClosable({ shown: SECOND });
     const card = shownCardButton();
     const focus = vi.spyOn(card, 'focus');
+    const scroll = placeInList(card, VIEWPORT.top + 50);
+    focusRingShows(card, true);
     const close = sheetContent().querySelector<HTMLButtonElement>(
       'button[aria-label="Fermer le détail"]',
     );
@@ -533,6 +601,7 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     expect(card.getAttribute('aria-current')).toBeNull();
     expect(focus).toHaveBeenCalledWith({ preventScroll: true });
     expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
   });
 });
 

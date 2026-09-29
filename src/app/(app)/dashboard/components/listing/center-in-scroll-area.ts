@@ -1,4 +1,8 @@
 const SCROLL_AREA_VIEWPORT = '[data-slot="scroll-area-viewport"]';
+const CARD = '[data-slot="card"]';
+// why: a result card draws its button's focus ring 2px wide, 2px outside its
+// own edge (outline-2 outline-offset-2).
+const FOCUS_RING_EXTENT_PX = 4;
 const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
 
 type ViewportBox = { viewportTop: number; viewportHeight: number };
@@ -58,16 +62,20 @@ export function centerInScrollArea(element: HTMLElement): void {
 
 // why: focus moved with preventScroll can land on an element the list has
 // scrolled away from, leaving its focus indicator off-screen. Only then is it
-// centred, so an element already in view never makes the list jump.
+// centred, so an element already in view never makes the list jump. What must
+// fit is the ring, which a card inside the list draws around itself rather
+// than around the button that holds focus.
 export function revealInScrollArea(element: HTMLElement): void {
   const viewport = element.closest<HTMLElement>(SCROLL_AREA_VIEWPORT);
   if (viewport === null) return;
-  const item = element.getBoundingClientRect();
+  const card = element.closest<HTMLElement>(CARD);
+  const ringed = card !== null && viewport.contains(card) ? card : element;
+  const item = ringed.getBoundingClientRect();
   const visible = isInView({
     viewportTop: viewport.getBoundingClientRect().top + viewport.clientTop,
     viewportHeight: viewport.clientHeight,
-    itemTop: item.top,
-    itemHeight: item.height,
+    itemTop: item.top - FOCUS_RING_EXTENT_PX,
+    itemHeight: item.height + 2 * FOCUS_RING_EXTENT_PX,
   });
-  if (!visible) centerInScrollArea(element);
+  if (!visible) centerInScrollArea(ringed);
 }

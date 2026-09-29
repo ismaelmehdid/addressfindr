@@ -162,9 +162,10 @@ export function ResultsWorkspace({
   // onOpenChange(false)) can unmount the panel that held focus. Focus then
   // returns to the shown result's card, the one marked current while the
   // detail is open. preventScroll keeps the page still; the list moves only
-  // when the card is out of its view, as after tabbing past every later card
-  // to reach the detail. Focus outside the detail, such as on a card where
-  // Escape was pressed, stays where it is.
+  // to show the card's focus ring, when the browser draws one (a keyboard
+  // close, not a pointer one) and the card is out of view, as after tabbing
+  // past every later card to reach the detail. Focus outside the detail, such
+  // as on a card where Escape was pressed, stays where it is.
   function closeDetail(): void {
     const focused = document.activeElement;
     const focusInDetail =
@@ -185,7 +186,7 @@ export function ResultsWorkspace({
         shownCard?.isConnected === true ? shownCard : headingRef.current;
       if (target === null) return;
       target.focus({ preventScroll: true });
-      revealInScrollArea(target);
+      if (target.matches(':focus-visible')) revealInScrollArea(target);
     });
   }
 
