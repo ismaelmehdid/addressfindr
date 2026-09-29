@@ -5,8 +5,9 @@ import { getCurrentUser } from '@/application/me/get-current-user';
 import {
   applyRateLimit,
   type RateLimitBucket,
+  type RateLimitRefusal,
 } from '@/application/rate-limit/apply-rate-limit';
-import { unauthorized, validation } from '@/core/errors';
+import { serviceUnavailable, unauthorized, validation } from '@/core/errors';
 import { rateLimitIdentifier } from '@/shared/client-ip';
 import { jsonError } from '@/shared/errors-http';
 import { log } from '@/shared/logger';
@@ -14,6 +15,25 @@ import { log } from '@/shared/logger';
 export type AuthedRouteContext = {
   userId: string;
 };
+
+function rateLimitRefusal(args: {
+  refusal: RateLimitRefusal;
+  event: string;
+  context: Record<string, unknown>;
+}): Response {
+  if (args.refusal.reason === 'unavailable') {
+    log.warn(`${args.event}.rate_limit_unavailable`, args.context);
+    return jsonError(serviceUnavailable('Rate limiter unavailable'));
+  }
+  log.warn(`${args.event}.rate_limited`, {
+    ...args.context,
+    reset: args.refusal.reset,
+  });
+  return NextResponse.json(
+    { error: 'rate_limited', reset: args.refusal.reset },
+    { status: 429 },
+  );
+}
 
 export async function requireAuthedRoute(args: {
   rateLimit: RateLimitBucket;
@@ -28,16 +48,13 @@ export async function requireAuthedRoute(args: {
   const identifier = me.value.id;
   const rl = await applyRateLimit({ identifier, limit: args.rateLimit });
   if (!rl.success) {
-    log.warn(`${args.event}.rate_limited`, {
-      userId: me.value.id,
-      reset: rl.reset,
-    });
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: 'rate_limited', reset: rl.reset },
-        { status: 429 },
-      ),
+      response: rateLimitRefusal({
+        refusal: rl,
+        event: args.event,
+        context: { userId: me.value.id },
+      }),
     };
   }
   return {
@@ -67,16 +84,13 @@ export async function openRoute(args: {
     limit: args.rateLimit,
   });
   if (!rl.success) {
-    log.warn(`${args.event}.rate_limited`, {
-      authenticated: userId !== null,
-      reset: rl.reset,
-    });
     return {
       ok: false,
-      response: NextResponse.json(
-        { error: 'rate_limited', reset: rl.reset },
-        { status: 429 },
-      ),
+      response: rateLimitRefusal({
+        refusal: rl,
+        event: args.event,
+        context: { authenticated: userId !== null },
+      }),
     };
   }
   return { ok: true, caller: { userId } };

@@ -4,6 +4,7 @@ import {
   externalApi,
   forbidden,
   notFound,
+  serviceUnavailable,
   unauthorized,
   unknown,
   validation,
@@ -29,6 +30,9 @@ describe('appErrorToStatus — M22 single source of truth', () => {
   it('maps external_api to 502', () => {
     expect(appErrorToStatus('external_api')).toBe(502);
   });
+  it('maps service_unavailable to 503', () => {
+    expect(appErrorToStatus('service_unavailable')).toBe(503);
+  });
   it('maps unknown to 500', () => {
     expect(appErrorToStatus('unknown')).toBe(500);
   });
@@ -43,6 +47,7 @@ describe('jsonError', () => {
       { error: conflict('y'), status: 409 },
       { error: validation('z'), status: 400 },
       { error: externalApi('p', 'w'), status: 502 },
+      { error: serviceUnavailable('s'), status: 503 },
       { error: unknown('q'), status: 500 },
     ] as const;
     for (const c of cases) {

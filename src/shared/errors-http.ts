@@ -9,6 +9,7 @@ const CODE_TO_STATUS: Record<AppErrorCode, number> = {
   validation: 400,
   rate_limited: 429,
   external_api: 502,
+  service_unavailable: 503,
   db_error: 500,
   unknown: 500,
 };

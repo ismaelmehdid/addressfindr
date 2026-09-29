@@ -113,7 +113,7 @@ describe('openRoute — anonymous access with a rate limit', () => {
     mockedUser.mockResolvedValue(err(unauthorized('no session')));
     mockedRateLimit.mockResolvedValue({
       success: false,
-      remaining: 0,
+      reason: 'limited',
       reset: 42,
     });
 
@@ -128,5 +128,27 @@ describe('openRoute — anonymous access with a rate limit', () => {
     expect(result.response.status).toBe(429);
     const body = await result.response.json();
     expect(body.error).toBe('rate_limited');
+  });
+});
+
+describe('openRoute — limiter unavailable', () => {
+  it('answers 503 when a paid bucket fails closed', async () => {
+    mockedUser.mockResolvedValue(err(unauthorized('no session')));
+    mockedRateLimit.mockResolvedValue({
+      success: false,
+      reason: 'unavailable',
+    });
+
+    const result = await openRoute({
+      req: extractRequest(),
+      rateLimit: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(503);
+    const body = await result.response.json();
+    expect(body.error).toBe('service_unavailable');
   });
 });
