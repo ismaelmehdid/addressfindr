@@ -627,6 +627,83 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     expect(document.activeElement).toBe(card);
     expect(scroll).not.toHaveBeenCalled();
   });
+
+  // why: Base UI closes the sheet on any Escape inside it; the one that
+  // leaves the Street View panorama is already handled and must not.
+  it('leaves the Street View panorama on Escape without closing the sheet', async () => {
+    onScreen(40);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+      ),
+    );
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    const shown: AddressCandidate = {
+      ...FIRST,
+      record: {
+        ...FIRST.record,
+        point: { latitude: 45.7578, longitude: 4.8515 },
+      },
+    };
+    await renderClosable({
+      match: match([shown, SECOND, THIRD]),
+      shown,
+      streetViewEnabled: true,
+      streetViewEmbedKey: 'browser-embed-key',
+    });
+    // why: the opening sheet moves focus into itself a frame later.
+    await act(async () => {
+      await nextFrame();
+    });
+    const trigger = (): HTMLButtonElement | null =>
+      sheetContent().querySelector<HTMLButtonElement>(
+        'button[aria-label="Explorer le panorama Street View"]',
+      );
+    await act(async () => {
+      trigger()?.click();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    const back = document.activeElement;
+    expect(back?.textContent).toBe('Retour à la photo');
+    expect(sheetContent().querySelector('iframe')).not.toBeNull();
+
+    await act(async () => {
+      back?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(
+      resultsColumn().querySelector('button[aria-current="true"]'),
+    ).not.toBeNull();
+    expect(sheetContent().querySelector('iframe')).toBeNull();
+    expect(document.activeElement).toBe(trigger());
+
+    await act(async () => {
+      trigger()?.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(
+      resultsColumn().querySelector('button[aria-current="true"]'),
+    ).toBeNull();
+  });
 });
 
 function sheetContent(): HTMLElement {

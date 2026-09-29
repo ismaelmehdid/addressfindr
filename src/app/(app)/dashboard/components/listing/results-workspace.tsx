@@ -364,7 +364,17 @@ export function ResultsWorkspace({
       {!isLg && (
         <Sheet
           open={detailOpen}
-          onOpenChange={(open) => {
+          onOpenChange={(open, details) => {
+            // why: an Escape the detail already handled (leaving the Street
+            // View panorama) must not also close the sheet, as on lg.
+            if (
+              !open &&
+              details.reason === 'escape-key' &&
+              details.event.defaultPrevented
+            ) {
+              details.cancel();
+              return;
+            }
             if (!open) closeDetail();
           }}
         >

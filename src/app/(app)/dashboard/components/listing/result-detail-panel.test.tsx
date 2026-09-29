@@ -13,6 +13,7 @@ import {
 } from 'vitest';
 import { scoreColour } from '@/core/ademe/score-scale';
 import type { AddressCandidate, DpeRecord } from '@/core/ademe/types';
+import { streetViewImagePath } from '@/core/street-view/links';
 import messages from '@/i18n/messages/fr.json';
 import { ResultDetailPanel } from './result-detail-panel';
 import type { SearchFeedback } from './use-search-feedback';
@@ -408,5 +409,53 @@ describe('ResultDetailPanel confirmation', () => {
     });
 
     expect(confirm).toHaveBeenCalledExactlyOnceWith('2269E0000001A');
+  });
+});
+
+describe('ResultDetailPanel Street View panorama', () => {
+  const OTHER_POINT = { latitude: 45.7612, longitude: 4.8567 };
+
+  function panoramaTrigger(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Explorer le panorama Street View"]',
+    );
+  }
+
+  async function renderExplorable(record: Partial<DpeRecord>): Promise<void> {
+    await render({
+      candidate: candidate(record),
+      streetViewEnabled: true,
+      streetViewEmbedKey: 'browser-embed-key',
+    });
+  }
+
+  // why: a panorama left open would show another address than the one the
+  // detail now names.
+  it('shows the photo again, not the panorama, when the shown result changes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+      ),
+    );
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    await renderExplorable({ point: TRUSTED_POINT });
+    await act(async () => {
+      panoramaTrigger()?.click();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(container.querySelector('iframe')).not.toBeNull();
+
+    await renderExplorable({ dpeNumber: '2269E0000002B', point: OTHER_POINT });
+
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(panoramaTrigger()).not.toBeNull();
+    expect(container.querySelector('img')?.src).toBe(
+      new URL(streetViewImagePath(OTHER_POINT), document.baseURI).href,
+    );
   });
 });

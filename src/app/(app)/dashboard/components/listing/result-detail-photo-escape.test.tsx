@@ -40,33 +40,39 @@ async function press(target: Element, key: string): Promise<void> {
   });
 }
 
-function dialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[role="dialog"]');
+function panoramaTrigger(): HTMLButtonElement {
+  const trigger = document.querySelector<HTMLButtonElement>(
+    'button[aria-label="Explorer le panorama Street View"]',
+  );
+  if (trigger === null) throw new Error('no panorama trigger');
+  return trigger;
 }
 
-async function openPanorama(trigger: HTMLButtonElement): Promise<Element> {
+async function explore(): Promise<Element> {
   await act(async () => {
-    trigger.click();
+    panoramaTrigger().click();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   });
-  const close = dialog()?.querySelector(
-    'button[aria-label="Fermer le panorama"]',
+  const back = [...document.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Retour à la photo',
   );
-  if (close === undefined || close === null) {
-    throw new Error('no panorama dialog');
-  }
-  return close;
+  if (back === undefined) throw new Error('no panorama shown');
+  return back;
 }
 
 // why: Next.js mounts React on `document`, where the detail shortcuts listen
-// too; the dialog's popup stops Escape and the arrow keys in its portal before
-// they get there, and a key that lands on <body> while it is open is ignored.
-// It must be the file's only root: React skips listening on a document an
-// earlier root already marked.
-it('keeps the detail shortcuts away from keys pressed while the panorama dialog is open', async () => {
+// too, so nothing the panorama does can stop the key reaching them; it marks
+// Escape handled instead. It must be the file's only root: React skips
+// listening on a document an earlier root already marked.
+it('leaves the panorama on Escape without closing the detail, which the next Escape closes', async () => {
   const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
   vi.stubGlobal(
     'fetch',
-    vi.fn(() => new Promise<Response>(() => {})),
+    vi.fn(async () =>
+      Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+    ),
   );
   const root = createRoot(document);
   onTestFinished(() => {
@@ -90,29 +96,22 @@ it('keeps the detail shortcuts away from keys pressed while the panorama dialog 
       </html>,
     );
   });
-  const trigger = document.querySelector<HTMLButtonElement>(
-    'button[aria-label="Explorer le panorama Street View"]',
-  );
-  if (trigger === null) throw new Error('no panorama trigger');
 
-  const close = await openPanorama(trigger);
-  await press(close, 'ArrowLeft');
-  await press(close, 'ArrowRight');
-  expect(dialog()).not.toBeNull();
-  expect(shortcuts.onPrevious).not.toHaveBeenCalled();
-  expect(shortcuts.onNext).not.toHaveBeenCalled();
+  const back = await explore();
+  expect(document.activeElement).toBe(back);
+  expect(document.querySelector('iframe')).not.toBeNull();
 
-  await press(close, 'Escape');
-  expect(dialog()).toBeNull();
+  // why: only Escape is claimed; the arrow keys still page the results.
+  await press(back, 'ArrowLeft');
+  await press(back, 'ArrowRight');
+  expect(shortcuts.onPrevious).toHaveBeenCalledOnce();
+  expect(shortcuts.onNext).toHaveBeenCalledOnce();
+
+  await press(back, 'Escape');
   expect(shortcuts.onClose).not.toHaveBeenCalled();
+  expect(document.querySelector('iframe')).toBeNull();
+  expect(document.activeElement).toBe(panoramaTrigger());
 
-  await openPanorama(trigger);
-  await press(document.body, 'ArrowRight');
-  await press(document.body, 'Escape');
-  expect(shortcuts.onNext).not.toHaveBeenCalled();
-  expect(shortcuts.onClose).not.toHaveBeenCalled();
-  expect(dialog()).toBeNull();
-
-  await press(trigger, 'Escape');
+  await press(panoramaTrigger(), 'Escape');
   expect(shortcuts.onClose).toHaveBeenCalledOnce();
 });
