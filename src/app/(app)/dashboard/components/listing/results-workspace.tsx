@@ -3,7 +3,7 @@
 import { ChevronDown, Info, MapPin, MapPinOff, Search } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,8 @@ import { cn } from '@/lib/utils';
 import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
+import { DEFAULT_MAP_VIEW, type MapView } from './map-view';
+import { MapViewSwitch } from './map-view-switch';
 import { MissingListingFeedback } from './missing-listing-feedback';
 import { ResultDetailPanel } from './result-detail-panel';
 import { ResultsPager } from './results-pager';
@@ -115,6 +117,7 @@ export function ResultsWorkspace({
     candidates: match.candidates,
   });
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const [mapView, setMapView] = useState<MapView>(DEFAULT_MAP_VIEW);
   const { candidates } = match;
   const total = candidates.length;
   const index = Math.max(
@@ -279,31 +282,44 @@ export function ResultsWorkspace({
                   overview={map.overview}
                   focusRequest={focusRequest}
                   padding={padding}
+                  view={mapView}
                   accessToken={accessToken}
                 />
               </MapErrorBoundary>
             </div>
-            <Badge
-              variant="outline"
-              aria-live="polite"
+            <div
               className={cn(
-                'absolute top-3 left-3 z-10 h-auto gap-1.5 bg-paper py-1 whitespace-normal shadow-sm',
+                'pointer-events-none absolute top-3 left-3 z-10 @container',
                 // why: between lg and xl the floating detail panel (z-20)
-                // covers the right 424px, so the chip must not grow under it.
-                panelFloats
-                  ? 'max-w-[calc(100%_-_448px)]'
-                  : 'max-w-[calc(100%-1.5rem)]',
+                // covers the right 424px, so the chip and the switch stay
+                // left of it. Side by side, the chip wraps before it reaches
+                // the switch; in a strip narrower than 20rem it would shrink
+                // to a word per line, so it drops below the switch instead.
+                panelFloats ? 'right-[424px]' : 'right-3',
               )}
             >
-              {shown.record.point === null ? (
-                <MapPinOff aria-hidden />
-              ) : (
-                <MapPin aria-hidden />
-              )}
-              {shown.record.point === null
-                ? t('mapNoTrustedPoint', { address: shown.record.address })
-                : t('mapPinned', { address: shown.record.address })}
-            </Badge>
+              <div className="flex flex-col-reverse items-end gap-2 @xs:flex-row @xs:items-start @xs:justify-between">
+                <Badge
+                  variant="outline"
+                  aria-live="polite"
+                  className="pointer-events-auto h-auto min-w-0 shrink gap-1.5 self-start bg-paper py-1 whitespace-normal shadow-sm"
+                >
+                  {shown.record.point === null ? (
+                    <MapPinOff aria-hidden />
+                  ) : (
+                    <MapPin aria-hidden />
+                  )}
+                  {shown.record.point === null
+                    ? t('mapNoTrustedPoint', { address: shown.record.address })
+                    : t('mapPinned', { address: shown.record.address })}
+                </Badge>
+                <MapViewSwitch
+                  view={mapView}
+                  onViewChange={setMapView}
+                  className="pointer-events-auto shrink-0"
+                />
+              </div>
+            </div>
           </>
         ) : (
           <EmptyState

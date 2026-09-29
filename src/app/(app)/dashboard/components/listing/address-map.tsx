@@ -7,12 +7,8 @@ import mapboxgl, {
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 import type { GeoPoint } from '@/core/geo/types';
+import { type MapView, mapStyleUrl, showsBuildings } from './map-view';
 import 'mapbox-gl/dist/mapbox-gl.css';
-
-// why: Mapbox v3's Standard style draws its own buildings and does not expose
-// the "composite" source, so this layer is rejected there. light-v11 carries
-// it, and its light background follows the visual language of DESIGN.md.
-const MAP_STYLE = 'mapbox://styles/mapbox/light-v11';
 
 const BUILDINGS_LAYER: FillExtrusionLayerSpecification = {
   id: 'add-3d-buildings',
@@ -70,12 +66,14 @@ export function AddressMap({
   overview,
   focusRequest,
   padding,
+  view,
   accessToken,
 }: {
   point: GeoPoint | null;
   overview: GeoPoint;
   focusRequest: number;
   padding: PaddingOptions;
+  view: MapView;
   accessToken: string;
 }) {
   const t = useTranslations('Listing');
@@ -83,6 +81,7 @@ export function AddressMap({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
   const initialCameraRef = useRef(cameraFor(point, overview));
+  const styledViewRef = useRef(view);
 
   // why: every `new mapboxgl.Map()` is a billed map load. The map is built once
   // and moved afterwards, never recreated per address.
@@ -93,7 +92,7 @@ export function AddressMap({
     const map = new mapboxgl.Map({
       accessToken,
       container,
-      style: MAP_STYLE,
+      style: mapStyleUrl(styledViewRef.current),
       ...initialCameraRef.current,
       antialias: true,
       attributionControl: false,
@@ -107,7 +106,9 @@ export function AddressMap({
     map.addControl(new mapboxgl.AttributionControl(), 'bottom-right');
 
     map.on('style.load', () => {
-      map.addLayer(BUILDINGS_LAYER, firstLabelLayerId(map));
+      if (showsBuildings(styledViewRef.current)) {
+        map.addLayer(BUILDINGS_LAYER, firstLabelLayerId(map));
+      }
     });
 
     // why: Mapbox only tracks window resizes; the map also changes size when
@@ -125,6 +126,23 @@ export function AddressMap({
       mapRef.current = null;
     };
   }, [accessToken]);
+
+  // why: `setStyle` restyles the map already loaded, so unlike a new map it
+  // is not billed. Without a diff, Mapbox rebuilds the style and fires
+  // `style.load` again, where the buildings follow the new view; the camera,
+  // the marker and the attribution stay as they are.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map === null || styledViewRef.current === view) return;
+    styledViewRef.current = view;
+    map.setStyle(mapStyleUrl(view), {
+      diff: false,
+      // why: the options type requires both font families; these are the
+      // Mapbox defaults the map was built with, so the labels keep their fonts.
+      localFontFamily: null,
+      localIdeographFontFamily: 'sans-serif',
+    });
+  }, [view]);
 
   const latitude = point?.latitude ?? null;
   const longitude = point?.longitude ?? null;
