@@ -307,11 +307,13 @@ function ResultDetailBody({
             )}
             <p
               role="status"
-              className={cn(
-                'text-[12px]',
-                copyStatus !== 'idle' && 'mt-1',
-                copyStatus === 'failed' ? 'text-destructive' : 'text-graphite',
-              )}
+              // why: the check on the copy button is the visible confirmation,
+              // so a success is only announced; a failure is also shown.
+              className={
+                copyStatus === 'failed'
+                  ? 'mt-1 text-[12px] text-destructive'
+                  : 'sr-only'
+              }
             >
               {copyStatus === 'copied'
                 ? t('detailCopied')
