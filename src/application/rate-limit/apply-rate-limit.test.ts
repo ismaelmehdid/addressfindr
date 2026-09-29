@@ -69,7 +69,12 @@ vi.mock('@upstash/ratelimit', () => ({
 }));
 
 import { getRedisClient } from '@/infra/external-apis/redis/client';
-import { applyRateLimit, type RateLimitBucket } from './apply-rate-limit';
+import {
+  applyDailyCap,
+  applyRateLimit,
+  type DailyCappedBucket,
+  type RateLimitBucket,
+} from './apply-rate-limit';
 
 const PAID_BUCKETS: RateLimitBucket[] = [
   'listing-extract',
@@ -81,6 +86,11 @@ const FREE_BUCKETS: RateLimitBucket[] = [
   'default',
   'upload',
   'listing-feedback',
+];
+const DAILY_CAPPED_BUCKETS: DailyCappedBucket[] = [
+  'listing-extract',
+  'listing-match',
+  'street-view',
 ];
 
 function withRedis(): void {
@@ -139,13 +149,11 @@ describe('applyRateLimit', () => {
 
     expect(upstash.limiters.map((l) => l.prefix)).toEqual([
       'app:ratelimit:listing-extract',
-      'app:ratelimit:daily:listing-extract',
       'app:ratelimit:street-view',
-      'app:ratelimit:daily:street-view',
     ]);
   });
 
-  it('keys listing feedback on its own counter, with no daily cap', async () => {
+  it('keys listing feedback on its own counter', async () => {
     inProduction();
     withRedis();
 
@@ -159,45 +167,25 @@ describe('applyRateLimit', () => {
       'app:ratelimit:listing-feedback',
     ]);
   });
-});
 
-describe('applyRateLimit — global daily cap', () => {
-  it('counts every caller on one fixed window of a day', async () => {
+  it('refuses a caller over its limit', async () => {
     inProduction();
     withRedis();
 
-    await applyRateLimit({ identifier: 'ip:1', limit: 'listing-match' });
-
-    expect(upstash.limiters).toContainEqual({
-      prefix: 'app:ratelimit:daily:listing-match',
-      limiter: { kind: 'fixed', tokens: 500, window: '1 d' },
-    });
-  });
-
-  it('refuses every caller once the cap is spent', async () => {
-    inProduction();
-    withRedis();
-    envMock.RATE_LIMIT_DAILY_LISTING_EXTRACT = 3;
-
-    const results = [];
-    for (const ip of ['203.0.113.1', '203.0.113.2', '203.0.113.3']) {
-      results.push(
-        await applyRateLimit({
-          identifier: `ip:${ip}`,
-          limit: 'listing-extract',
-        }),
-      );
+    for (let i = 0; i < 10; i += 1) {
+      await applyRateLimit({ identifier: 'ip:1', limit: 'listing-extract' });
     }
-    const overCap = await applyRateLimit({
-      identifier: 'ip:203.0.113.4',
+    const over = await applyRateLimit({
+      identifier: 'ip:1',
       limit: 'listing-extract',
     });
 
-    expect(results.every((r) => r.success)).toBe(true);
-    expect(overCap).toEqual({ success: false, reason: 'limited', reset: 1000 });
+    expect(over).toEqual({ success: false, reason: 'limited', reset: 1000 });
   });
 
-  it('spends none of the daily cap on calls the caller limit refused', async () => {
+  // why: the daily token is taken by the route only once its input is valid,
+  // so the per-caller limit must never spend it.
+  it('never spends the daily cap', async () => {
     inProduction();
     withRedis();
 
@@ -206,12 +194,67 @@ describe('applyRateLimit — global daily cap', () => {
     }
 
     expect(
-      upstash.counts.get('app:ratelimit:daily:listing-extract:global'),
-    ).toBe(10);
+      upstash.limiters.some((l) => l.prefix.startsWith('app:ratelimit:daily')),
+    ).toBe(false);
   });
 });
 
-describe('applyRateLimit — paid buckets fail closed in production', () => {
+describe('applyDailyCap', () => {
+  it('always passes in development', async () => {
+    envMock.NODE_ENV = 'development';
+    withRedis();
+
+    const r = await applyDailyCap({ bucket: 'listing-extract' });
+
+    expect(r.success).toBe(true);
+    expect(upstash.limiters).toEqual([]);
+  });
+
+  it('counts every caller on one fixed window of a day', async () => {
+    inProduction();
+    withRedis();
+
+    await applyDailyCap({ bucket: 'listing-match' });
+
+    expect(upstash.limiters).toEqual([
+      {
+        prefix: 'app:ratelimit:daily:listing-match',
+        limiter: { kind: 'fixed', tokens: 500, window: '1 d' },
+      },
+    ]);
+    expect(upstash.counts.get('app:ratelimit:daily:listing-match:global')).toBe(
+      1,
+    );
+  });
+
+  it('refuses every call once the cap is spent', async () => {
+    inProduction();
+    withRedis();
+    envMock.RATE_LIMIT_DAILY_LISTING_EXTRACT = 3;
+
+    const results = [];
+    for (let i = 0; i < 3; i += 1) {
+      results.push(await applyDailyCap({ bucket: 'listing-extract' }));
+    }
+    const overCap = await applyDailyCap({ bucket: 'listing-extract' });
+
+    expect(results.every((r) => r.success)).toBe(true);
+    expect(overCap).toEqual({ success: false, reason: 'limited', reset: 1000 });
+  });
+
+  it('keeps one counter per bucket', async () => {
+    inProduction();
+    withRedis();
+    envMock.RATE_LIMIT_DAILY_STREET_VIEW = 1;
+
+    await applyDailyCap({ bucket: 'street-view' });
+    const other = await applyDailyCap({ bucket: 'listing-extract' });
+
+    expect(other.success).toBe(true);
+  });
+});
+
+describe('paid buckets fail closed in production', () => {
   it.each(
     PAID_BUCKETS,
   )('refuses %s when redis is not configured', async (bucket) => {
@@ -219,6 +262,17 @@ describe('applyRateLimit — paid buckets fail closed in production', () => {
     withoutRedis();
 
     const r = await applyRateLimit({ identifier: 'u', limit: bucket });
+
+    expect(r).toEqual({ success: false, reason: 'unavailable' });
+  });
+
+  it.each(
+    DAILY_CAPPED_BUCKETS,
+  )('refuses the daily cap of %s when redis is not configured', async (bucket) => {
+    inProduction();
+    withoutRedis();
+
+    const r = await applyDailyCap({ bucket });
 
     expect(r).toEqual({ success: false, reason: 'unavailable' });
   });
@@ -247,9 +301,11 @@ describe('applyRateLimit — paid buckets fail closed in production', () => {
       identifier: 'u',
       limit: 'listing-feedback',
     });
+    const daily = await applyDailyCap({ bucket: 'street-view' });
 
     expect(paid).toEqual({ success: false, reason: 'unavailable' });
     expect(free.success).toBe(true);
+    expect(daily).toEqual({ success: false, reason: 'unavailable' });
   });
 
   // why: Upstash resolves success with reason 'timeout' when redis does not
@@ -264,9 +320,11 @@ describe('applyRateLimit — paid buckets fail closed in production', () => {
       limit: 'listing-extract',
     });
     const free = await applyRateLimit({ identifier: 'u', limit: 'default' });
+    const daily = await applyDailyCap({ bucket: 'listing-extract' });
 
     expect(paid).toEqual({ success: false, reason: 'unavailable' });
     expect(free.success).toBe(true);
+    expect(daily).toEqual({ success: false, reason: 'unavailable' });
   });
 
   it('keeps failing open outside production', async () => {
@@ -274,11 +332,13 @@ describe('applyRateLimit — paid buckets fail closed in production', () => {
     envMock.VERCEL_ENV = 'preview';
     withoutRedis();
 
-    const r = await applyRateLimit({
+    const perCaller = await applyRateLimit({
       identifier: 'u',
       limit: 'listing-extract',
     });
+    const daily = await applyDailyCap({ bucket: 'listing-extract' });
 
-    expect(r.success).toBe(true);
+    expect(perCaller.success).toBe(true);
+    expect(daily.success).toBe(true);
   });
 });

@@ -3,7 +3,9 @@ import type { BaseIssue, BaseSchema } from 'valibot';
 import * as v from 'valibot';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import {
+  applyDailyCap,
   applyRateLimit,
+  type DailyCappedBucket,
   type RateLimitBucket,
   type RateLimitRefusal,
 } from '@/application/rate-limit/apply-rate-limit';
@@ -150,6 +152,24 @@ export async function openRoute(args: {
     };
   }
   return { ok: true, caller: { userId } };
+}
+
+// why: the daily cap is shared by every caller, so a route spends it only
+// after validating its input, right before the paid call.
+export async function spendDailyCap(args: {
+  bucket: DailyCappedBucket;
+  event: string;
+}): Promise<{ ok: true } | { ok: false; response: Response }> {
+  const cap = await applyDailyCap({ bucket: args.bucket });
+  if (cap.success) return { ok: true };
+  return {
+    ok: false,
+    response: rateLimitRefusal({
+      refusal: cap,
+      event: args.event,
+      context: { scope: 'daily' },
+    }),
+  };
 }
 
 function isJsonMediaType(contentType: string | null): boolean {

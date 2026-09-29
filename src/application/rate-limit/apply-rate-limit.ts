@@ -14,6 +14,11 @@ export type RateLimitBucket =
   | 'street-view'
   | 'listing-feedback';
 
+export type DailyCappedBucket = Extract<
+  RateLimitBucket,
+  'listing-extract' | 'listing-match' | 'street-view'
+>;
+
 export type RateLimitRefusal =
   | { success: false; reason: 'limited'; reset: number }
   | { success: false; reason: 'unavailable' };
@@ -55,100 +60,39 @@ const UNLIMITED: RateLimitResult = {
   reset: 0,
 };
 
-function dailyCap(bucket: RateLimitBucket): number | null {
+function dailyCap(bucket: DailyCappedBucket): number {
   const e = env();
-  if (bucket === 'listing-extract') return e.RATE_LIMIT_DAILY_LISTING_EXTRACT;
-  if (bucket === 'listing-match') return e.RATE_LIMIT_DAILY_LISTING_MATCH;
-  if (bucket === 'street-view') return e.RATE_LIMIT_DAILY_STREET_VIEW;
-  return null;
+  const caps: Record<DailyCappedBucket, number> = {
+    'listing-extract': e.RATE_LIMIT_DAILY_LISTING_EXTRACT,
+    'listing-match': e.RATE_LIMIT_DAILY_LISTING_MATCH,
+    'street-view': e.RATE_LIMIT_DAILY_STREET_VIEW,
+  };
+  return caps[bucket];
 }
 
-type BucketLimiters = {
-  perCaller: Ratelimit;
-  daily: { limiter: Ratelimit; cap: number } | null;
-};
+type RatelimitWindow = ReturnType<typeof Ratelimit.fixedWindow>;
 
 const globalForRateLimit = globalThis as unknown as {
-  rateLimiters: Map<RateLimitBucket, BucketLimiters | null> | undefined;
+  rateLimiters: Map<string, Ratelimit | null> | undefined;
 };
 
 // why: Upstash keys a counter on prefix + identifier + window. With a shared
 // prefix every bucket incremented the same counter: one search's photos
 // exhausted the next search's extraction quota.
-function buildBucketLimiters(bucket: RateLimitBucket): BucketLimiters | null {
-  const redis = getRedisClient();
-  if (!redis) return null;
-  const cap = dailyCap(bucket);
-  return {
-    perCaller: new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(PER_CALLER_PER_MINUTE[bucket], '1 m'),
-      prefix: `app:ratelimit:${bucket}`,
-      analytics: false,
-    }),
-    daily:
-      cap === null
-        ? null
-        : {
-            cap,
-            limiter: new Ratelimit({
-              redis,
-              limiter: Ratelimit.fixedWindow(cap, '1 d'),
-              prefix: `app:ratelimit:daily:${bucket}`,
-              analytics: false,
-            }),
-          },
-  };
-}
-
-function bucketLimiters(bucket: RateLimitBucket): BucketLimiters | null {
+function cachedRatelimit(
+  prefix: string,
+  window: () => RatelimitWindow,
+): Ratelimit | null {
   globalForRateLimit.rateLimiters ??= new Map();
   const cache = globalForRateLimit.rateLimiters;
-  if (cache.has(bucket)) return cache.get(bucket) ?? null;
-  const built = buildBucketLimiters(bucket);
-  cache.set(bucket, built);
-  return built;
-}
+  if (cache.has(prefix)) return cache.get(prefix) ?? null;
 
-async function limitOrThrow(
-  limiter: Ratelimit,
-  identifier: string,
-): Promise<{ success: boolean; remaining: number; reset: number }> {
-  const result = await limiter.limit(identifier);
-  // why: Upstash resolves a Redis timeout as a success. It is an outage.
-  if (result.reason === 'timeout') throw new Error('Rate limit timed out');
-  return result;
-}
-
-async function limitCallerThenDay(input: {
-  limiters: BucketLimiters;
-  identifier: string;
-  bucket: RateLimitBucket;
-}): Promise<RateLimitResult> {
-  const caller = await limitOrThrow(input.limiters.perCaller, input.identifier);
-  if (!caller.success) {
-    return { success: false, reason: 'limited', reset: caller.reset };
-  }
-
-  const { daily } = input.limiters;
-  if (daily === null) {
-    return { success: true, remaining: caller.remaining, reset: caller.reset };
-  }
-
-  const day = await limitOrThrow(daily.limiter, DAILY_CAP_IDENTIFIER);
-  if (!day.success) {
-    log.warn('rate_limit.daily_cap_reached', {
-      limit: input.bucket,
-      cap: daily.cap,
-      reset: day.reset,
-    });
-    return { success: false, reason: 'limited', reset: day.reset };
-  }
-  return {
-    success: true,
-    remaining: Math.min(caller.remaining, day.remaining),
-    reset: caller.reset,
-  };
+  const redis = getRedisClient();
+  const limiter = redis
+    ? new Ratelimit({ redis, limiter: window(), prefix, analytics: false })
+    : null;
+  cache.set(prefix, limiter);
+  return limiter;
 }
 
 // why: "production" is VERCEL_ENV, as for auth cookies and billing. Previews
@@ -172,21 +116,20 @@ function whenRedisUnavailable(input: {
   return UNLIMITED;
 }
 
-export async function applyRateLimit(input: {
+async function consume(input: {
+  limiter: Ratelimit | null;
   identifier: string;
   limit: RateLimitBucket;
 }): Promise<RateLimitResult> {
-  if (env().NODE_ENV === 'development') return UNLIMITED;
-
-  const limiters = bucketLimiters(input.limit);
-  if (!limiters) return whenRedisUnavailable(input);
-
+  if (!input.limiter) return whenRedisUnavailable(input);
   try {
-    return await limitCallerThenDay({
-      limiters,
-      identifier: input.identifier,
-      bucket: input.limit,
-    });
+    const result = await input.limiter.limit(input.identifier);
+    // why: Upstash resolves a Redis timeout as a success. It is an outage.
+    if (result.reason === 'timeout') throw new Error('Rate limit timed out');
+    if (!result.success) {
+      return { success: false, reason: 'limited', reset: result.reset };
+    }
+    return { success: true, remaining: result.remaining, reset: result.reset };
   } catch (error) {
     log.error(
       'rate_limit.error',
@@ -195,4 +138,42 @@ export async function applyRateLimit(input: {
     );
     return whenRedisUnavailable(input);
   }
+}
+
+export async function applyRateLimit(input: {
+  identifier: string;
+  limit: RateLimitBucket;
+}): Promise<RateLimitResult> {
+  if (env().NODE_ENV === 'development') return UNLIMITED;
+
+  const limiter = cachedRatelimit(`app:ratelimit:${input.limit}`, () =>
+    Ratelimit.slidingWindow(PER_CALLER_PER_MINUTE[input.limit], '1 m'),
+  );
+  return consume({ limiter, identifier: input.identifier, limit: input.limit });
+}
+
+// why: one counter shared by every caller. A route takes its token only once
+// the input is valid, so malformed calls cannot exhaust it for everyone.
+export async function applyDailyCap(input: {
+  bucket: DailyCappedBucket;
+}): Promise<RateLimitResult> {
+  if (env().NODE_ENV === 'development') return UNLIMITED;
+
+  const cap = dailyCap(input.bucket);
+  const limiter = cachedRatelimit(`app:ratelimit:daily:${input.bucket}`, () =>
+    Ratelimit.fixedWindow(cap, '1 d'),
+  );
+  const result = await consume({
+    limiter,
+    identifier: DAILY_CAP_IDENTIFIER,
+    limit: input.bucket,
+  });
+  if (!result.success && result.reason === 'limited') {
+    log.warn('rate_limit.daily_cap_reached', {
+      limit: input.bucket,
+      cap,
+      reset: result.reset,
+    });
+  }
+  return result;
 }

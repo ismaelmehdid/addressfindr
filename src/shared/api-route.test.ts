@@ -11,16 +11,26 @@ vi.mock('@/application/me/get-current-user', () => ({
 
 vi.mock('@/application/rate-limit/apply-rate-limit', () => ({
   applyRateLimit: vi.fn(),
+  applyDailyCap: vi.fn(),
 }));
 
 import * as v from 'valibot';
 import { getCurrentUser } from '@/application/me/get-current-user';
-import { applyRateLimit } from '@/application/rate-limit/apply-rate-limit';
+import {
+  applyDailyCap,
+  applyRateLimit,
+} from '@/application/rate-limit/apply-rate-limit';
 import { unauthorized } from '@/core/errors';
-import { openRoute, parseJsonBody, requireAuthedRoute } from './api-route';
+import {
+  openRoute,
+  parseJsonBody,
+  requireAuthedRoute,
+  spendDailyCap,
+} from './api-route';
 
 const mockedUser = vi.mocked(getCurrentUser);
 const mockedRateLimit = vi.mocked(applyRateLimit);
+const mockedDailyCap = vi.mocked(applyDailyCap);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -320,5 +330,53 @@ describe('parseJsonBody — media type', () => {
     );
 
     expect(result.ok).toBe(true);
+  });
+});
+
+describe('spendDailyCap', () => {
+  it('lets the paid call run while the cap holds', async () => {
+    mockedDailyCap.mockResolvedValue({ success: true, remaining: 7, reset: 0 });
+
+    const result = await spendDailyCap({
+      bucket: 'listing-extract',
+      event: 'test.event',
+    });
+
+    expect(result).toEqual({ ok: true });
+    expect(mockedDailyCap).toHaveBeenCalledWith({ bucket: 'listing-extract' });
+  });
+
+  it('answers the rate-limit 429 once the cap is spent', async () => {
+    mockedDailyCap.mockResolvedValue({
+      success: false,
+      reason: 'limited',
+      reset: 99,
+    });
+
+    const result = await spendDailyCap({
+      bucket: 'street-view',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(429);
+    expect(await result.response.json()).toEqual({
+      error: 'rate_limited',
+      reset: 99,
+    });
+  });
+
+  it('answers 503 when the cap cannot be checked', async () => {
+    mockedDailyCap.mockResolvedValue({ success: false, reason: 'unavailable' });
+
+    const result = await spendDailyCap({
+      bucket: 'listing-match',
+      event: 'test.event',
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(503);
   });
 });
