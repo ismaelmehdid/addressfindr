@@ -7,7 +7,12 @@ import {
   type RateLimitBucket,
   type RateLimitRefusal,
 } from '@/application/rate-limit/apply-rate-limit';
-import { serviceUnavailable, unauthorized, validation } from '@/core/errors';
+import {
+  serviceUnavailable,
+  unauthorized,
+  unsupportedMediaType,
+  validation,
+} from '@/core/errors';
 import { rateLimitIdentifier } from '@/shared/client-ip';
 import { jsonError } from '@/shared/errors-http';
 import { log } from '@/shared/logger';
@@ -96,6 +101,11 @@ export async function openRoute(args: {
   return { ok: true, caller: { userId } };
 }
 
+function isJsonMediaType(contentType: string | null): boolean {
+  const mediaType = contentType?.split(';')[0]?.trim().toLowerCase();
+  return mediaType === 'application/json';
+}
+
 export async function parseJsonBody<
   TSchema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,
 >(
@@ -105,6 +115,15 @@ export async function parseJsonBody<
   | { ok: true; value: v.InferOutput<TSchema> }
   | { ok: false; response: Response }
 > {
+  if (!isJsonMediaType(req.headers.get('content-type'))) {
+    return {
+      ok: false,
+      response: jsonError(
+        unsupportedMediaType('Request body must be application/json'),
+      ),
+    };
+  }
+
   let body: unknown;
   try {
     body = await req.json();

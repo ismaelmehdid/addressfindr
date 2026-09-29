@@ -13,10 +13,11 @@ vi.mock('@/application/rate-limit/apply-rate-limit', () => ({
   applyRateLimit: vi.fn(),
 }));
 
+import * as v from 'valibot';
 import { getCurrentUser } from '@/application/me/get-current-user';
 import { applyRateLimit } from '@/application/rate-limit/apply-rate-limit';
 import { unauthorized } from '@/core/errors';
-import { openRoute, requireAuthedRoute } from './api-route';
+import { openRoute, parseJsonBody, requireAuthedRoute } from './api-route';
 
 const mockedUser = vi.mocked(getCurrentUser);
 const mockedRateLimit = vi.mocked(applyRateLimit);
@@ -150,5 +151,78 @@ describe('openRoute — limiter unavailable', () => {
     expect(result.response.status).toBe(503);
     const body = await result.response.json();
     expect(body.error).toBe('service_unavailable');
+  });
+});
+
+describe('parseJsonBody — media type', () => {
+  const Schema = v.object({ url: v.string() });
+
+  function jsonRequest(contentType: string | null): Request {
+    return new Request('https://app.test/api/listings/extract', {
+      method: 'POST',
+      headers: contentType === null ? {} : { 'content-type': contentType },
+      body: JSON.stringify({ url: 'https://www.leboncoin.fr/ad/1' }),
+    });
+  }
+
+  it('refuses a JSON body sent as text/plain with 415', async () => {
+    const result = await parseJsonBody(
+      jsonRequest('text/plain;charset=UTF-8'),
+      Schema,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(415);
+    const body = await result.response.json();
+    expect(body.error).toBe('unsupported_media_type');
+  });
+
+  it('refuses a form-encoded body with 415', async () => {
+    const result = await parseJsonBody(
+      jsonRequest('application/x-www-form-urlencoded'),
+      Schema,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(415);
+  });
+
+  it('refuses a body without a content type with 415', async () => {
+    const result = await parseJsonBody(jsonRequest(null), Schema);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(415);
+  });
+
+  it('refuses a JSON-looking subtype that is not application/json', async () => {
+    const result = await parseJsonBody(
+      jsonRequest('application/json-patch+json'),
+      Schema,
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.response.status).toBe(415);
+  });
+
+  it('accepts application/json', async () => {
+    const result = await parseJsonBody(jsonRequest('application/json'), Schema);
+
+    expect(result).toEqual({
+      ok: true,
+      value: { url: 'https://www.leboncoin.fr/ad/1' },
+    });
+  });
+
+  it('accepts application/json with a charset, in any case', async () => {
+    const result = await parseJsonBody(
+      jsonRequest('Application/JSON; charset=utf-8'),
+      Schema,
+    );
+
+    expect(result.ok).toBe(true);
   });
 });
