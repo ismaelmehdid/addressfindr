@@ -58,4 +58,29 @@ describe('parseLandSurfaceM2', () => {
       parseLandSurfaceM2('terrain de 800 m², parcelle de 650 m²'),
     ).toBeNull();
   });
+
+  it('reads a plot described by comma-separated words', () => {
+    expect(
+      parseLandSurfaceM2('Sur un terrain plat, clos et arboré de 1000 m²'),
+    ).toBe(1000);
+  });
+
+  it('still refuses an area a comma hands to another building', () => {
+    expect(
+      parseLandSurfaceM2('Sur un terrain, une maison de 120 m²'),
+    ).toBeNull();
+    expect(parseLandSurfaceM2('Terrain arboré, maison de 120 m²')).toBeNull();
+  });
+
+  // why: these spaces are invisible and a \uXXXX escape has been flattened to
+  // a plain space in this repo before, so they are built from their code point
+  // and checked before use.
+  it('joins a thousands group split by an invisible space', () => {
+    for (const code of [0x00a0, 0x202f]) {
+      const space = String.fromCharCode(code);
+      const quote = `terrain de 1${space}200 m²`;
+      expect(quote).toContain(space);
+      expect(parseLandSurfaceM2(quote)).toBe(1200);
+    }
+  });
 });

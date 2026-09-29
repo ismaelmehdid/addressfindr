@@ -189,6 +189,8 @@ describe('parseFloor', () => {
     expect(parseFloor('au 2ème étage')).toBe(2);
     expect(parseFloor('3EME ETAGE')).toBe(3);
     expect(parseFloor('au 4ème et dernier étage')).toBe(4);
+    expect(parseFloor('au 2nd étage')).toBe(2);
+    expect(parseFloor('au 2nde étage')).toBe(2);
   });
 
   it('accepts a superscript ordinal', () => {
@@ -201,6 +203,14 @@ describe('parseFloor', () => {
   it('reads a labelled floor', () => {
     expect(parseFloor('Étage : 3')).toBe(3);
     expect(parseFloor('Étage 3/5')).toBe(3);
+    expect(parseFloor('Étage 3 avec ascenseur')).toBe(3);
+    expect(parseFloor('- Étage 3 sur 5')).toBe(3);
+  });
+
+  it('refuses a bare étage number that counts something else', () => {
+    expect(parseFloor('dernier étage 3 pièces')).toBeNull();
+    expect(parseFloor('Étage 3 pièces')).toBeNull();
+    expect(parseFloor('Étage 3 5')).toBeNull();
   });
 
   it('ignores an arrondissement ordinal', () => {
@@ -244,6 +254,11 @@ describe('parseBuildingFloors', () => {
   it('reads a labelled count', () => {
     expect(parseBuildingFloors("Nombre d'étages : 5")).toBe(5);
     expect(parseBuildingFloors('Étage : 3/5')).toBe(5);
+    expect(parseBuildingFloors("Nombre d'étages dans l'immeuble : 6")).toBe(6);
+  });
+
+  it('refuses words between the label and a number without a colon', () => {
+    expect(parseBuildingFloors("Nombre d'étages dans l'immeuble 6")).toBeNull();
   });
 
   it('refuses a quote that names only the dwelling floor', () => {

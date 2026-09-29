@@ -59,9 +59,10 @@ const LAND_AREAS: readonly (readonly [RegExp, number])[] = [
   ],
 ];
 
-// why: between the plot word and its area there may only be words — no other
-// number, no sentence break, and no other building the area could belong to.
-const LAND_LEAD_IN = /^[^\d.,;!?\n]{0,40}$/;
+// why: between the plot word and its area there may only be words and commas
+// ("terrain plat, clos et arboré de") — no other number, no sentence break, and
+// no other building the area could belong to.
+const LAND_LEAD_IN = /^[^\d.;!?\n]{0,40}$/;
 const OTHER_BUILT_SUBJECT =
   /maison|appartement|villa|pavillon|logement|habitation|b[aâ]ti|d[ée]pendance|hangar|grange|atelier|pi[èe]ce|chambre|salon/i;
 const LAND_TRAILER = /^\s*d(?:e\s+|['’]\s*)(?:terrain|parcelle)/i;
@@ -323,11 +324,14 @@ function singleCapturedCount(
 // resolved to a floor.
 const GROUND_FLOOR = /\brez[\s-]*de\b|\brdc\b/;
 const FLOOR_RANGE =
-  /\d\s*(?:er|ere|re|eme|ieme|e)\s+(?:au|a|et)\s+\d{1,2}\s*(?:er|ere|re|eme|ieme|e)\b/;
+  /\d\s*(?:er|ere|re|nde|nd|eme|ieme|e)\s+(?:au|a|et)\s+\d{1,2}\s*(?:er|ere|re|nde|nd|eme|ieme|e)\b/;
 const FLOOR_ORDINAL =
-  /(?<![\p{L}\d])(\d{1,2})\s*(?:er|ere|re|eme|ieme|e)\s*(?:et\s+dernier\s+)?etage(?!s)/gu;
+  /(?<![\p{L}\d])(\d{1,2})\s*(?:er|ere|re|nde|nd|eme|ieme|e)\s*(?:et\s+dernier\s+)?etage(?!s)/gu;
 const FLOOR_LABEL = /(?<![\p{L}'])etage\s*:\s*(\d{1,2})(?!\d)/gu;
-const FLOOR_LABEL_BARE = /(?<![\p{L}'])etage\s+(\d{1,2})\s*(?:$|\/|sur\s+\d)/gu;
+// why: a bare "Étage N" is a label only where it opens a line or a list item.
+// In prose ("dernier étage 3 pièces") the number counts something else.
+const FLOOR_LABEL_BARE =
+  /(?<![\p{L}\d'][ \t]*)etage[ \t]+(\d{1,2})(?![\d.,]?\d)(?![ \t]*(?:\d|pieces?\b|chambres?\b|m2))/gu;
 
 export function parseFloor(raw: string): number | null {
   const text = foldFloorText(raw);
@@ -342,7 +346,10 @@ export function parseFloor(raw: string): number | null {
 const STOREYS_ABOVE_FLOOR = /etage\s+sur\s+(\d{1,2})(?!\d)(?!\s*niveau)/g;
 const STOREYS_OF_LABEL =
   /(?<![\p{L}'])etage\s*:?\s*\d{1,2}\s*(?:\/|sur)\s*(\d{1,2})(?!\d)(?!\s*niveau)/gu;
-const STOREY_COUNT_LABEL = /nombre\s+d'\s*etages?\s*:?\s*(\d{1,2})(?!\d)/g;
+// why: words between the label and its number ("dans l'immeuble") are only
+// read up to a colon, so no later number can be taken for the count.
+const STOREY_COUNT_LABEL =
+  /nombre\s+d'\s*etages?(?:(?:\s+[a-z']+){1,4}\s*:|\s*:?)\s*(\d{1,2})(?!\d)/g;
 // why: "sur 2 étages" and "duplex de 2 étages" count the dwelling's own
 // levels, not the building's.
 const STOREY_COUNT = /(?<![\p{L}\d.,])(?<!sur\s+)(\d{1,2})\s*etages\b/gu;
