@@ -2,10 +2,10 @@ import type { BuildingFacts } from '@/core/building/types';
 import { type ParcelArea, totalLandSurface } from './land-surface';
 import type { DpeRecord } from './types';
 
-// why: completer, jamais ecraser. L'ADEME decrit le logement diagnostique sur
-// place ; la BDNB reconstitue le batiment. Quand les deux parlent, le releve
-// prime. Mesure du 2026-09-22 : l'ADEME laisse annee_construction vide sur 42%
-// des adresses de Lyon 3e, et la BDNB la fournit sur celles qu'elle rattache.
+// why: fill, never overwrite. ADEME describes the dwelling surveyed on site;
+// BDNB reconstructs the building. When both speak, the survey wins. Measured
+// 2026-09-22: ADEME leaves annee_construction empty on 42% of Lyon 3e
+// addresses, and BDNB supplies it on the ones it links.
 export function enrichRecords(input: {
   records: readonly DpeRecord[];
   facts: readonly BuildingFacts[];
@@ -23,9 +23,12 @@ export function enrichRecords(input: {
     const fact = byBanId.get(record.banId);
     if (fact === undefined) return record;
 
-    const parcels = fact.parcelIds
-      .map((parcelId) => areaByParcel.get(parcelId))
-      .filter((area): area is ParcelArea => area !== undefined);
+    // why: a parcel the cadastre did not answer for still counts as one of the
+    // building's parcels, so a partial answer never passes for a single plot.
+    const parcels = fact.parcelIds.map(
+      (parcelId): ParcelArea =>
+        areaByParcel.get(parcelId) ?? { parcelId, areaM2: null },
+    );
 
     return {
       ...record,

@@ -25,6 +25,7 @@ import {
 } from '@/core/ademe/unverified-records';
 import { MAX_BUILDING_LOOKUPS } from '@/core/building/types';
 import { type AppError, parseInput, validation } from '@/core/errors';
+import type { FieldSource } from '@/core/listing/types';
 import { ademeDpeDirectory } from '@/infra/external-apis/ademe/ademe-dpe-directory';
 import { cadastreParcelDirectory } from '@/infra/external-apis/cadastre/cadastre-parcel-directory';
 import { log } from '@/shared/logger';
@@ -37,6 +38,13 @@ const REFUSAL_MESSAGE = {
   'no-commune': 'Could not resolve the listing commune to an INSEE code',
   'no-surface': 'The listing does not state a usable surface',
 } as const;
+
+// why: any other source, present or future, is treated as a model quote and
+// must be confirmed by the postal code — fail closed.
+const STRUCTURED_SOURCES: ReadonlySet<FieldSource> = new Set([
+  'hydration',
+  'json-ld',
+]);
 
 export async function findAddressCandidates(
   input: FindAddressCandidatesInput,
@@ -55,12 +63,15 @@ export async function findAddressCandidates(
   );
   if (parsed.isErr()) return err(parsed.error);
 
-  const { fields } = parsed.value.listing;
+  const { fields, sources } = parsed.value.listing;
 
   log.info('ademe.match.start', { portal: fields.portal });
 
   const commune = await (deps.resolveCommune ?? resolveCommune)({
     inseeCode: fields.inseeCode,
+    inseeCodeOrigin: STRUCTURED_SOURCES.has(sources.inseeCode)
+      ? 'structured'
+      : 'quoted',
     postalCode: fields.postalCode,
     city: fields.city,
   });
