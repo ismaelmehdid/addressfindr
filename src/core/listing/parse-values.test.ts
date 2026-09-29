@@ -2,11 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   parseAnnualEnergyCostRange,
   parseBedroomCount,
+  parseBuildingFloors,
   parseCity,
   parseCount,
   parseDpeDate,
   parseDpeEnergyValue,
   parseEnergyClass,
+  parseFloor,
   parseFrenchNumber,
   parseGesEmissionValue,
   parseInseeCode,
@@ -114,6 +116,30 @@ describe('parseEnergyClass', () => {
     expect(parseEnergyClass('DPE C · GES C', 'dpe')).toBeNull();
     expect(parseEnergyClass('DPE C · GES C', 'ges')).toBeNull();
   });
+
+  // why: the DPE letter is a hard equality filter. Reading the "d" of an
+  // elided "d'" as class D drops the true row from the search.
+  it('refuses the letter of an elided article', () => {
+    expect(parseEnergyClass("DPE en cours d'établissement", 'dpe')).toBeNull();
+    expect(
+      parseEnergyClass("GES : 12 kg d'équivalent CO2/m²/an", 'ges'),
+    ).toBeNull();
+  });
+
+  it('refuses an elision written with a typographic apostrophe', () => {
+    const apostrophe = String.fromCharCode(0x2019);
+    const quote = `DPE en cours d${apostrophe}établissement`;
+    expect(quote).toContain(apostrophe);
+    expect(parseEnergyClass(quote, 'dpe')).toBeNull();
+  });
+
+  it('reads the class letter beside an elided article', () => {
+    expect(parseEnergyClass('Classe énergie C', 'dpe')).toBe('C');
+    expect(parseEnergyClass("Classe d'énergie C", 'dpe')).toBe('C');
+    expect(parseEnergyClass("Consommation d'énergie : c'est un D", 'dpe')).toBe(
+      'D',
+    );
+  });
 });
 
 describe('parseCount', () => {
@@ -149,6 +175,109 @@ describe('parseRoomCount and parseBedroomCount', () => {
 
   it('refuses a rooms quote for bedrooms', () => {
     expect(parseBedroomCount('4 pièces')).toBeNull();
+  });
+});
+
+describe('parseFloor', () => {
+  it('reads the ordinal attached to étage, not an earlier number', () => {
+    expect(parseFloor('3 pièces au 2e étage')).toBe(2);
+    expect(parseFloor('au 3e étage sur 5')).toBe(3);
+  });
+
+  it('accepts the usual ordinal spellings', () => {
+    expect(parseFloor('1er étage')).toBe(1);
+    expect(parseFloor('au 2ème étage')).toBe(2);
+    expect(parseFloor('3EME ETAGE')).toBe(3);
+    expect(parseFloor('au 4ème et dernier étage')).toBe(4);
+    expect(parseFloor('au 2nd étage')).toBe(2);
+    expect(parseFloor('au 2nde étage')).toBe(2);
+  });
+
+  it('accepts a superscript ordinal', () => {
+    const superscriptE = String.fromCharCode(0x1d49);
+    const quote = `au 2${superscriptE} étage`;
+    expect(quote).toContain(superscriptE);
+    expect(parseFloor(quote)).toBe(2);
+  });
+
+  it('reads a labelled floor', () => {
+    expect(parseFloor('Étage : 3')).toBe(3);
+    expect(parseFloor('Étage 3/5')).toBe(3);
+    expect(parseFloor('Étage 3 avec ascenseur')).toBe(3);
+    expect(parseFloor('- Étage 3 sur 5')).toBe(3);
+  });
+
+  it('refuses a bare étage number that counts something else', () => {
+    expect(parseFloor('dernier étage 3 pièces')).toBeNull();
+    expect(parseFloor('Étage 3 pièces')).toBeNull();
+    expect(parseFloor('Étage 3 5')).toBeNull();
+  });
+
+  it('ignores an arrondissement ordinal', () => {
+    expect(parseFloor('Lyon 3e, au 2e étage')).toBe(2);
+  });
+
+  // why: a quote reading "rez-de-chaussée" has always resolved to no floor,
+  // since a house describes its own ground level the same way.
+  it('keeps a ground floor absent', () => {
+    expect(parseFloor('au rez-de-chaussée')).toBeNull();
+    expect(
+      parseFloor("au rez-de-chaussée d'un immeuble de 3 étages"),
+    ).toBeNull();
+  });
+
+  it('refuses a quote naming several floors', () => {
+    expect(parseFloor('du 1er au 3e étage')).toBeNull();
+    expect(parseFloor('duplex aux 4e et 5e étages')).toBeNull();
+  });
+
+  it('refuses a number that is not an ordinal floor', () => {
+    expect(parseFloor('immeuble de 5 étages')).toBeNull();
+    expect(parseFloor('3 pièces')).toBeNull();
+    expect(parseFloor('dernier étage')).toBeNull();
+  });
+});
+
+describe('parseBuildingFloors', () => {
+  it('reads the count after the dwelling floor', () => {
+    expect(parseBuildingFloors('au 3e étage sur 5')).toBe(5);
+    expect(parseBuildingFloors('au 3e étage sur 5 étages')).toBe(5);
+  });
+
+  it('reads a storey count', () => {
+    expect(parseBuildingFloors('immeuble de 5 étages')).toBe(5);
+    expect(parseBuildingFloors("au 2e étage d'un immeuble de 4 étages")).toBe(
+      4,
+    );
+  });
+
+  it('reads a labelled count', () => {
+    expect(parseBuildingFloors("Nombre d'étages : 5")).toBe(5);
+    expect(parseBuildingFloors('Étage : 3/5')).toBe(5);
+    expect(parseBuildingFloors("Nombre d'étages dans l'immeuble : 6")).toBe(6);
+  });
+
+  it('refuses words between the label and a number without a colon', () => {
+    expect(parseBuildingFloors("Nombre d'étages dans l'immeuble 6")).toBeNull();
+  });
+
+  it('refuses a quote that names only the dwelling floor', () => {
+    expect(parseBuildingFloors('3 pièces au 2e étage')).toBeNull();
+    expect(parseBuildingFloors('au 3e étage')).toBeNull();
+  });
+
+  // why: an apartment spread over several levels says nothing about the
+  // height of its building.
+  it('refuses the levels of the dwelling itself', () => {
+    expect(parseBuildingFloors('appartement sur 2 étages')).toBeNull();
+    expect(parseBuildingFloors('duplex de 2 étages')).toBeNull();
+    expect(parseBuildingFloors('au 1er étage sur 2 niveaux')).toBeNull();
+  });
+
+  it('refuses two different counts', () => {
+    expect(
+      parseBuildingFloors('immeuble de 5 étages, au 3e étage sur 6'),
+    ).toBeNull();
   });
 });
 

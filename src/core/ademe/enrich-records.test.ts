@@ -53,9 +53,9 @@ describe('enrichRecords', () => {
     expect(enriched?.yearBuilt).toBe(1880);
   });
 
-  // why: l'ADEME decrit le logement diagnostique, la BDNB decrit le batiment
-  // modelise. Quand les deux parlent, la mesure de terrain prime : on ne
-  // remplace jamais une valeur presente par une valeur reconstituee.
+  // why: ADEME describes the surveyed dwelling, BDNB the modelled building.
+  // When both speak, the on-site measurement wins: a stated value is never
+  // replaced by a reconstructed one.
   it('never overwrites a year the register already stated', () => {
     const [enriched] = enrichRecords({
       records: [record({ dpeNumber: 'a', yearBuilt: 1975 })],
@@ -124,7 +124,7 @@ describe('enrichRecords', () => {
   });
 });
 
-describe('enrichRecords — surface de terrain', () => {
+describe('enrichRecords — plot area', () => {
   it('fills the plot area when the building sits on one parcel', () => {
     const [enriched] = enrichRecords({
       records: [record({ dpeNumber: 'a', propertyType: 'house' })],
@@ -151,6 +151,35 @@ describe('enrichRecords — surface de terrain', () => {
       records: [record({ dpeNumber: 'a', propertyType: 'house' })],
       facts: [facts({ parcelIds: ['69204000AD0022'] })],
       parcelAreas: [],
+    });
+    expect(enriched?.landSurfaceM2).toBeNull();
+  });
+
+  // why: the cadastre adapter caps its lookups and drops a parcel whose lookup
+  // failed, so an answered parcel may be only one of the building's parcels.
+  it('leaves the plot area absent when only one of the building parcels came back', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022', '69204000AD0023'] })],
+      parcelAreas: [{ parcelId: '69204000AD0022', areaM2: 500 }],
+    });
+    expect(enriched?.landSurfaceM2).toBeNull();
+  });
+
+  it('leaves the plot area absent when the single parcel came back without an area', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022'] })],
+      parcelAreas: [{ parcelId: '69204000AD0022', areaM2: null }],
+    });
+    expect(enriched?.landSurfaceM2).toBeNull();
+  });
+
+  it('ignores an area the cadastre returned for a parcel of another building', () => {
+    const [enriched] = enrichRecords({
+      records: [record({ dpeNumber: 'a', propertyType: 'house' })],
+      facts: [facts({ parcelIds: ['69204000AD0022'] })],
+      parcelAreas: [{ parcelId: '69204000AD0099', areaM2: 800 }],
     });
     expect(enriched?.landSurfaceM2).toBeNull();
   });

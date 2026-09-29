@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
   },
   // why: the dev bubble sits on the Mapbox logo, which must stay visible.
   devIndicators: false,
+  // why: the optimizer re-fetches local URLs without browser headers, which
+  // would let any page proxy the billed /api/street-view through it.
+  images: { unoptimized: true },
 };
 
 const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');

@@ -23,20 +23,46 @@ import {
   type ExtractedListing,
 } from '@/core/listing/types';
 import messages from '@/i18n/messages/fr.json';
+import type { MapView } from './map-view';
 import { type DetailPreference, ResultsWorkspace } from './results-workspace';
+
+// why: Mapbox needs WebGL, which jsdom lacks. The stand-in keeps the map's
+// role and shows which view the workspace asked it to draw.
+vi.mock('./address-map', () => ({
+  AddressMap: ({ view }: { view: MapView }) => (
+    <div role="application" data-view={view} />
+  ),
+}));
 
 // why: tells React that act() drives the updates, so it flushes them there.
 (
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-// why: jsdom implements neither. Every media query matches unless a test
-// narrows the screen, so by default the view lays itself out as on a wide
-// screen (lg and xl).
-let wideScreen = true;
+// why: jsdom implements neither. The view lays itself out for a screen this
+// many rem wide, past xl (80rem) unless a test narrows it, and the list
+// scrolls instantly, as for a user who prefers reduced motion.
+const WIDE_SCREEN_REM = 90;
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
+let screenWidthRem = WIDE_SCREEN_REM;
+
+function queryMatches(query: string): boolean {
+  if (query === REDUCED_MOTION_QUERY) return true;
+  const width = /\(min-width: ([\d.]+)rem\)/.exec(query)?.[1];
+  if (width === undefined) throw new Error(`unexpected media query ${query}`);
+  return screenWidthRem >= Number(width);
+}
+
+function onScreen(widthRem: number): void {
+  screenWidthRem = widthRem;
+  onTestFinished(() => {
+    screenWidthRem = WIDE_SCREEN_REM;
+  });
+}
+
 HTMLElement.prototype.scrollTo = vi.fn();
 window.matchMedia = (query: string): MediaQueryList => ({
-  matches: wideScreen,
+  matches: queryMatches(query),
   media: query,
   onchange: null,
   addEventListener: () => {},
@@ -511,6 +537,10 @@ describe('ResultsWorkspace detail shortcuts', () => {
       '<div role="radiogroup"><button role="radio" data-target></button></div>',
     ],
     ['the map', '<div role="application"><div data-target></div></div>'],
+    [
+      'a toggle group',
+      '<div data-slot="toggle-group"><button data-target></button></div>',
+    ],
   ])('leaves the keys to %s', async (_, html) => {
     const onSelect = vi.fn();
     const onCloseDetail = vi.fn();
@@ -540,10 +570,7 @@ describe('ResultsWorkspace detail sheet below lg', () => {
   // why: jsdom cannot lay out, so this pins the class the sheet's scrolling
   // depends on: the detail's scroll area only scrolls inside a definite height.
   it('gives the bottom sheet a definite height instead of the primitive h-auto', async () => {
-    wideScreen = false;
-    onTestFinished(() => {
-      wideScreen = true;
-    });
+    onScreen(40);
     await render({});
 
     const sheet = document.querySelector('[data-slot="sheet-content"]');
@@ -575,10 +602,7 @@ describe('ResultsWorkspace detail sheet below lg', () => {
       },
     ],
   ])("returns focus to the shown result's card when the sheet closes on %s", async (_, closeSheet) => {
-    wideScreen = false;
-    onTestFinished(() => {
-      wideScreen = true;
-    });
+    onScreen(40);
     await renderClosable({ shown: SECOND });
     const card = shownCardButton();
     const focus = vi.spyOn(card, 'focus');
@@ -612,6 +636,152 @@ function sheetContent(): HTMLElement {
   if (sheet === null) throw new Error('no detail sheet');
   return sheet;
 }
+
+const READY_MAP = {
+  kind: 'ready',
+  overview: { latitude: 45.7597, longitude: 4.8422 },
+} as const;
+
+async function renderWithMap(
+  props: Partial<ComponentProps<typeof ResultsWorkspace>> = {},
+): Promise<void> {
+  await render({ map: READY_MAP, accessToken: 'pk.test', ...props });
+}
+
+function mapViewSwitch(): HTMLElement | null {
+  return container.querySelector<HTMLElement>(
+    `[role="group"][aria-label="${messages.Listing.mapViewLabel}"]`,
+  );
+}
+
+function mapViewOption(label: string): HTMLButtonElement {
+  const option = [...(mapViewSwitch()?.querySelectorAll('button') ?? [])].find(
+    (button) => button.textContent === label,
+  );
+  if (option === undefined) throw new Error(`no "${label}" map view`);
+  return option;
+}
+
+function pressedMapViews(): (string | null)[] {
+  return [...(mapViewSwitch()?.querySelectorAll('button') ?? [])]
+    .filter((button) => button.getAttribute('aria-pressed') === 'true')
+    .map((button) => button.textContent);
+}
+
+function drawnMapView(): string | null | undefined {
+  return container
+    .querySelector('[role="application"]')
+    ?.getAttribute('data-view');
+}
+
+// why: the toggle group moves focus between its options in a microtask; an
+// async act() lets it land before the next key.
+async function pressFocusedKey(key: string): Promise<void> {
+  await act(async () => {
+    (document.activeElement ?? document.body).dispatchEvent(
+      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
+    );
+  });
+}
+
+const MAP_VIEW = messages.Listing.mapViewMap;
+const SATELLITE_VIEW = messages.Listing.mapViewSatellite;
+
+describe('ResultsWorkspace map view switch', () => {
+  it('offers the map and the satellite view, the map first and pressed', async () => {
+    await renderWithMap();
+
+    expect(
+      [...(mapViewSwitch()?.querySelectorAll('button') ?? [])].map(
+        (button) => button.textContent,
+      ),
+    ).toEqual([MAP_VIEW, SATELLITE_VIEW]);
+    expect(pressedMapViews()).toEqual([MAP_VIEW]);
+    expect(drawnMapView()).toBe('map');
+  });
+
+  it('draws the satellite view once it is picked', async () => {
+    await renderWithMap();
+
+    act(() => {
+      mapViewOption(SATELLITE_VIEW).click();
+    });
+    expect(pressedMapViews()).toEqual([SATELLITE_VIEW]);
+    expect(drawnMapView()).toBe('satellite');
+
+    act(() => {
+      mapViewOption(MAP_VIEW).click();
+    });
+    expect(pressedMapViews()).toEqual([MAP_VIEW]);
+    expect(drawnMapView()).toBe('map');
+  });
+
+  it('keeps the view when its option is pressed again', async () => {
+    await renderWithMap();
+
+    act(() => {
+      mapViewOption(MAP_VIEW).click();
+    });
+    expect(pressedMapViews()).toEqual([MAP_VIEW]);
+    expect(drawnMapView()).toBe('map');
+  });
+
+  it('keeps the arrow keys and Escape from the detail shortcuts', async () => {
+    const onSelect = vi.fn();
+    const onCloseDetail = vi.fn();
+    await renderWithMap({ onSelect, onCloseDetail });
+    act(() => {
+      mapViewOption(MAP_VIEW).focus();
+    });
+
+    await pressFocusedKey('ArrowRight');
+    expect(document.activeElement).toBe(mapViewOption(SATELLITE_VIEW));
+    await pressFocusedKey('ArrowLeft');
+    expect(document.activeElement).toBe(mapViewOption(MAP_VIEW));
+    await pressFocusedKey('Escape');
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(onCloseDetail).not.toHaveBeenCalled();
+  });
+
+  it('is not drawn without a map', async () => {
+    await render({ map: { kind: 'unavailable' } });
+
+    expect(mapViewSwitch()).toBeNull();
+  });
+
+  // why: jsdom cannot lay out, so this pins the classes the placement depends
+  // on: between lg and xl the detail floats over the right 424px of the map.
+  it.each([
+    ['past xl, with the detail docked', WIDE_SCREEN_REM, 'open', 'right-3'],
+    [
+      'between lg and xl, beside the floating detail',
+      70,
+      'open',
+      'right-[424px]',
+    ],
+    ['between lg and xl, with the detail closed', 70, 'closed', 'right-3'],
+    ['below lg', 40, 'open', 'right-3'],
+  ] as const)('sits top right %s', async (_, widthRem, detailPreference, right) => {
+    onScreen(widthRem);
+    await renderWithMap({ detailPreference });
+
+    const strip = mapViewSwitch()?.closest('.absolute');
+    expect(strip?.classList).toContain('top-3');
+    expect(strip?.classList).toContain(right);
+  });
+
+  it('shares one flex box with the address chip, so the two never overlap', async () => {
+    await renderWithMap();
+
+    const box = mapViewSwitch()?.parentElement;
+    expect(box?.querySelector('[aria-live="polite"]')?.textContent).toBe(
+      messages.Listing.mapNoTrustedPoint.replace(
+        '{address}',
+        FIRST.record.address,
+      ),
+    );
+  });
+});
 
 const FeedbackRequestSchema = v.object({
   searchId: v.string(),

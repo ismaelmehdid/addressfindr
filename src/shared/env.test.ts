@@ -134,3 +134,40 @@ describe('env Street View embed key', () => {
     expect(() => env()).toThrow(/NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY/);
   });
 });
+
+describe('env daily caps on paid routes', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('defaults to 100 extractions, 500 matches and 1000 photos a day', async () => {
+    const env = await loadEnv({ EMAIL_PROVIDER: 'none' });
+    expect(env().RATE_LIMIT_DAILY_LISTING_EXTRACT).toBe(100);
+    expect(env().RATE_LIMIT_DAILY_LISTING_MATCH).toBe(500);
+    expect(env().RATE_LIMIT_DAILY_STREET_VIEW).toBe(1000);
+  });
+
+  it('reads an override as a number', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      RATE_LIMIT_DAILY_LISTING_EXTRACT: '40',
+    });
+    expect(env().RATE_LIMIT_DAILY_LISTING_EXTRACT).toBe(40);
+  });
+
+  it('rejects a cap that is not a number', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      RATE_LIMIT_DAILY_STREET_VIEW: 'lots',
+    });
+    expect(() => env()).toThrow(/RATE_LIMIT_DAILY_STREET_VIEW/);
+  });
+
+  it('rejects a cap of zero', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      RATE_LIMIT_DAILY_LISTING_MATCH: '0',
+    });
+    expect(() => env()).toThrow(/RATE_LIMIT_DAILY_LISTING_MATCH/);
+  });
+});

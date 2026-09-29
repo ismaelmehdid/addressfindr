@@ -6,6 +6,7 @@ vi.mock('@/shared/env', () => ({
 }));
 
 import type { getBuildingFacts } from '@/application/building/get-building-facts';
+import type { ResolveCommuneInput } from '@/application/commune/dto';
 import type { IDpeDirectory } from '@/core/ademe/ports/dpe-directory.port';
 import type {
   DpeDateSearchFilter,
@@ -248,6 +249,34 @@ describe('findAddressCandidates', () => {
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) expect(result.error.code).toBe('validation');
+  });
+});
+
+describe('findAddressCandidates — INSEE code provenance', () => {
+  it.each([
+    { source: 'hydration', origin: 'structured' },
+    { source: 'json-ld', origin: 'structured' },
+    { source: 'llm', origin: 'quoted' },
+  ] as const)('passes an INSEE code read from $source as $origin', async ({
+    source,
+    origin,
+  }) => {
+    const { directory } = directoryReturning([record()]);
+    const seen: ResolveCommuneInput[] = [];
+    const base = listing({ inseeCode: '69383' });
+
+    await findAddressCandidates(
+      { listing: { ...base, sources: { ...base.sources, inseeCode: source } } },
+      {
+        dpeDirectory: directory,
+        resolveCommune: async (input) => {
+          seen.push(input);
+          return ok({ kind: 'resolved', commune: LYON_3E });
+        },
+      },
+    );
+
+    expect(seen[0]?.inseeCodeOrigin).toBe(origin);
   });
 });
 

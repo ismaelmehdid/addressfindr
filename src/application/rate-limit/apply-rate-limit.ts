@@ -5,108 +5,6 @@ import { getRedisClient } from '@/infra/external-apis/redis/client';
 import { env } from '@/shared/env';
 import { log } from '@/shared/logger';
 
-export type RateLimitResult = {
-  success: boolean;
-  remaining: number;
-  reset: number;
-};
-
-const globalForRateLimit = globalThis as unknown as {
-  defaultRatelimit: Ratelimit | null | undefined;
-  uploadRatelimit: Ratelimit | null | undefined;
-  transcribeRatelimit: Ratelimit | null | undefined;
-  listingExtractRatelimit: Ratelimit | null | undefined;
-  listingMatchRatelimit: Ratelimit | null | undefined;
-  streetViewRatelimit: Ratelimit | null | undefined;
-  listingFeedbackRatelimit: Ratelimit | null | undefined;
-};
-
-// why: Upstash keys a counter on prefix + identifier + window. With a shared
-// prefix every bucket incremented the same counter: one search's photos
-// exhausted the next search's extraction quota.
-function buildRatelimit(
-  bucket: RateLimitBucket,
-  tokens: number,
-  window: '1 m',
-): Ratelimit | null {
-  const redis = getRedisClient();
-  if (!redis) return null;
-  return new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(tokens, window),
-    prefix: `app:ratelimit:${bucket}`,
-    analytics: false,
-  });
-}
-
-function getDefaultRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.defaultRatelimit !== undefined) {
-    return globalForRateLimit.defaultRatelimit;
-  }
-  const limiter = buildRatelimit('default', 60, '1 m');
-  globalForRateLimit.defaultRatelimit = limiter;
-  return limiter;
-}
-
-function getUploadRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.uploadRatelimit !== undefined) {
-    return globalForRateLimit.uploadRatelimit;
-  }
-  const limiter = buildRatelimit('upload', 20, '1 m');
-  globalForRateLimit.uploadRatelimit = limiter;
-  return limiter;
-}
-
-function getTranscribeRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.transcribeRatelimit !== undefined) {
-    return globalForRateLimit.transcribeRatelimit;
-  }
-  const limiter = buildRatelimit('transcribe', 30, '1 m');
-  globalForRateLimit.transcribeRatelimit = limiter;
-  return limiter;
-}
-
-function getListingExtractRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.listingExtractRatelimit !== undefined) {
-    return globalForRateLimit.listingExtractRatelimit;
-  }
-  const limiter = buildRatelimit('listing-extract', 10, '1 m');
-  globalForRateLimit.listingExtractRatelimit = limiter;
-  return limiter;
-}
-
-function getListingMatchRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.listingMatchRatelimit !== undefined) {
-    return globalForRateLimit.listingMatchRatelimit;
-  }
-  const limiter = buildRatelimit('listing-match', 20, '1 m');
-  globalForRateLimit.listingMatchRatelimit = limiter;
-  return limiter;
-}
-
-// why: a search shows up to 10 addresses, so 10 photos. 60 a minute leaves
-// six searches a minute without opening the billed key to abuse.
-function getStreetViewRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.streetViewRatelimit !== undefined) {
-    return globalForRateLimit.streetViewRatelimit;
-  }
-  const limiter = buildRatelimit('street-view', 60, '1 m');
-  globalForRateLimit.streetViewRatelimit = limiter;
-  return limiter;
-}
-
-// why: a displayed result sends at most two feedback calls, the verdict and
-// its detail. 20 a minute absorbs retries without letting one caller flood
-// the table.
-function getListingFeedbackRatelimit(): Ratelimit | null {
-  if (globalForRateLimit.listingFeedbackRatelimit !== undefined) {
-    return globalForRateLimit.listingFeedbackRatelimit;
-  }
-  const limiter = buildRatelimit('listing-feedback', 20, '1 m');
-  globalForRateLimit.listingFeedbackRatelimit = limiter;
-  return limiter;
-}
-
 export type RateLimitBucket =
   | 'default'
   | 'upload'
@@ -116,46 +14,166 @@ export type RateLimitBucket =
   | 'street-view'
   | 'listing-feedback';
 
-function getLimiter(bucket: RateLimitBucket): Ratelimit | null {
-  if (bucket === 'upload') return getUploadRatelimit();
-  if (bucket === 'transcribe') return getTranscribeRatelimit();
-  if (bucket === 'listing-extract') return getListingExtractRatelimit();
-  if (bucket === 'listing-match') return getListingMatchRatelimit();
-  if (bucket === 'street-view') return getStreetViewRatelimit();
-  if (bucket === 'listing-feedback') return getListingFeedbackRatelimit();
-  return getDefaultRatelimit();
+export type DailyCappedBucket = Extract<
+  RateLimitBucket,
+  'listing-extract' | 'listing-match' | 'street-view'
+>;
+
+export type RateLimitRefusal =
+  | { success: false; reason: 'limited'; reset: number }
+  | { success: false; reason: 'unavailable' };
+
+export type RateLimitResult =
+  | { success: true; remaining: number; reset: number }
+  | RateLimitRefusal;
+
+const PER_CALLER_PER_MINUTE: Record<RateLimitBucket, number> = {
+  default: 60,
+  upload: 20,
+  transcribe: 30,
+  'listing-extract': 10,
+  'listing-match': 20,
+  // why: a search shows up to 10 addresses, so 10 photos. 60 a minute leaves
+  // six searches a minute without opening the billed key to abuse.
+  'street-view': 60,
+  // why: a displayed result sends at most two feedback calls, the verdict and
+  // its detail. 20 a minute absorbs retries without letting one caller flood
+  // the table.
+  'listing-feedback': 20,
+};
+
+// why: each of these fronts a provider billed per call (Firecrawl and Groq,
+// Google, OpenAI) or ADEME's heaviest reads, so it refuses rather than runs
+// unlimited when Redis is down in production.
+const PAID_BUCKETS: ReadonlySet<RateLimitBucket> = new Set([
+  'listing-extract',
+  'listing-match',
+  'street-view',
+  'transcribe',
+]);
+
+const DAILY_CAP_IDENTIFIER = 'global';
+
+const UNLIMITED: RateLimitResult = {
+  success: true,
+  remaining: Number.POSITIVE_INFINITY,
+  reset: 0,
+};
+
+function dailyCap(bucket: DailyCappedBucket): number {
+  const e = env();
+  const caps: Record<DailyCappedBucket, number> = {
+    'listing-extract': e.RATE_LIMIT_DAILY_LISTING_EXTRACT,
+    'listing-match': e.RATE_LIMIT_DAILY_LISTING_MATCH,
+    'street-view': e.RATE_LIMIT_DAILY_STREET_VIEW,
+  };
+  return caps[bucket];
 }
 
-export async function applyRateLimit(input: {
+type RatelimitWindow = ReturnType<typeof Ratelimit.fixedWindow>;
+
+const globalForRateLimit = globalThis as unknown as {
+  rateLimiters: Map<string, Ratelimit | null> | undefined;
+};
+
+// why: Upstash keys a counter on prefix + identifier + window. With a shared
+// prefix every bucket incremented the same counter: one search's photos
+// exhausted the next search's extraction quota.
+function cachedRatelimit(
+  prefix: string,
+  window: () => RatelimitWindow,
+): Ratelimit | null {
+  globalForRateLimit.rateLimiters ??= new Map();
+  const cache = globalForRateLimit.rateLimiters;
+  if (cache.has(prefix)) return cache.get(prefix) ?? null;
+
+  const redis = getRedisClient();
+  const limiter = redis
+    ? new Ratelimit({ redis, limiter: window(), prefix, analytics: false })
+    : null;
+  cache.set(prefix, limiter);
+  return limiter;
+}
+
+// why: "production" is VERCEL_ENV, as for auth cookies and billing. Previews
+// sit behind Vercel's deployment protection and keep failing open.
+function whenRedisUnavailable(input: {
+  identifier: string;
+  limit: RateLimitBucket;
+}): RateLimitResult {
+  if (PAID_BUCKETS.has(input.limit) && env().VERCEL_ENV === 'production') {
+    log.error(
+      'rate_limit.refused.redis_unavailable',
+      new Error('Redis unavailable in front of a paid route'),
+      { identifier: input.identifier, limit: input.limit },
+    );
+    return { success: false, reason: 'unavailable' };
+  }
+  log.warn('rate_limit.skipped.redis_unavailable', {
+    identifier: input.identifier,
+    limit: input.limit,
+  });
+  return UNLIMITED;
+}
+
+async function consume(input: {
+  limiter: Ratelimit | null;
   identifier: string;
   limit: RateLimitBucket;
 }): Promise<RateLimitResult> {
-  if (env().NODE_ENV === 'development') {
-    return { success: true, remaining: Number.POSITIVE_INFINITY, reset: 0 };
-  }
-
-  const limiter = getLimiter(input.limit);
-  if (!limiter) {
-    log.warn('rate_limit.skipped.redis_unavailable', {
-      identifier: input.identifier,
-      limit: input.limit,
-    });
-    return { success: true, remaining: Number.POSITIVE_INFINITY, reset: 0 };
-  }
-
+  if (!input.limiter) return whenRedisUnavailable(input);
   try {
-    const result = await limiter.limit(input.identifier);
-    return {
-      success: result.success,
-      remaining: result.remaining,
-      reset: result.reset,
-    };
+    const result = await input.limiter.limit(input.identifier);
+    // why: Upstash resolves a Redis timeout as a success. It is an outage.
+    if (result.reason === 'timeout') throw new Error('Rate limit timed out');
+    if (!result.success) {
+      return { success: false, reason: 'limited', reset: result.reset };
+    }
+    return { success: true, remaining: result.remaining, reset: result.reset };
   } catch (error) {
     log.error(
       'rate_limit.error',
       error instanceof Error ? error : new Error(String(error)),
       { identifier: input.identifier, limit: input.limit },
     );
-    return { success: true, remaining: Number.POSITIVE_INFINITY, reset: 0 };
+    return whenRedisUnavailable(input);
   }
+}
+
+export async function applyRateLimit(input: {
+  identifier: string;
+  limit: RateLimitBucket;
+}): Promise<RateLimitResult> {
+  if (env().NODE_ENV === 'development') return UNLIMITED;
+
+  const limiter = cachedRatelimit(`app:ratelimit:${input.limit}`, () =>
+    Ratelimit.slidingWindow(PER_CALLER_PER_MINUTE[input.limit], '1 m'),
+  );
+  return consume({ limiter, identifier: input.identifier, limit: input.limit });
+}
+
+// why: one counter shared by every caller. A route takes its token only once
+// the input is valid, so malformed calls cannot exhaust it for everyone.
+export async function applyDailyCap(input: {
+  bucket: DailyCappedBucket;
+}): Promise<RateLimitResult> {
+  if (env().NODE_ENV === 'development') return UNLIMITED;
+
+  const cap = dailyCap(input.bucket);
+  const limiter = cachedRatelimit(`app:ratelimit:daily:${input.bucket}`, () =>
+    Ratelimit.fixedWindow(cap, '1 d'),
+  );
+  const result = await consume({
+    limiter,
+    identifier: DAILY_CAP_IDENTIFIER,
+    limit: input.bucket,
+  });
+  if (!result.success && result.reason === 'limited') {
+    log.warn('rate_limit.daily_cap_reached', {
+      limit: input.bucket,
+      cap,
+      reset: result.reset,
+    });
+  }
+  return result;
 }

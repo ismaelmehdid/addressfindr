@@ -1,3 +1,4 @@
+import { withinBounds } from '../field-bounds';
 import {
   parseCity,
   parseCount,
@@ -7,7 +8,7 @@ import {
   parseStreetAddress,
   parseSurfaceM2,
 } from '../parse-values';
-import type { ExtractedValues } from '../types';
+import type { ExtractedFieldName, ExtractedValues } from '../types';
 
 const SCRIPT_PATTERN =
   /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -75,6 +76,34 @@ function quantitativeValue(value: unknown): string | null {
   return asString(value);
 }
 
+function bounded(
+  field: ExtractedFieldName,
+  value: number | null,
+): number | null {
+  return value !== null && withinBounds(field, value) ? value : null;
+}
+
+function surface(raw: string): number | null {
+  return bounded('surfaceM2', parseSurfaceM2(`${raw} m²`));
+}
+
+function count(field: ExtractedFieldName, raw: string): number | null {
+  return bounded(field, parseCount(raw));
+}
+
+// why: a listing names its land, garden or balcony "Surface du terrain" and
+// so on; read as the living surface, it would match a different dwelling.
+const NON_LIVING_SURFACE_NAME =
+  /terrain|parcelle|jardin|balcon|terrasse|loggia|cave|garage|parking|s[ée]jour|combles?|grenier|cellier/i;
+
+// why: a title packs price and postal code together ("72000 € Hardricourt
+// (78250)"); only the parenthesised code is the postal code.
+const TITLE_POSTAL_CODE = /\(\s*(\d{5})\s*\)/;
+
+function titlePostalCode(title: string): string | null {
+  return TITLE_POSTAL_CODE.exec(title)?.[1] ?? null;
+}
+
 function readAdditionalProperties(
   node: Record<string, unknown>,
   values: Partial<ExtractedValues>,
@@ -87,9 +116,11 @@ function readAdditionalProperties(
     const raw = asString(prop.value);
     if (!raw) continue;
     if (name.includes('surface')) {
-      values.surfaceM2 ??= parseSurfaceM2(`${raw} m²`);
+      if (!NON_LIVING_SURFACE_NAME.test(name)) {
+        values.surfaceM2 ??= surface(raw);
+      }
     } else if (name.includes('pièce') || name.includes('piece')) {
-      values.rooms ??= parseCount(raw);
+      values.rooms ??= count('rooms', raw);
     } else if (name.includes('type')) {
       values.propertyType ??= parsePropertyType(raw);
     }
@@ -118,26 +149,28 @@ export function mapJsonLdToValues(
 
   for (const node of nodes) {
     const type = typeOf(node);
-    // why: le noeud Organization porte l'adresse du portail, jamais celle du bien
+    // why: the Organization node carries the portal's address, never the property's
     if (!LISTING_TYPES.has(type) && type !== 'offer') continue;
 
     if (type === 'offer') {
       const price = asString(node.price);
-      if (price) values.priceEur ??= parsePriceEur(price);
+      if (price) {
+        values.priceEur ??= bounded('priceEur', parsePriceEur(price));
+      }
       continue;
     }
 
     const size = quantitativeValue(node.floorSize);
-    if (size) values.surfaceM2 ??= parseSurfaceM2(`${size} m²`);
+    if (size) values.surfaceM2 ??= surface(size);
 
     const rooms = asString(node.numberOfRooms);
-    if (rooms) values.rooms ??= parseCount(rooms);
+    if (rooms) values.rooms ??= count('rooms', rooms);
 
     const bedrooms = asString(node.numberOfBedrooms);
-    if (bedrooms) values.bedrooms ??= parseCount(bedrooms);
+    if (bedrooms) values.bedrooms ??= count('bedrooms', bedrooms);
 
     const year = asString(node.yearBuilt);
-    if (year) values.yearBuilt ??= parseCount(year);
+    if (year) values.yearBuilt ??= count('yearBuilt', year);
 
     const posted = asString(node.datePosted);
     if (posted) values.publishedAt ??= posted;
@@ -149,12 +182,11 @@ export function mapJsonLdToValues(
     readAdditionalProperties(node, values);
   }
 
-  // why: le titre est une heuristique et doit passer APRES tous les champs
-  // structures, sinon un prix a 5 chiffres ("89000 € Lyon (69001)") est capte
-  // comme code postal et ??= empeche l'adresse structuree de le corriger
+  // why: the title is a heuristic, so it runs after every structured field;
+  // ??= would otherwise stop the structured address from overriding it.
   for (const title of titles) {
     values.propertyType ??= parsePropertyType(title);
-    values.postalCode ??= parsePostalCode(title);
+    values.postalCode ??= titlePostalCode(title);
   }
 
   for (const key of Object.keys(values) as (keyof ExtractedValues)[]) {

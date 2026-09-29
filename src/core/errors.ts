@@ -6,9 +6,11 @@ export type AppError =
   | { code: 'unauthorized'; message: string }
   | { code: 'forbidden'; message: string }
   | { code: 'validation'; message: string; field?: string }
+  | { code: 'unsupported_media_type'; message: string }
   | { code: 'conflict'; message: string }
   | { code: 'rate_limited'; message: string; retryAfterSeconds?: number }
   | { code: 'external_api'; message: string; provider: string }
+  | { code: 'service_unavailable'; message: string }
   | { code: 'db_error'; message: string }
   | { code: 'unknown'; message: string };
 
@@ -30,6 +32,10 @@ export function validation(message: string, field?: string): AppError {
   return { code: 'validation', message, field };
 }
 
+export function unsupportedMediaType(message: string): AppError {
+  return { code: 'unsupported_media_type', message };
+}
+
 export function rateLimited(
   message: string,
   retryAfterSeconds?: number,
@@ -43,6 +49,10 @@ export function conflict(message: string): AppError {
 
 export function externalApi(provider: string, message: string): AppError {
   return { code: 'external_api', provider, message };
+}
+
+export function serviceUnavailable(message: string): AppError {
+  return { code: 'service_unavailable', message };
 }
 
 export function unknown(message: string): AppError {
