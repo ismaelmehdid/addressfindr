@@ -113,6 +113,26 @@ describe('resolveQuotedFields', () => {
     expect(values.gesClass).toBeUndefined();
   });
 
+  it('reads the floor and the building floor count from one quote', () => {
+    const quote = 'au 3e étage sur 5';
+    const values = resolveQuotedFields({
+      source: `Appartement ${quote} avec ascenseur`,
+      quotes: { floor: quote, buildingFloors: quote },
+    });
+    expect(values.floor).toBe(3);
+    expect(values.buildingFloors).toBe(5);
+  });
+
+  it('reads the floor, not the room count, from a quote carrying both', () => {
+    const quote = '3 pièces au 2e étage';
+    const values = resolveQuotedFields({
+      source: `Appartement ${quote}`,
+      quotes: { floor: quote, buildingFloors: quote },
+    });
+    expect(values.floor).toBe(2);
+    expect(values.buildingFloors).toBeUndefined();
+  });
+
   it('ignores a field with no quote', () => {
     expect(resolveQuotedFields({ source: SOURCE, quotes: {} })).toEqual({});
   });
