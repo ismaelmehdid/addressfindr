@@ -23,7 +23,7 @@ import { ListingUrlForm } from './listing-url-form';
 
 // why: jsdom implements neither. Every media query matches, so the results
 // lay themselves out as on a wide screen, detail panel open.
-HTMLElement.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.scrollTo = vi.fn();
 window.matchMedia = (query: string): MediaQueryList => ({
   matches: true,
   media: query,
@@ -182,7 +182,11 @@ async function renderForm(): Promise<void> {
         messages={messages}
         timeZone="Europe/Paris"
       >
-        <ListingUrlForm mapboxAccessToken="" streetViewEnabled={false} />
+        <ListingUrlForm
+          mapboxAccessToken=""
+          streetViewEnabled={false}
+          streetViewEmbedKey=""
+        />
       </NextIntlClientProvider>,
     );
   });
