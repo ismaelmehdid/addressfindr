@@ -143,6 +143,7 @@ async function render(
           map={{ kind: 'unavailable' }}
           accessToken=""
           streetViewEnabled={false}
+          streetViewEmbedKey=""
           onSelect={() => {}}
           onCloseDetail={() => {}}
           onMapFailure={() => {}}

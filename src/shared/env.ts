@@ -29,6 +29,11 @@ const EnvSchema = v.object({
   NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN: v.optional(
     v.pipe(v.string(), v.minLength(1), v.startsWith('pk.')),
   ),
+  // why: browser key for the Maps Embed API, restricted by HTTP referrer.
+  // Without it, the Street View photo opens Google Maps in a new tab.
+  NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY: v.optional(
+    v.pipe(v.string(), v.minLength(1)),
+  ),
 
   DATABASE_URL: v.pipe(v.string(), v.minLength(1)),
   DATABASE_SSL: v.optional(v.picklist(['allow', 'require']), 'allow'),
@@ -246,6 +251,17 @@ function assertBillingConfigured(parsed: Env): void {
   }
 }
 
+function assertServerKeyStaysPrivate(parsed: Env): void {
+  if (
+    parsed.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY !== undefined &&
+    parsed.NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY === parsed.GOOGLE_MAPS_API_KEY
+  ) {
+    throw new Error(
+      'NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY must be a browser key distinct from GOOGLE_MAPS_API_KEY, which never leaves the server.',
+    );
+  }
+}
+
 // `.env` ships every optional key with an empty value, and dotenv loads those
 // as '' rather than undefined — which would defeat v.optional() and fail the
 // minLength/url/email checks. An empty value means "not set".
@@ -272,6 +288,7 @@ export function env(): Env {
   }
   assertEmailProviderConfigured(result.output);
   assertBillingConfigured(result.output);
+  assertServerKeyStaysPrivate(result.output);
   cached = result.output;
   return cached;
 }

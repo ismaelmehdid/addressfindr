@@ -24,3 +24,13 @@ export function streetViewPanoramaUrl(point: GeoPoint): string {
   });
   return `https://www.google.com/maps/@?${query.toString()}`;
 }
+
+// why: the Maps Embed API shows the panorama closest to `location`. Its key is
+// a browser key restricted by referrer, never the server's Street View key.
+export function streetViewEmbedUrl(point: GeoPoint, apiKey: string): string {
+  const query = new URLSearchParams({
+    key: apiKey,
+    location: `${coordinate(point.latitude)},${coordinate(point.longitude)}`,
+  });
+  return `https://www.google.com/maps/embed/v1/streetview?${query.toString()}`;
+}

@@ -61,6 +61,7 @@ function PanelWithShortcuts({ onClose }: { onClose: () => void }) {
       rank={1}
       onClose={onClose}
       streetViewEnabled={false}
+      streetViewEmbedKey=""
       listing={{
         propertyType: 'apartment',
         surfaceM2: 63,

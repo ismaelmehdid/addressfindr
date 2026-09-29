@@ -91,6 +91,7 @@ export function ResultDetailPanel({
   rank,
   onClose,
   streetViewEnabled,
+  streetViewEmbedKey,
   listing,
   feedback,
 }: {
@@ -98,6 +99,7 @@ export function ResultDetailPanel({
   rank: number;
   onClose: () => void;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
   listing: DetailListing;
   feedback: SearchFeedback;
 }) {
@@ -126,6 +128,7 @@ export function ResultDetailPanel({
         key={`photo:${candidate.record.dpeNumber}`}
         record={candidate.record}
         streetViewEnabled={streetViewEnabled}
+        streetViewEmbedKey={streetViewEmbedKey}
       />
       <ResultDetailBody
         key={`body:${candidate.record.dpeNumber}`}

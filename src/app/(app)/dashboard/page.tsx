@@ -13,6 +13,7 @@ export default function DashboardHomePage(): React.ReactElement {
     <ListingUrlForm
       mapboxAccessToken={env().NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? ''}
       streetViewEnabled={env().GOOGLE_MAPS_API_KEY !== undefined}
+      streetViewEmbedKey={env().NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY ?? ''}
     />
   );
 }

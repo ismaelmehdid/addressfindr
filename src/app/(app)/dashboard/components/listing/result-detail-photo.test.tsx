@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { aerialImageUrl } from '@/core/geo/aerial-image';
 import {
+  streetViewEmbedUrl,
   streetViewImagePath,
   streetViewPanoramaUrl,
 } from '@/core/street-view/links';
@@ -26,6 +27,7 @@ const RECORD = {
   address: '16 Rue Lavoisier 69003 Lyon',
   point: TRUSTED_POINT,
 };
+const EMBED_KEY = 'browser-embed-key';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -53,10 +55,25 @@ function render(
         messages={messages}
         timeZone="Europe/Paris"
       >
-        <ResultDetailPhoto record={RECORD} streetViewEnabled {...props} />
+        <ResultDetailPhoto
+          record={RECORD}
+          streetViewEnabled
+          streetViewEmbedKey=""
+          {...props}
+        />
       </NextIntlClientProvider>,
     );
   });
+}
+
+function panoramaTrigger(): HTMLButtonElement | null {
+  return container.querySelector<HTMLButtonElement>(
+    'button[aria-label="Explorer le panorama Street View"]',
+  );
+}
+
+function dialog(): HTMLElement | null {
+  return document.querySelector<HTMLElement>('[role="dialog"]');
 }
 
 function photo(): HTMLImageElement | null {
@@ -72,7 +89,7 @@ function failPhoto(): void {
 }
 
 describe('ResultDetailPhoto', () => {
-  it('links the Street View photo to the panorama in a new tab', () => {
+  it('links the Street View photo to the panorama in a new tab without an embed key', () => {
     render({});
 
     const link = container.querySelector('a');
@@ -103,6 +120,69 @@ describe('ResultDetailPhoto', () => {
         'focus-visible:after:ring-charcoal',
       ]),
     );
+  });
+
+  it('opens the panorama in a dialog inside the app with an embed key', () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    expect(container.querySelector('a')).toBeNull();
+    const trigger = panoramaTrigger();
+    expect(trigger?.textContent).toBe('');
+    expect(container.textContent).toContain('Explorer le panorama');
+    expect(dialog()).toBeNull();
+
+    act(() => {
+      trigger?.click();
+    });
+
+    const opened = dialog();
+    expect(opened?.textContent).toContain(`Street View · ${RECORD.address}`);
+    const frame = opened?.querySelector('iframe');
+    expect(frame?.getAttribute('src')).toBe(
+      streetViewEmbedUrl(TRUSTED_POINT, EMBED_KEY),
+    );
+    expect(frame?.getAttribute('title')).toBe(
+      'Panorama Street View interactif',
+    );
+    expect(frame?.hasAttribute('allowfullscreen')).toBe(true);
+    expect(frame?.getAttribute('loading')).toBe('lazy');
+    expect(frame?.getAttribute('referrerpolicy')).toBe(
+      'strict-origin-when-cross-origin',
+    );
+    const outbound = opened?.querySelector('a');
+    expect(outbound?.getAttribute('href')).toBe(
+      streetViewPanoramaUrl(TRUSTED_POINT),
+    );
+    expect(outbound?.getAttribute('target')).toBe('_blank');
+    expect(outbound?.textContent).toBe(
+      'Ouvrir dans Google Maps (nouvel onglet)',
+    );
+  });
+
+  it('closes the panorama dialog from its close button', () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    act(() => {
+      panoramaTrigger()?.click();
+    });
+    const close = dialog()?.querySelector<HTMLButtonElement>(
+      'button[aria-label="Fermer le panorama"]',
+    );
+
+    act(() => {
+      close?.click();
+    });
+
+    expect(dialog()).toBeNull();
+  });
+
+  it('never offers the panorama dialog on the orthophoto', () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    failPhoto();
+
+    expect(photo()?.src).toBe(AERIAL_SRC);
+    expect(panoramaTrigger()).toBeNull();
+    expect(container.querySelector('button')).toBeNull();
   });
 
   it('falls back from Street View to the orthophoto, then to the placeholder', () => {

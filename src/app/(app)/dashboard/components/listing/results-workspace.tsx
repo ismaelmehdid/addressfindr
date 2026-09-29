@@ -88,6 +88,7 @@ export function ResultsWorkspace({
   map,
   accessToken,
   streetViewEnabled,
+  streetViewEmbedKey,
   onSelect,
   onCloseDetail,
   onMapFailure,
@@ -101,6 +102,7 @@ export function ResultsWorkspace({
   map: MapAvailability;
   accessToken: string;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
   onSelect: (dpeNumber: string) => void;
   onCloseDetail: () => void;
   onMapFailure: () => void;
@@ -177,6 +179,7 @@ export function ResultsWorkspace({
       rank={rank}
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
+      streetViewEmbedKey={streetViewEmbedKey}
       listing={listing.fields}
       feedback={feedback}
     />

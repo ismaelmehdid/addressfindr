@@ -154,8 +154,9 @@ export const DOMAINS = [
   },
   {
     // Street photo of a candidate address (Google Street View Static API).
-    // The UI imports it to build the photo URL (/api/street-view) and the
-    // outbound link to the Google Maps panorama.
+    // The UI imports it to build the photo URL (/api/street-view), the
+    // embedded panorama (Maps Embed API) and the outbound link to the Google
+    // Maps panorama.
     name: 'street-view',
     dirs: [
       'src/core/street-view',

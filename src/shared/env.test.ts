@@ -100,3 +100,37 @@ describe('env optional infrastructure values', () => {
     expect(() => env()).toThrow(/CRON_SECRET/);
   });
 });
+
+describe('env Street View embed key', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('treats an empty embed key as unset', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY: '',
+    });
+    expect(env().NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY).toBeUndefined();
+  });
+
+  it('accepts a browser key distinct from the server key', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      GOOGLE_MAPS_API_KEY: 'server-street-view-key',
+      NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY: 'browser-embed-key',
+    });
+    expect(env().NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY).toBe(
+      'browser-embed-key',
+    );
+  });
+
+  it('refuses to serve the server Street View key to the browser', async () => {
+    const env = await loadEnv({
+      EMAIL_PROVIDER: 'none',
+      GOOGLE_MAPS_API_KEY: 'server-street-view-key',
+      NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY: 'server-street-view-key',
+    });
+    expect(() => env()).toThrow(/NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY/);
+  });
+});

@@ -116,6 +116,7 @@ async function render(
           rank={2}
           onClose={() => {}}
           streetViewEnabled={false}
+          streetViewEmbedKey=""
           listing={LISTING}
           feedback={FEEDBACK}
           {...props}

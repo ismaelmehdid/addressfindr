@@ -156,9 +156,11 @@ const WORKSPACE_LAYOUT_CLASS = 'relative flex min-h-0 flex-1 flex-col';
 export function ListingUrlForm({
   mapboxAccessToken,
   streetViewEnabled,
+  streetViewEmbedKey,
 }: {
   mapboxAccessToken: string;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
 }) {
   const t = useTranslations('Listing');
   const [url, setUrl] = useState('');
@@ -275,6 +277,7 @@ export function ListingUrlForm({
           })}
           accessToken={mapboxAccessToken}
           streetViewEnabled={streetViewEnabled}
+          streetViewEmbedKey={streetViewEmbedKey}
           onSelect={(dpeNumber) => {
             setSelection((current) => ({
               dpeNumber,

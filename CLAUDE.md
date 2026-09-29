@@ -114,7 +114,7 @@ Verified on 7000 `dpe03existant` rows across `69383`, `75115`, `13201`, `33063`,
 - The gate that follows lives in `core/geo/resolve-mappable-point.ts`: status, then overseas postal code, then a métropole bounding box. **No pin beats a wrong pin.**
 - **The map speaks for the top-ranked candidate only** (`core/ademe/candidate-on-map.ts`). When #1 has no trusted point, no pin is shown — pinning #2 by default would put a different address on the map than the answer. Another candidate is pinned only when the user picks it, and the pinned address is always named above the map. A picked candidate without a trusted point is honoured too: the pin disappears and the map rests on the commune (`mapOverview`), it never stays on the previous address.
 - **The results view is a three-panel workspace** matching precisement.fr: the analysed listing and the ranked cards on the left, the map, and the selected result's detail (photo, score, address, energy labels, fact tiles with ✓ only when the value agrees with the listing's own (surface within 1 m²), verify-elsewhere links, "C'est ce logement") on the right; the detail floats over the map between `lg` and `xl` and becomes a bottom sheet below `lg`. It never shows how a candidate was scored. There are no accounts in the UI. When no map can be drawn the map region shows a notice and the rest works.
-- **Street View photos only ever point at a trusted point.** A candidate without one gets no photo. The free metadata call runs first, so an image is only billed when a panorama exists within 50 m; without `heading`, Google aims the camera at the point.
+- **Street View photos only ever point at a trusted point.** A candidate without one gets no photo. The free metadata call runs first, so an image is only billed when a panorama exists within 50 m; without `heading`, Google aims the camera at the point. The panorama the photo opens (Maps Embed API, in a dialog) points at that same trusted point, never another one.
 
 ---
 
@@ -285,7 +285,7 @@ Domains and their tables:
 | `listing` | `listing_feedback` | `application/listing/*` use cases, `core/listing/types` |
 | `commune` | none | `application/commune/resolve-commune`, `core/commune/types` |
 | `ademe` | none | `application/ademe/find-address-candidates`, `application/ademe/dto`, `core/ademe/types` |
-| `street-view` | none | `core/street-view/links` (the UI builds the `/api/street-view` photo URL and the outbound Google Maps panorama link) |
+| `street-view` | none | `core/street-view/links` (the UI builds the `/api/street-view` photo URL, the embedded panorama URL and the outbound Google Maps panorama link) |
 | `rate-limit` / `email` | none (platform, open to all) | `apply-rate-limit`, `llm-cost-limiter`, `email-sender` |
 
 Rules the checker enforces:
@@ -344,6 +344,7 @@ Rules the checker enforces:
     - **Groq** — hébergeur d'inférence pour l'extraction de champs depuis le markdown d'annonce. Le modèle reste un modèle OpenAI (`openai/gpt-oss-120b`), donc la règle « OpenAI-only » tient sur le fond ; seul l'hôte d'inférence change. API compatible OpenAI, donc `@ai-sdk/openai` avec un `baseURL` — aucun paquet npm ajouté, et le repli vers OpenAI est un changement de config.
     - **Google Street View Static API** — photo de rue de chaque adresse candidate (demandé explicitement le 2026-09-24). Appelé en REST via `fetch` depuis `/api/street-view`, clé serveur `GOOGLE_MAPS_API_KEY` jamais servie au navigateur, aucun paquet npm ajouté. Métadonnées gratuites, image facturée seulement si un panorama existe. Clé absente = fiches sans photo.
       - **Compatible avec la carte Mapbox.** Afficher l'imagerie Street View sur le même écran que la carte Mapbox a été confirmé acceptable par Google (2026-09-28, question posée par le propriétaire du projet). Ce n'est plus un bloquant pour la prod.
+    - **Google Maps Embed API** — panorama Street View explorable dans l'app au clic sur la photo Street View du détail (demandé explicitement le 2026-09-28). Une `<iframe>` `google.com/maps/embed/v1/streetview` dans une boîte de dialogue, pointée uniquement sur le point de confiance de la photo, aucun paquet npm ajouté. Gratuite, sans facturation au chargement. Clé navigateur distincte `NEXT_PUBLIC_GOOGLE_MAPS_EMBED_API_KEY`, restreinte par référent HTTP aux domaines de l'app et à la seule « Maps Embed API » ; l'app refuse de démarrer si elle vaut `GOOGLE_MAPS_API_KEY`. Clé absente = la photo ouvre Google Maps dans un nouvel onglet, comme avant.
     - Rationale et mesures : `docs/superpowers/specs/2026-09-17-listing-ingestion-extraction.md` §3 et §4.1.
 - **Cron is only for retry / stuck-state cleanup.** Primary work runs in-request (or via `waitUntil`).
 
