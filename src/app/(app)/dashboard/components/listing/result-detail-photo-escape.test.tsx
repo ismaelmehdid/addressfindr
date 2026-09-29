@@ -32,12 +32,21 @@ function PhotoWithShortcuts(shortcuts: Shortcuts) {
   );
 }
 
-async function press(target: Element, key: string): Promise<void> {
-  await act(async () => {
-    target.dispatchEvent(
-      new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }),
-    );
+async function press(
+  target: Element,
+  key: string,
+  modifiers: KeyboardEventInit = {},
+): Promise<KeyboardEvent> {
+  const event = new KeyboardEvent('keydown', {
+    key,
+    bubbles: true,
+    cancelable: true,
+    ...modifiers,
   });
+  await act(async () => {
+    target.dispatchEvent(event);
+  });
+  return event;
 }
 
 function panoramaTrigger(): HTMLButtonElement {
@@ -62,12 +71,17 @@ async function explore(): Promise<Element> {
   return back;
 }
 
+function openInMaps(): HTMLAnchorElement {
+  const link = document.querySelector<HTMLAnchorElement>('a[target="_blank"]');
+  if (link === null) throw new Error('no Google Maps link');
+  return link;
+}
+
 // why: Next.js mounts React on `document`, where the detail shortcuts listen
-// too, so nothing the panorama does can stop the key reaching them; it marks
-// Escape handled instead. It must be the file's only root: React skips
-// listening on a document an earlier root already marked.
-it('leaves the panorama on Escape without closing the detail, which the next Escape closes', async () => {
-  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+// too, so nothing the panorama does can stop a key reaching them; it marks the
+// key handled instead. Every root in this file is mounted on `document`:
+// React skips listening on a document an earlier container root marked.
+async function mountOnDocument(shortcuts: Shortcuts): Promise<void> {
   vi.stubGlobal(
     'fetch',
     vi.fn(async () =>
@@ -96,16 +110,15 @@ it('leaves the panorama on Escape without closing the detail, which the next Esc
       </html>,
     );
   });
+}
+
+it('leaves the panorama on Escape without closing the detail, which the next Escape closes', async () => {
+  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+  await mountOnDocument(shortcuts);
 
   const back = await explore();
   expect(document.activeElement).toBe(back);
   expect(document.querySelector('iframe')).not.toBeNull();
-
-  // why: only Escape is claimed; the arrow keys still page the results.
-  await press(back, 'ArrowLeft');
-  await press(back, 'ArrowRight');
-  expect(shortcuts.onPrevious).toHaveBeenCalledOnce();
-  expect(shortcuts.onNext).toHaveBeenCalledOnce();
 
   await press(back, 'Escape');
   expect(shortcuts.onClose).not.toHaveBeenCalled();
@@ -114,4 +127,41 @@ it('leaves the panorama on Escape without closing the detail, which the next Esc
 
   await press(panoramaTrigger(), 'Escape');
   expect(shortcuts.onClose).toHaveBeenCalledOnce();
+});
+
+// why: Street View is turned with the arrow keys. Paging to another result
+// from the panorama would remount the photo, discarding the panorama and
+// dropping focus to <body>, so the arrow keys page again only once the photo
+// is back.
+it('keeps the arrow keys from paging the results while the panorama is explored', async () => {
+  const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
+  await mountOnDocument(shortcuts);
+
+  const back = await explore();
+  const claimed = [
+    await press(back, 'ArrowLeft'),
+    await press(back, 'ArrowRight'),
+    await press(openInMaps(), 'ArrowLeft'),
+    await press(openInMaps(), 'ArrowRight'),
+  ];
+
+  expect(claimed.map((event) => event.defaultPrevented)).toEqual([
+    true,
+    true,
+    true,
+    true,
+  ]);
+  expect(shortcuts.onPrevious).not.toHaveBeenCalled();
+  expect(shortcuts.onNext).not.toHaveBeenCalled();
+  expect(document.querySelector('iframe')).not.toBeNull();
+  expect(document.activeElement).toBe(back);
+
+  // why: a modified arrow is no shortcut, and Alt+Left is the browser's Back.
+  expect(
+    (await press(back, 'ArrowLeft', { altKey: true })).defaultPrevented,
+  ).toBe(false);
+
+  await press(back, 'Escape');
+  await press(panoramaTrigger(), 'ArrowRight');
+  expect(shortcuts.onNext).toHaveBeenCalledOnce();
 });

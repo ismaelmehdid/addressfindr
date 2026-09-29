@@ -149,8 +149,26 @@ describe('ResultDetailPhoto', () => {
       streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: null }),
     );
     expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.textContent).toContain('Street View');
-    expect(link?.textContent).toContain('Explorer le panorama');
+    expect(link?.getAttribute('aria-label')).toBe(
+      'Street View, ouvrir dans Google Maps (nouvel onglet)',
+    );
+  });
+
+  // why: without the key the click leaves the app, so the photo must not
+  // promise a panorama explored in place; what it shows is in its name.
+  it('says the photo opens Google Maps, not the panorama in place, without an embed key', () => {
+    render({});
+
+    const link = container.querySelector('a');
+    const name = link?.getAttribute('aria-label')?.toLowerCase() ?? '';
+    const badges = [
+      ...(link?.querySelectorAll('[data-slot="badge"]') ?? []),
+    ].map((badge) => badge.textContent);
+    expect(badges).toEqual(['Street View', 'Ouvrir dans Google Maps']);
+    for (const badge of badges) {
+      expect(name).toContain(badge?.toLowerCase());
+    }
+    expect(link?.textContent).not.toContain('Explorer le panorama');
   });
 
   // why: the panel clips an outer ring and the absolutely positioned photo
@@ -205,6 +223,23 @@ describe('ResultDetailPhoto', () => {
     expect(openInMaps()?.textContent).toBe(
       'Ouvrir dans Google Maps (nouvel onglet)',
     );
+  });
+
+  // why: the embed lays its own controls along its edges, more of them on a
+  // phone (motion tracking, compass, zoom); ours sit in a bar outside the
+  // frame, so they can never cover one.
+  it('keeps its own controls out of the panorama frame', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await explore();
+
+    const frameArea = frame().parentElement;
+    expect([...(frameArea?.children ?? [])]).toEqual([frame()]);
+    expect(frameArea?.contains(backButton())).toBe(false);
+    expect(frameArea?.contains(openInMaps())).toBe(false);
+    expect(
+      container.querySelector('[role="group"]')?.contains(backButton()),
+    ).toBe(true);
   });
 
   // why: the screenshot is the panorama nearest the point, aimed at it; the

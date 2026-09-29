@@ -19,8 +19,9 @@ import { useFocusWhenShown } from './use-focus-when-shown';
 import { useStreetViewPanorama } from './use-street-view-panorama';
 
 // why: in the 85svh mobile sheet a full 320px photo can leave the body no height.
-const PHOTO_AREA_CLASS =
-  'relative block h-[min(320px,40svh)] shrink-0 overflow-hidden border-b border-border bg-mist lg:h-[320px]';
+const PHOTO_HEIGHT_CLASS = 'h-[min(320px,40svh)] lg:h-[320px]';
+
+const PHOTO_AREA_CLASS = `relative block ${PHOTO_HEIGHT_CLASS} shrink-0 overflow-hidden border-b border-border bg-mist`;
 
 // why: a <button> may not hold the photo's block elements, so the panorama
 // trigger is an empty button laid over the photo; on top, it shows its own
@@ -28,11 +29,16 @@ const PHOTO_AREA_CLASS =
 const PANORAMA_TRIGGER_CLASS =
   'absolute inset-0 z-10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-charcoal';
 
-// why: the embed draws its own controls along its edges, the fullscreen
-// button 40px tall at 10px from the top-right corner. Ours stack just below
-// that button, aligned with it, so they cover none of them.
-const PANORAMA_CONTROLS_CLASS =
-  'absolute top-[58px] right-2.5 z-10 flex flex-col items-end gap-1.5';
+// why: the embed draws its own controls along its edges, more of them on a
+// phone (motion tracking, compass, zoom) and placed by its own size. Ours sit
+// in a bar below the frame, which keeps the photo's size, so they can never
+// cover one. On the narrowest phones the bar wraps rather than overflow.
+const PANORAMA_BAR_CLASS =
+  'flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2.5 py-1.5';
+
+const BADGE_BOTTOM_RIGHT_CLASS = 'absolute right-2.5 bottom-2.5';
+
+const PAGING_KEYS: ReadonlySet<string> = new Set(['ArrowLeft', 'ArrowRight']);
 
 export function ResultDetailPhoto({
   record,
@@ -100,16 +106,10 @@ export function ResultDetailPhoto({
     );
   }
 
-  const badges = (
-    <>
-      <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
-        {t('streetViewBadge')}
-      </Badge>
-      <Badge variant="secondary" className="absolute right-2.5 bottom-2.5">
-        <Rotate3d aria-hidden />
-        {t('photoExplorePanorama')}
-      </Badge>
-    </>
+  const streetViewBadge = (
+    <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">
+      {t('streetViewBadge')}
+    </Badge>
   );
 
   if (streetViewEmbedKey.length > 0) {
@@ -120,17 +120,22 @@ export function ResultDetailPhoto({
         apiKey={streetViewEmbedKey}
       >
         {image}
-        {badges}
+        {streetViewBadge}
+        <Badge variant="secondary" className={BADGE_BOTTOM_RIGHT_CLASS}>
+          <Rotate3d aria-hidden />
+          {t('photoExplorePanorama')}
+        </Badge>
       </ExplorableStreetView>
     );
   }
 
   // why: without a browser embed key, the interactive panorama opens on
-  // Google Maps in a new tab rather than inside the app, on the capture
-  // closest to the point: resolving the photo's own panorama would spend a
-  // lookup on every photo shown. The panel clips an outer focus ring and the
-  // positioned photo covers an inset outline, so the ring is a pseudo-element
-  // stacked above the photo.
+  // Google Maps in a new tab rather than inside the app, and the badge says
+  // so instead of promising a panorama explored in place. It opens on the
+  // capture closest to the point: resolving the photo's own panorama would
+  // spend a lookup on every photo shown. The panel clips an outer focus ring
+  // and the positioned photo covers an inset outline, so the ring is a
+  // pseudo-element stacked above the photo.
   return (
     <a
       href={streetViewPanoramaUrl({ point: photo.point, panorama: null })}
@@ -143,7 +148,11 @@ export function ResultDetailPhoto({
       )}
     >
       {image}
-      {badges}
+      {streetViewBadge}
+      <Badge variant="secondary" className={BADGE_BOTTOM_RIGHT_CLASS}>
+        {t('photoOpenInMaps')}
+        <ArrowUpRight aria-hidden />
+      </Badge>
     </a>
   );
 }
@@ -181,13 +190,21 @@ function ExplorableStreetView({
     setExploring(false);
   }
 
-  // why: Escape leaves the panorama, not the detail. Marking it handled keeps
-  // it from the detail shortcuts and from the mobile sheet, which both skip
-  // an Escape whose default is already prevented.
-  function leaveOnEscape(event: KeyboardEvent<HTMLDivElement>): void {
-    if (event.key !== 'Escape' || event.defaultPrevented) return;
-    event.preventDefault();
-    stopExploring();
+  // why: Escape leaves the panorama, not the detail, and the arrow keys stay
+  // here instead of paging to another result: that remounts this photo,
+  // discarding the panorama and dropping focus to <body>. Marking a key
+  // handled keeps it from the detail shortcuts, and Escape from the mobile
+  // sheet, which skip a key whose default is already prevented. A modified
+  // arrow is no shortcut (Alt+Left is the browser's Back), so it goes through.
+  function claimKeys(event: KeyboardEvent<HTMLDivElement>): void {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      stopExploring();
+      return;
+    }
+    const modified =
+      event.altKey || event.ctrlKey || event.metaKey || event.shiftKey;
+    if (!modified && PAGING_KEYS.has(event.key)) event.preventDefault();
   }
 
   if (!exploring) {
@@ -209,29 +226,32 @@ function ExplorableStreetView({
     <div
       role="group"
       aria-label={t('streetViewPanoramaLabel', { address })}
-      className={PHOTO_AREA_CLASS}
-      onKeyDown={leaveOnEscape}
+      className="shrink-0 border-b border-border"
+      onKeyDown={claimKeys}
     >
-      {lookup.kind === 'locating' ? (
-        <Skeleton className="absolute inset-0 rounded-none" />
-      ) : (
-        // why: the key is restricted by referrer, so Google must receive this origin.
-        <iframe
-          title={t('streetViewPanoramaFrame')}
-          src={streetViewEmbedUrl({ point, apiKey, panorama: lookup.panorama })}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="strict-origin-when-cross-origin"
-          className="absolute inset-0 size-full border-0"
-        />
-      )}
-      <div className={PANORAMA_CONTROLS_CLASS}>
-        <Button
-          ref={backRef}
-          variant="outline"
-          size="sm"
-          onClick={stopExploring}
-        >
+      <div
+        className={cn('relative overflow-hidden bg-mist', PHOTO_HEIGHT_CLASS)}
+      >
+        {lookup.kind === 'locating' ? (
+          <Skeleton className="absolute inset-0 rounded-none" />
+        ) : (
+          // why: the key is restricted by referrer, so Google must receive this origin.
+          <iframe
+            title={t('streetViewPanoramaFrame')}
+            src={streetViewEmbedUrl({
+              point,
+              apiKey,
+              panorama: lookup.panorama,
+            })}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            className="absolute inset-0 size-full border-0"
+          />
+        )}
+      </div>
+      <div className={PANORAMA_BAR_CLASS}>
+        <Button ref={backRef} variant="ghost" size="sm" onClick={stopExploring}>
           <ArrowLeft aria-hidden />
           {t('streetViewPanoramaBack')}
         </Button>
@@ -240,7 +260,7 @@ function ExplorableStreetView({
             href={streetViewPanoramaUrl({ point, panorama: lookup.panorama })}
             target="_blank"
             rel="noopener noreferrer"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
           >
             {t.rich('streetViewPanoramaOpenInMaps', {
               hidden: (chunks) => <span className="sr-only">{chunks}</span>,

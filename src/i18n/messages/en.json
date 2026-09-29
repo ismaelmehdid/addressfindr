@@ -115,7 +115,7 @@
     "detailCopy": "Copy the address",
     "detailCopied": "Address copied",
     "detailCopyFailed": "Could not copy the address",
-    "detailStreetViewOpen": "Open in Google Street View (new tab)",
+    "detailStreetViewOpen": "Street View, open in Google Maps (new tab)",
     "detailStreetViewExplore": "Explore the Street View panorama",
     "streetViewPanoramaLabel": "Street View · {address}",
     "streetViewPanoramaFrame": "Interactive Street View panorama",
@@ -162,6 +162,7 @@
     "listingNewTab": "(new tab)",
     "listingFloorGround": "Ground floor",
     "photoExplorePanorama": "Explore the panorama",
+    "photoOpenInMaps": "Open in Google Maps",
     "photoUnavailable": "Image unavailable",
     "factLand": "Cadastral plot"
   }
