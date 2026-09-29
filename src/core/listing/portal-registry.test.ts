@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { portalDomain, resolvePortal } from './portal-registry';
-import { PORTAL_IDS } from './types';
+import { resolvePortal } from './portal-registry';
 
 describe('resolvePortal', () => {
   it('resolves a bare domain', () => {
@@ -26,25 +25,5 @@ describe('resolvePortal', () => {
 
   it('does not match a lookalike suffix', () => {
     expect(resolvePortal('notleboncoin.fr')).toBeNull();
-  });
-});
-
-describe('portalDomain', () => {
-  it('gives the registered domain of a portal', () => {
-    expect(portalDomain('leboncoin')).toBe('leboncoin.fr');
-  });
-
-  it('keeps the two lefigaro properties apart', () => {
-    expect(portalDomain('lefigaro-immobilier')).toBe('immobilier.lefigaro.fr');
-    expect(portalDomain('lefigaro-proprietes')).toBe('proprietes.lefigaro.fr');
-  });
-
-  it.each(
-    PORTAL_IDS,
-  )('gives %s a domain that resolves back to it', (portal) => {
-    const domain = portalDomain(portal);
-
-    expect(domain).not.toBeNull();
-    expect(resolvePortal(domain ?? '')).toBe(portal);
   });
 });

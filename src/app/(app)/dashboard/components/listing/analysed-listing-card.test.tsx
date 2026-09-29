@@ -19,8 +19,13 @@ import { AnalysedListingCard } from './analysed-listing-card';
 const LISTING_URL =
   'https://www.leboncoin.fr/ad/ventes_immobilieres/2345678901?utm_source=newsletter';
 const DISPLAY_URL = 'leboncoin.fr/ad/ventes_immobilieres/2345678901';
-const LEBONCOIN_FAVICON =
-  'https://www.google.com/s2/favicons?domain=leboncoin.fr&sz=64';
+const LEBONCOIN_FAVICON = '/portal-icons/leboncoin.png';
+
+// why: the icons ship with the app; an icon is always fetched from the app's
+// own origin, never from a third party.
+function onAppOrigin(path: string): string {
+  return new URL(path, window.location.origin).href;
+}
 
 function listing(
   over: Partial<ExtractedListing['fields']> = {},
@@ -140,7 +145,7 @@ describe('AnalysedListingCard', () => {
     render(listing());
     const icon = favicon();
 
-    expect(icon?.src).toBe(LEBONCOIN_FAVICON);
+    expect(icon?.src).toBe(onAppOrigin(LEBONCOIN_FAVICON));
     expect(icon?.getAttribute('alt')).toBe('');
     expect(icon?.getAttribute('aria-hidden')).toBe('true');
     expect(icon?.parentElement?.firstElementChild).toBe(icon);
@@ -168,9 +173,7 @@ describe('AnalysedListingCard', () => {
       }),
     );
 
-    expect(favicon()?.src).toBe(
-      'https://www.google.com/s2/favicons?domain=seloger.com&sz=64',
-    );
+    expect(favicon()?.src).toBe(onAppOrigin('/portal-icons/seloger.png'));
   });
 
   it('shows each listing detail as a chip, icon on the left, in order', () => {

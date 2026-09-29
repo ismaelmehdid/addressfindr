@@ -26,10 +26,3 @@ export function resolvePortal(hostname: string): PortalId | null {
   }
   return null;
 }
-
-export function portalDomain(portal: PortalId): string | null {
-  for (const [domain, candidate] of Object.entries(DOMAIN_TO_PORTAL)) {
-    if (candidate === portal) return domain;
-  }
-  return null;
-}

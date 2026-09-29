@@ -11,7 +11,7 @@ export function ListingPortalIcon({ portal }: { portal: PortalId }) {
   const src = portalIconUrl(portal);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  if (src === null || src === failedSrc) {
+  if (src === failedSrc) {
     return (
       <Globe
         aria-hidden
@@ -21,6 +21,8 @@ export function ListingPortalIcon({ portal }: { portal: PortalId }) {
     );
   }
 
+  // why: the icons are already 16 to 64 px files; the image optimizer would
+  // only add a round trip.
   return (
     <Image
       unoptimized

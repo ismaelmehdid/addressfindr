@@ -1,34 +1,40 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { portalIconUrl } from './portal-icon';
-import { portalDomain } from './portal-registry';
-import { PORTAL_IDS, type PortalId } from './types';
+import { PORTAL_IDS } from './types';
 
-function iconUrl(portal: PortalId): URL {
-  const href = portalIconUrl(portal);
-  if (href === null) throw new Error(`no icon URL for ${portal}`);
-  return new URL(href);
-}
+const PORTAL_ICONS_DIR = fileURLToPath(
+  new URL('../../../public/portal-icons/', import.meta.url),
+);
+const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
 describe('portalIconUrl', () => {
-  it('asks Google s2 for the 64 px favicon of the portal domain', () => {
-    expect(portalIconUrl('leboncoin')).toBe(
-      'https://www.google.com/s2/favicons?domain=leboncoin.fr&sz=64',
+  it('serves the icon of a portal from the app itself', () => {
+    expect(portalIconUrl('leboncoin')).toBe('/portal-icons/leboncoin.png');
+  });
+
+  // why: fetching a favicon from a third party at runtime would hand it the
+  // visitor's IP address and the app's origin on every result.
+  it.each(
+    PORTAL_IDS,
+  )('never sends the browser to another host for %s', (portal) => {
+    const origin = 'https://app.test';
+
+    expect(new URL(portalIconUrl(portal), origin).origin).toBe(origin);
+  });
+});
+
+describe('bundled portal icons', () => {
+  it('holds exactly one icon per portal, and nothing else', () => {
+    expect(readdirSync(PORTAL_ICONS_DIR).sort()).toEqual(
+      PORTAL_IDS.map((portal) => `${portal}.png`).sort(),
     );
   });
 
-  it('sends the portal domain and nothing else', () => {
-    const url = iconUrl('lefigaro-immobilier');
+  it.each(PORTAL_IDS)('holds a PNG image for %s', (portal) => {
+    const bytes = readFileSync(`${PORTAL_ICONS_DIR}${portal}.png`);
 
-    expect(url.origin + url.pathname).toBe(
-      'https://www.google.com/s2/favicons',
-    );
-    expect([...url.searchParams.keys()]).toEqual(['domain', 'sz']);
-    expect(url.searchParams.get('domain')).toBe('immobilier.lefigaro.fr');
-  });
-
-  it.each(PORTAL_IDS)('has an icon for %s', (portal) => {
-    expect(iconUrl(portal).searchParams.get('domain')).toBe(
-      portalDomain(portal),
-    );
+    expect([...bytes.subarray(0, PNG_SIGNATURE.length)]).toEqual(PNG_SIGNATURE);
   });
 });
