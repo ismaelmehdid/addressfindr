@@ -59,11 +59,9 @@ function PanelWithShortcuts({ onClose }: { onClose: () => void }) {
     <ResultDetailPanel
       candidate={CANDIDATE}
       rank={1}
-      total={1}
-      onPrevious={null}
-      onNext={null}
       onClose={onClose}
       streetViewEnabled={false}
+      streetViewEmbedKey=""
       listing={{
         propertyType: 'apartment',
         surfaceM2: 63,

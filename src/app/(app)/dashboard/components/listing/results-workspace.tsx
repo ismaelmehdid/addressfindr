@@ -1,12 +1,11 @@
 'use client';
 
-import { ChevronDown, Info, MapPin, MapPinOff, Search } from 'lucide-react';
+import { ChevronDown, Info, MapPin, MapPinOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   Collapsible,
@@ -26,13 +25,15 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
+import { revealInScrollArea } from './center-in-scroll-area';
 import { MapErrorBoundary } from './map-error-boundary';
 import { DEFAULT_MAP_VIEW, type MapView } from './map-view';
 import { MapViewSwitch } from './map-view-switch';
 import { MissingListingFeedback } from './missing-listing-feedback';
+import { NewSearchDialog } from './new-search-dialog';
 import { ResultDetailPanel } from './result-detail-panel';
-import { ResultsPager } from './results-pager';
 import { useDetailShortcuts } from './use-detail-shortcuts';
+import type { ListingSearchResult } from './use-listing-search';
 import { useSearchFeedback } from './use-search-feedback';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
@@ -91,6 +92,7 @@ export function ResultsWorkspace({
   map,
   accessToken,
   streetViewEnabled,
+  streetViewEmbedKey,
   onSelect,
   onCloseDetail,
   onMapFailure,
@@ -104,10 +106,11 @@ export function ResultsWorkspace({
   map: MapAvailability;
   accessToken: string;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
   onSelect: (dpeNumber: string) => void;
   onCloseDetail: () => void;
   onMapFailure: () => void;
-  onNewSearch: () => void;
+  onNewSearch: (result: ListingSearchResult) => void;
 }) {
   const t = useTranslations('Listing');
   const isLg = useMediaQuery(LG_QUERY);
@@ -117,6 +120,9 @@ export function ResultsWorkspace({
     candidates: match.candidates,
   });
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const [mapView, setMapView] = useState<MapView>(DEFAULT_MAP_VIEW);
   const { candidates } = match;
   const total = candidates.length;
@@ -126,8 +132,8 @@ export function ResultsWorkspace({
       (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
     ),
   );
-  // why: the pagers wrap around, so as soon as there are two results every
-  // one of them has a neighbour on both sides.
+  // why: the arrow-key shortcuts wrap around, so as soon as there are two
+  // results every one of them has a neighbour on both sides.
   const previous =
     total > 1 ? candidates[(index - 1 + total) % total] : undefined;
   const next = total > 1 ? candidates[(index + 1) % total] : undefined;
@@ -155,14 +161,35 @@ export function ResultsWorkspace({
     headingRef.current?.focus();
   }, []);
 
-  // why: closing the detail (close button, or the mobile Sheet's
-  // onOpenChange(false)) can unmount the panel that held focus. Moving focus
-  // to the results heading right after the close renders keeps it from
-  // dropping to <body>.
+  // why: closing the detail (its close button, Escape, or the mobile Sheet's
+  // onOpenChange(false)) can unmount the panel that held focus. Focus then
+  // returns to the shown result's card, the one marked current while the
+  // detail is open. preventScroll keeps the page still; the list moves only
+  // to show the card's focus ring, when the browser draws one (a keyboard
+  // close, not a pointer one) and the card is out of view, as after tabbing
+  // past every later card to reach the detail. Focus outside the detail, such
+  // as on a card where Escape was pressed, stays where it is.
   function closeDetail(): void {
+    const focused = document.activeElement;
+    const focusInDetail =
+      focused !== null &&
+      [asideRef.current, sheetRef.current].some(
+        (panel) => panel?.contains(focused) === true,
+      );
+    const shownCard =
+      resultsRef.current?.querySelector<HTMLElement>(
+        'button[aria-current="true"]',
+      ) ?? null;
     onCloseDetail();
     requestAnimationFrame(() => {
-      headingRef.current?.focus();
+      const active = document.activeElement;
+      const fellToBody = active === null || active === document.body;
+      if (!focusInDetail && !fellToBody) return;
+      const target =
+        shownCard?.isConnected === true ? shownCard : headingRef.current;
+      if (target === null) return;
+      target.focus({ preventScroll: true });
+      if (target.matches(':focus-visible')) revealInScrollArea(target);
     });
   }
 
@@ -179,11 +206,9 @@ export function ResultsWorkspace({
     <ResultDetailPanel
       candidate={shown}
       rank={rank}
-      total={total}
-      onPrevious={selectPrevious}
-      onNext={selectNext}
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
+      streetViewEmbedKey={streetViewEmbedKey}
       listing={listing.fields}
       feedback={feedback}
     />
@@ -197,34 +222,22 @@ export function ResultsWorkspace({
       )}
     >
       <section
+        ref={resultsRef}
         aria-labelledby="results-heading"
         className="order-2 flex min-h-0 flex-col border-t border-border bg-linen lg:order-none lg:border-t-0 lg:border-r"
       >
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-4 p-3">
-            <Button variant="outline" className="w-full" onClick={onNewSearch}>
-              <Search />
-              {t('resultsNewSearch')}
-            </Button>
+            <NewSearchDialog onFound={onNewSearch} />
             <AnalysedListingCard listing={listing} />
-            <div className="flex min-h-7 items-center justify-between gap-2">
-              <h2
-                id="results-heading"
-                ref={headingRef}
-                tabIndex={-1}
-                className="text-[15px] font-semibold text-ink outline-none"
-              >
-                {t('addressHeading')}
-              </h2>
-              {detailOpen && selectPrevious !== null && selectNext !== null && (
-                <ResultsPager
-                  rank={rank}
-                  total={total}
-                  onPrevious={selectPrevious}
-                  onNext={selectNext}
-                />
-              )}
-            </div>
+            <h2
+              id="results-heading"
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-[15px] font-semibold text-ink outline-none"
+            >
+              {t('addressHeading')}
+            </h2>
             {needsVerification(match) && (
               <Alert role="status">
                 <Info />
@@ -338,6 +351,7 @@ export function ResultsWorkspace({
 
       {isLg && detailOpen && (
         <aside
+          ref={asideRef}
           aria-label={t('detailTitle', { rank })}
           className="absolute inset-y-3 right-3 z-20 flex w-[400px] min-h-0 xl:static xl:inset-auto xl:z-auto xl:w-auto"
         >
@@ -355,6 +369,7 @@ export function ResultsWorkspace({
           }}
         >
           <SheetContent
+            ref={sheetRef}
             side="bottom"
             showCloseButton={false}
             // why: replaces the primitive's same-variant h-auto, under which the detail's scroll area never scrolls

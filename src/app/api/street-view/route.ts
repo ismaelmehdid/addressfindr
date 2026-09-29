@@ -1,4 +1,4 @@
-import { GetStreetViewImageInputSchema } from '@/application/street-view/dto';
+import { StreetViewPointInputSchema } from '@/application/street-view/dto';
 import { getStreetViewImage } from '@/application/street-view/get-street-view-image';
 import { notFound, parseInput } from '@/core/errors';
 import { openRoute, spendDailyCap } from '@/shared/api-route';
@@ -18,7 +18,7 @@ export async function GET(req: Request): Promise<Response> {
   const query = new URL(req.url).searchParams;
   const point = { lat: query.get('lat') ?? '', lon: query.get('lon') ?? '' };
   const valid = parseInput(
-    GetStreetViewImageInputSchema,
+    StreetViewPointInputSchema,
     point,
     'Invalid Street View point',
   );

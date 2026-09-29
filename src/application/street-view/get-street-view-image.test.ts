@@ -16,7 +16,10 @@ import { getStreetViewImage } from './get-street-view-image';
 function imagery(): IStreetViewImagery & {
   imageToward: ReturnType<typeof vi.fn>;
 } {
-  return { imageToward: vi.fn(async () => ok(null)) };
+  return {
+    imageToward: vi.fn(async () => ok(null)),
+    panoramaNear: vi.fn(async () => ok(null)),
+  };
 }
 
 describe('getStreetViewImage', () => {

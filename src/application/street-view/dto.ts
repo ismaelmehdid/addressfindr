@@ -10,13 +10,20 @@ const CoordinateSchema = v.pipe(
 
 // why: points shown on the map already passed core/geo's metropolitan
 // bounding box. A point outside it cannot come from the UI, and must not
-// spend billed Street View images.
-export const GetStreetViewImageInputSchema = v.pipe(
+// reach Google, whose images are billed.
+export const StreetViewPointInputSchema = v.pipe(
   v.object({ lat: CoordinateSchema, lon: CoordinateSchema }),
   v.transform(({ lat, lon }) => ({ latitude: lat, longitude: lon })),
   v.check(isWithinMetropolitanFrance, 'Point is outside metropolitan France'),
 );
 
-export type GetStreetViewImageInput = v.InferInput<
-  typeof GetStreetViewImageInputSchema
+export type StreetViewPointInput = v.InferInput<
+  typeof StreetViewPointInputSchema
 >;
+
+// why: what /api/street-view/panorama answers; the UI validates it before
+// building the embed from it.
+export const StreetViewPanoramaSchema = v.object({
+  panoId: v.pipe(v.string(), v.minLength(1)),
+  heading: v.pipe(v.number(), v.integer(), v.minValue(0), v.maxValue(359)),
+});

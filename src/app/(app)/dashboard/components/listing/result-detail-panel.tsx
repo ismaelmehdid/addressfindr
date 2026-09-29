@@ -30,7 +30,6 @@ import type {
 import { cn } from '@/lib/utils';
 import { ConfirmListingButton } from './confirm-listing-button';
 import { ResultDetailPhoto } from './result-detail-photo';
-import { ResultsPager } from './results-pager';
 import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
 import { useCopyAddress } from './use-copy-address';
 import type { SearchFeedback } from './use-search-feedback';
@@ -90,60 +89,46 @@ type DetailListing = Pick<
 export function ResultDetailPanel({
   candidate,
   rank,
-  total,
-  onPrevious,
-  onNext,
   onClose,
   streetViewEnabled,
+  streetViewEmbedKey,
   listing,
   feedback,
 }: {
   candidate: AddressCandidate;
   rank: number;
-  total: number;
-  onPrevious: (() => void) | null;
-  onNext: (() => void) | null;
   onClose: () => void;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
   listing: DetailListing;
   feedback: SearchFeedback;
 }) {
   const t = useTranslations('Listing');
 
-  // why: the header (and its pager/close buttons) stays mounted across a
-  // selection change, so keyboard focus on one of its buttons survives
-  // "Résultat suivant"/"précédent" instead of dropping to <body>. Only the
-  // photo and the body below, keyed on the shown result, reset their state.
+  // why: the header (and its close button) stays mounted across a selection
+  // change, so keyboard focus on it survives the arrow-key shortcuts instead
+  // of dropping to <body>. Only the photo and the body below, keyed on the
+  // shown result, reset their state.
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-11 shrink-0 items-center justify-between gap-2 border-b border-border px-3">
         <p className="text-[13px] font-semibold text-ink">
           {t('detailTitle', { rank })}
         </p>
-        <div className="flex items-center gap-1">
-          {onPrevious !== null && onNext !== null && (
-            <ResultsPager
-              rank={rank}
-              total={total}
-              onPrevious={onPrevious}
-              onNext={onNext}
-              className="gap-0.5"
-            />
-          )}
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t('detailClose')}
-            onClick={onClose}
-          >
-            <X />
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t('detailClose')}
+          onClick={onClose}
+        >
+          <X />
+        </Button>
       </div>
       <ResultDetailPhoto
         key={`photo:${candidate.record.dpeNumber}`}
         record={candidate.record}
         streetViewEnabled={streetViewEnabled}
+        streetViewEmbedKey={streetViewEmbedKey}
       />
       <ResultDetailBody
         key={`body:${candidate.record.dpeNumber}`}
@@ -307,11 +292,13 @@ function ResultDetailBody({
             )}
             <p
               role="status"
-              className={cn(
-                'text-[12px]',
-                copyStatus !== 'idle' && 'mt-1',
-                copyStatus === 'failed' ? 'text-destructive' : 'text-graphite',
-              )}
+              // why: the check on the copy button is the visible confirmation,
+              // so a success is only announced; a failure is also shown.
+              className={
+                copyStatus === 'failed'
+                  ? 'mt-1 text-[12px] text-destructive'
+                  : 'sr-only'
+              }
             >
               {copyStatus === 'copied'
                 ? t('detailCopied')

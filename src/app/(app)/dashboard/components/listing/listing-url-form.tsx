@@ -2,148 +2,26 @@
 
 import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { type FormEvent, useEffect, useRef, useState } from 'react';
-import * as v from 'valibot';
-import { AddressMatchSchema } from '@/application/ademe/dto';
-import { ExtractedListingSchema } from '@/application/listing/dto';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { candidateOnMap } from '@/core/ademe/candidate-on-map';
-import type { AddressMatch } from '@/core/ademe/types';
-import type { ExtractedListing } from '@/core/listing/types';
-import {
-  type ListingUrlRejection,
-  validateListingUrl,
-} from '@/core/listing/validate-listing-url';
 import {
   type DetailPreference,
   mapAvailability,
   ResultsWorkspace,
 } from './results-workspace';
+import {
+  addressMessage,
+  type ListingSearchResult,
+  linkMessage,
+  type SearchMessage,
+  useListingSearch,
+} from './use-listing-search';
 
-const REJECTION_KEY = {
-  empty: 'errorEmpty',
-  malformed: 'errorMalformed',
-  'unsupported-portal': 'errorUnsupportedPortal',
-} as const satisfies Record<ListingUrlRejection, string>;
-
-type ExtractionFailure = 'not-extractable' | 'rate-limited' | 'unknown';
-
-const FAILURE_KEY = {
-  'not-extractable': 'errorNotExtractable',
-  'rate-limited': 'errorRateLimited',
-  unknown: 'errorUnknown',
-} as const satisfies Record<ExtractionFailure, string>;
-
-type MatchFailure =
-  | 'not-enough-signal'
-  | 'rate-limited'
-  | 'unavailable'
-  | 'unknown';
-
-const MATCH_FAILURE_KEY = {
-  'not-enough-signal': 'errorMatchNotEnoughSignal',
-  'rate-limited': 'errorMatchRateLimited',
-  unavailable: 'errorMatchUnavailable',
-  unknown: 'errorMatchUnknown',
-} as const satisfies Record<MatchFailure, string>;
-
-type MatchState =
-  | { kind: 'pending' }
-  | { kind: 'found'; match: AddressMatch }
-  | { kind: 'failed'; failure: MatchFailure };
-
-type Status =
-  | { kind: 'idle' }
-  | { kind: 'pending' }
-  | { kind: 'failed'; failure: ExtractionFailure }
-  | { kind: 'extracted'; listing: ExtractedListing; match: MatchState };
-
-type ExtractionOutcome =
-  | { ok: true; listing: ExtractedListing }
-  | { ok: false; failure: ExtractionFailure };
-
-type MatchOutcome =
-  | { ok: true; match: AddressMatch }
-  | { ok: false; failure: MatchFailure };
-
-function errorCode(body: unknown): unknown {
-  return typeof body === 'object' && body !== null && 'error' in body
-    ? (body as { error: unknown }).error
-    : null;
-}
-
-function toFailure(body: unknown): ExtractionFailure {
-  const code = errorCode(body);
-  if (code === 'validation') return 'not-extractable';
-  if (code === 'rate_limited') return 'rate-limited';
-  return 'unknown';
-}
-
-function toMatchFailure(body: unknown): MatchFailure {
-  const code = errorCode(body);
-  if (code === 'validation') return 'not-enough-signal';
-  if (code === 'rate_limited') return 'rate-limited';
-  if (code === 'external_api') return 'unavailable';
-  return 'unknown';
-}
-
-async function postJson(
-  path: string,
-  payload: unknown,
-): Promise<{ ok: boolean; body: unknown } | null> {
-  let response: Response;
-  try {
-    response = await fetch(path, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-  } catch {
-    return null;
-  }
-
-  try {
-    return { ok: response.ok, body: await response.json() };
-  } catch {
-    return null;
-  }
-}
-
-async function requestExtraction(url: string): Promise<ExtractionOutcome> {
-  const response = await postJson('/api/listings/extract', { url });
-  if (response === null) return { ok: false, failure: 'unknown' };
-  if (!response.ok) {
-    return { ok: false, failure: toFailure(response.body) };
-  }
-
-  const parsed = v.safeParse(ExtractedListingSchema, response.body);
-  if (!parsed.success) return { ok: false, failure: 'unknown' };
-  return { ok: true, listing: parsed.output };
-}
-
-async function requestMatch(listing: ExtractedListing): Promise<MatchOutcome> {
-  const response = await postJson('/api/listings/match', { listing });
-  if (response === null) return { ok: false, failure: 'unknown' };
-  if (!response.ok) {
-    return { ok: false, failure: toMatchFailure(response.body) };
-  }
-
-  const parsed = v.safeParse(AddressMatchSchema, response.body);
-  if (!parsed.success) return { ok: false, failure: 'unknown' };
-  return { ok: true, match: parsed.output };
-}
-
-type FoundResult = { listing: ExtractedListing; match: AddressMatch };
-
-function foundResult(status: Status): FoundResult | null {
-  if (status.kind !== 'extracted' || status.match.kind !== 'found') {
-    return null;
-  }
-  const { match } = status.match;
-  if (match.refusedFor !== null || match.candidates.length === 0) return null;
-  return { listing: status.listing, match };
-}
+// why: numbered per search, so the results workspace remounts for each one
+// and nothing of the previous listing (selection, verdict, map) carries over.
+type ShownResult = ListingSearchResult & { search: number };
 
 type Selection = { dpeNumber: string | null; request: number };
 
@@ -156,96 +34,34 @@ const WORKSPACE_LAYOUT_CLASS = 'relative flex min-h-0 flex-1 flex-col';
 export function ListingUrlForm({
   mapboxAccessToken,
   streetViewEnabled,
+  streetViewEmbedKey,
 }: {
   mapboxAccessToken: string;
   streetViewEnabled: boolean;
+  streetViewEmbedKey: string;
 }) {
   const t = useTranslations('Listing');
-  const [url, setUrl] = useState('');
-  const [rejection, setRejection] = useState<ListingUrlRejection | null>(null);
-  const [status, setStatus] = useState<Status>({ kind: 'idle' });
+  const [found, setFound] = useState<ShownResult | null>(null);
   const [selection, setSelection] = useState<Selection>(INITIAL_SELECTION);
   const [detailPreference, setDetailPreference] =
     useState<DetailPreference>('default');
   const [mapFailed, setMapFailed] = useState(false);
-  const [searchFocusRequest, setSearchFocusRequest] = useState(0);
-  const latestSubmission = useRef(0);
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    if (searchFocusRequest > 0) inputRef.current?.focus();
-  }, [searchFocusRequest]);
-
-  function resetResult(): void {
+  function showResult(result: ListingSearchResult): void {
+    setFound((current) => ({ ...result, search: (current?.search ?? 0) + 1 }));
     setSelection(INITIAL_SELECTION);
     setDetailPreference('default');
     setMapFailed(false);
   }
 
-  function startNewSearch(): void {
-    latestSubmission.current += 1;
-    resetResult();
-    setUrl('');
-    setRejection(null);
-    setStatus({ kind: 'idle' });
-    setSearchFocusRequest((current) => current + 1);
-  }
+  const { url, rejection, status, changeUrl, submit } = useListingSearch({
+    onFound: showResult,
+  });
 
-  async function handleSubmit(
-    event: FormEvent<HTMLFormElement>,
-  ): Promise<void> {
-    event.preventDefault();
-    if (status.kind === 'pending') return;
+  const message = linkMessage({ status, rejection });
+  const isError = message?.tone === 'error';
+  const address = addressMessage(status);
 
-    const validated = validateListingUrl(url);
-    if (!validated.ok) {
-      setRejection(validated.reason);
-      return;
-    }
-
-    // why: a search still in flight can answer after a newer one. Its response
-    // must never replace the result of the listing on screen.
-    latestSubmission.current += 1;
-    const submission = latestSubmission.current;
-    setRejection(null);
-    resetResult();
-    setStatus({ kind: 'pending' });
-
-    const outcome = await requestExtraction(validated.canonicalUrl);
-    if (submission !== latestSubmission.current) return;
-    if (!outcome.ok) {
-      setStatus({ kind: 'failed', failure: outcome.failure });
-      return;
-    }
-
-    setStatus({
-      kind: 'extracted',
-      listing: outcome.listing,
-      match: { kind: 'pending' },
-    });
-
-    const matched = await requestMatch(outcome.listing);
-    if (submission !== latestSubmission.current) return;
-    setStatus({
-      kind: 'extracted',
-      listing: outcome.listing,
-      match: matched.ok
-        ? { kind: 'found', match: matched.match }
-        : { kind: 'failed', failure: matched.failure },
-    });
-  }
-
-  const isError = rejection !== null || status.kind === 'failed';
-  const message =
-    rejection !== null
-      ? t(REJECTION_KEY[rejection])
-      : status.kind === 'failed'
-        ? t(FAILURE_KEY[status.failure])
-        : status.kind === 'pending'
-          ? t('analyzing')
-          : null;
-
-  const found = foundResult(status);
   const shown =
     found === null
       ? null
@@ -263,6 +79,7 @@ export function ListingUrlForm({
     >
       {found !== null && shown !== null ? (
         <ResultsWorkspace
+          key={found.search}
           listing={found.listing}
           match={found.match}
           shown={shown}
@@ -275,6 +92,7 @@ export function ListingUrlForm({
           })}
           accessToken={mapboxAccessToken}
           streetViewEnabled={streetViewEnabled}
+          streetViewEmbedKey={streetViewEmbedKey}
           onSelect={(dpeNumber) => {
             setSelection((current) => ({
               dpeNumber,
@@ -288,7 +106,7 @@ export function ListingUrlForm({
           onMapFailure={() => {
             setMapFailed(true);
           }}
-          onNewSearch={startNewSearch}
+          onNewSearch={showResult}
         />
       ) : (
         <div className="w-full max-w-xl">
@@ -298,24 +116,20 @@ export function ListingUrlForm({
           <div className="mt-6">
             <form
               onSubmit={(event) => {
-                void handleSubmit(event);
+                event.preventDefault();
+                void submit();
               }}
               className="flex items-start gap-2"
             >
               <div className="flex-1">
                 <Input
-                  ref={inputRef}
                   type="url"
                   inputMode="url"
                   autoComplete="off"
                   spellCheck={false}
                   value={url}
                   onChange={(event) => {
-                    setUrl(event.target.value);
-                    setRejection(null);
-                    setStatus((current) =>
-                      current.kind === 'failed' ? { kind: 'idle' } : current,
-                    );
+                    changeUrl(event.target.value);
                   }}
                   placeholder={t('placeholder')}
                   aria-label={t('heading')}
@@ -346,13 +160,11 @@ export function ListingUrlForm({
                     : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
                 }
               >
-                {message}
+                {t(message.key)}
               </p>
             )}
           </div>
-          {status.kind === 'extracted' && (
-            <AddressSection state={status.match} />
-          )}
+          {address !== null && <AddressSection message={address} />}
         </div>
       )}
       <p className="sr-only" aria-live="polite">
@@ -367,7 +179,7 @@ export function ListingUrlForm({
   );
 }
 
-function AddressSection({ state }: { state: MatchState }) {
+function AddressSection({ message }: { message: SearchMessage }) {
   const t = useTranslations('Listing');
 
   return (
@@ -375,23 +187,15 @@ function AddressSection({ state }: { state: MatchState }) {
       <h2 className="text-[13px] font-medium tracking-[-0.08px] text-slate-neutral">
         {t('addressHeading')}
       </h2>
-      {state.kind === 'pending' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-          {t('addressSearching')}
-        </p>
-      )}
-      {state.kind === 'failed' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-destructive">
-          {t(MATCH_FAILURE_KEY[state.failure])}
-        </p>
-      )}
-      {state.kind === 'found' && (
-        <p className="mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral">
-          {state.match.refusedFor === 'insufficient-evidence'
-            ? t('addressInsufficientEvidence')
-            : t('addressNone')}
-        </p>
-      )}
+      <p
+        className={
+          message.tone === 'error'
+            ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'
+            : 'mt-2 text-[13px] tracking-[-0.08px] text-slate-neutral'
+        }
+      >
+        {t(message.key)}
+      </p>
     </section>
   );
 }

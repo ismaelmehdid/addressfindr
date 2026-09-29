@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { NextIntlClientProvider } from 'next-intl';
-import { act, type ComponentProps } from 'react';
+import { act, type ComponentProps, type ReactElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import * as v from 'valibot';
 import {
@@ -24,7 +24,7 @@ import {
 } from '@/core/listing/types';
 import messages from '@/i18n/messages/fr.json';
 import type { MapView } from './map-view';
-import { ResultsWorkspace } from './results-workspace';
+import { type DetailPreference, ResultsWorkspace } from './results-workspace';
 
 // why: Mapbox needs WebGL, which jsdom lacks. The stand-in keeps the map's
 // role and shows which view the workspace asked it to draw.
@@ -40,14 +40,17 @@ vi.mock('./address-map', () => ({
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 // why: jsdom implements neither. The view lays itself out for a screen this
-// many rem wide, past xl (80rem) unless a test narrows it.
+// many rem wide, past xl (80rem) unless a test narrows it, and the list
+// scrolls instantly, as for a user who prefers reduced motion.
 const WIDE_SCREEN_REM = 90;
+const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 let screenWidthRem = WIDE_SCREEN_REM;
 
-function minWidthRem(query: string): number {
+function queryMatches(query: string): boolean {
+  if (query === REDUCED_MOTION_QUERY) return true;
   const width = /\(min-width: ([\d.]+)rem\)/.exec(query)?.[1];
   if (width === undefined) throw new Error(`unexpected media query ${query}`);
-  return Number(width);
+  return screenWidthRem >= Number(width);
 }
 
 function onScreen(widthRem: number): void {
@@ -57,9 +60,9 @@ function onScreen(widthRem: number): void {
   });
 }
 
-HTMLElement.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.scrollTo = vi.fn();
 window.matchMedia = (query: string): MediaQueryList => ({
-  matches: screenWidthRem >= minWidthRem(query),
+  matches: queryMatches(query),
   media: query,
   onchange: null,
   addEventListener: () => {},
@@ -145,11 +148,44 @@ afterEach(() => {
   container.remove();
 });
 
+type WorkspaceProps = ComponentProps<typeof ResultsWorkspace>;
+
+const DEFAULT_PROPS: WorkspaceProps = {
+  listing: LISTING,
+  match: match([FIRST, SECOND, THIRD]),
+  shown: FIRST,
+  focusRequest: 0,
+  detailPreference: 'open',
+  map: { kind: 'unavailable' },
+  accessToken: '',
+  streetViewEnabled: false,
+  streetViewEmbedKey: '',
+  onSelect: () => {},
+  onCloseDetail: () => {},
+  onMapFailure: () => {},
+  onNewSearch: () => {},
+};
+
+// why: mirrors the dashboard, where closing the detail sets the preference to
+// 'closed'; the panel then unmounts and the card loses aria-current.
+function ClosableWorkspace(props: Partial<WorkspaceProps>) {
+  const [detailPreference, setDetailPreference] =
+    useState<DetailPreference>('open');
+  return (
+    <ResultsWorkspace
+      {...DEFAULT_PROPS}
+      {...props}
+      detailPreference={detailPreference}
+      onCloseDetail={() => {
+        setDetailPreference('closed');
+      }}
+    />
+  );
+}
+
 // why: the scroll area measures itself in a microtask after mounting; an
 // async act() flushes that update too.
-async function render(
-  props: Partial<ComponentProps<typeof ResultsWorkspace>>,
-): Promise<void> {
+async function mount(workspace: ReactElement): Promise<void> {
   await act(async () => {
     root.render(
       <NextIntlClientProvider
@@ -157,100 +193,31 @@ async function render(
         messages={messages}
         timeZone="Europe/Paris"
       >
-        <ResultsWorkspace
-          listing={LISTING}
-          match={match([FIRST, SECOND, THIRD])}
-          shown={FIRST}
-          focusRequest={0}
-          detailPreference="open"
-          map={{ kind: 'unavailable' }}
-          accessToken=""
-          streetViewEnabled={false}
-          onSelect={() => {}}
-          onCloseDetail={() => {}}
-          onMapFailure={() => {}}
-          onNewSearch={() => {}}
-          {...props}
-        />
+        {workspace}
       </NextIntlClientProvider>,
     );
   });
 }
 
-function headingRow(): HTMLElement {
-  const row = container.querySelector('#results-heading')?.parentElement;
-  if (row === null || row === undefined) throw new Error('no results heading');
-  return row;
+async function render(props: Partial<WorkspaceProps>): Promise<void> {
+  await mount(<ResultsWorkspace {...DEFAULT_PROPS} {...props} />);
 }
 
-function headingPager(): HTMLElement | null {
-  return headingRow().querySelector<HTMLElement>('[role="group"]');
+async function renderClosable(props: Partial<WorkspaceProps>): Promise<void> {
+  await mount(<ClosableWorkspace {...props} />);
 }
 
-function pagerButton(label: string): HTMLButtonElement {
-  const button = headingPager()?.querySelector<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
-  );
-  if (button === null || button === undefined) {
-    throw new Error(`no "${label}" button in the heading pager`);
-  }
-  return button;
-}
-
-describe('ResultsWorkspace heading pager', () => {
-  it('shows the rank among the results while a detail is open', async () => {
+// why: results are browsed from the list and with the arrow keys; no
+// "2 / 3" pager sits beside the results heading.
+describe('ResultsWorkspace results heading', () => {
+  it('shows no pager while a detail is open on several results', async () => {
     await render({ shown: SECOND });
 
-    expect(headingPager()?.getAttribute('aria-label')).toBe(
-      'Parcourir les résultats',
+    expect(container.querySelector('#results-heading')?.textContent).toBe(
+      messages.Listing.addressHeading,
     );
-    expect(headingPager()?.textContent).toBe('2 / 3');
-  });
-
-  it('is hidden while no detail is open', async () => {
-    await render({ detailPreference: 'closed' });
-
-    expect(headingRow().querySelectorAll('button')).toHaveLength(0);
-  });
-
-  it('is hidden when there is a single result', async () => {
-    await render({ match: match([FIRST]) });
-
-    expect(headingRow().querySelectorAll('button')).toHaveLength(0);
-  });
-
-  it('wraps from the first result to the last', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: FIRST, onSelect });
-
-    act(() => {
-      pagerButton('Résultat précédent').click();
-    });
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith(THIRD.record.dpeNumber);
-  });
-
-  it('wraps from the last result to the first', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: THIRD, onSelect });
-
-    act(() => {
-      pagerButton('Résultat suivant').click();
-    });
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith(FIRST.record.dpeNumber);
-  });
-
-  it('steps to the neighbours inside the list', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: SECOND, onSelect });
-
-    act(() => {
-      pagerButton('Résultat précédent').click();
-      pagerButton('Résultat suivant').click();
-    });
-    expect(onSelect.mock.calls).toEqual([
-      [FIRST.record.dpeNumber],
-      [THIRD.record.dpeNumber],
-    ]);
+    expect(resultsColumn().querySelector('[role="group"]')).toBeNull();
+    expect(resultsColumn().textContent).not.toContain('2 / 3');
   });
 });
 
@@ -272,23 +239,14 @@ function detailButton(label: string): HTMLButtonElement {
 }
 
 describe('ResultsWorkspace detail header', () => {
-  it('names the result and shows its rank among the results', async () => {
+  it('names the result and offers only the close button', async () => {
     await render({ shown: SECOND });
 
     expect(container.querySelector('aside')?.getAttribute('aria-label')).toBe(
       'Résultat 2',
     );
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
-    expect(detailHeader().querySelector('[role="group"]')?.textContent).toBe(
-      '2 / 3',
-    );
-    expect(detailButton('Fermer le détail')).toBeDefined();
-  });
-
-  it('hides the pager when there is a single result', async () => {
-    await render({ match: match([FIRST]) });
-
-    expect(detailHeader().querySelector('[role="group"]')).toBeNull();
+    expect(detailHeader().textContent).not.toContain('2 / 3');
     expect(
       [...detailHeader().querySelectorAll('button')].map((button) =>
         button.getAttribute('aria-label'),
@@ -296,19 +254,240 @@ describe('ResultsWorkspace detail header', () => {
     ).toEqual(['Fermer le détail']);
   });
 
-  it('keeps focus on the pager button when the shown result changes', async () => {
+  it('keeps focus on the close button when the shown result changes', async () => {
     await render({ shown: FIRST });
-    const next = detailButton('Résultat suivant');
+    const close = detailButton('Fermer le détail');
     act(() => {
-      next.focus();
+      close.focus();
     });
 
     await render({ shown: SECOND });
 
-    expect(document.activeElement).toBe(next);
+    expect(document.activeElement).toBe(close);
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
   });
+
+  // why: selecting a result centres it in the list, behind the bottom sheet on
+  // a phone; returning focus on close must not scroll the list back up.
+  it("returns focus to the shown result's card on close without scrolling the list", async () => {
+    await renderClosable({ shown: SECOND });
+    const card = shownCardButton();
+    const focus = vi.spyOn(card, 'focus');
+    const scroll = placeInList(card, VIEWPORT.top + 50);
+    focusRingShows(card, true);
+    const close = detailButton('Fermer le détail');
+    act(() => {
+      close.focus();
+    });
+
+    await act(async () => {
+      close.click();
+      await nextFrame();
+    });
+
+    expect(container.querySelector('aside')).toBeNull();
+    expect(card.getAttribute('aria-current')).toBeNull();
+    expect(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+    expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
+  // why: the close button is reached by tabbing past every later card, which
+  // scrolls the list until the shown card is out of its view.
+  it("brings the shown result's card back into view when the keyboard closes the detail", async () => {
+    await renderClosable({ shown: FIRST });
+    const card = shownCardButton();
+    const scroll = placeInList(card, VIEWPORT.top - 500);
+    focusRingShows(card, true);
+    const close = detailButton('Fermer le détail');
+    act(() => {
+      close.focus();
+    });
+
+    await act(async () => {
+      close.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(container.querySelector('aside')).toBeNull();
+    expect(document.activeElement).toBe(card);
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({
+      top: 50,
+      behavior: 'auto',
+    });
+  });
+
+  // why: the list only moves to show a focus ring, and focus a script moves
+  // after a pointer press shows none; the list stays where it was scrolled.
+  it('leaves the list where it was scrolled when a mouse closes the detail', async () => {
+    await renderClosable({ shown: FIRST });
+    const card = shownCardButton();
+    const scroll = placeInList(card, VIEWPORT.top - 500);
+    focusRingShows(card, false);
+    const close = detailButton('Fermer le détail');
+
+    await act(async () => {
+      clickWithMouse(close);
+      await nextFrame();
+    });
+
+    expect(container.querySelector('aside')).toBeNull();
+    expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
+  // why: a click does not focus a button in Safari, so focus can already sit
+  // on <body> when the detail closes.
+  it("moves focus that fell to the page to the shown result's card on close", async () => {
+    await renderClosable({ shown: SECOND });
+    const card = shownCardButton();
+    act(() => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+    expect(document.activeElement).toBe(document.body);
+
+    await act(async () => {
+      detailButton('Fermer le détail').click();
+      await nextFrame();
+    });
+
+    expect(container.querySelector('aside')).toBeNull();
+    expect(document.activeElement).toBe(card);
+  });
+
+  it('leaves focus on the card where Escape closes the detail', async () => {
+    const onCloseDetail = vi.fn();
+    await render({ shown: SECOND, onCloseDetail });
+    const card = otherCardButtons()[1];
+    if (card === undefined) throw new Error('no third card');
+    const heading = container.querySelector<HTMLElement>('#results-heading');
+    if (heading === null) throw new Error('no results heading');
+    const headingFocus = vi.spyOn(heading, 'focus');
+    act(() => {
+      card.focus();
+    });
+
+    await act(async () => {
+      card.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(onCloseDetail).toHaveBeenCalledOnce();
+    expect(headingFocus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(card);
+  });
 });
+
+async function nextFrame(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      resolve();
+    });
+  });
+}
+
+function rect(top: number, height: number): DOMRect {
+  return {
+    x: 0,
+    y: top,
+    top,
+    bottom: top + height,
+    left: 0,
+    right: 336,
+    width: 336,
+    height,
+    toJSON: () => ({}),
+  };
+}
+
+// why: jsdom lays nothing out. The list's 400px viewport sits 120px down the
+// page, scrolled 600px into 2000px of content, so a mistake in the frame a
+// box is measured in moves the scroll target.
+const VIEWPORT = { top: 120, height: 400, scrollTop: 600, scrollHeight: 2000 };
+const CARD_HEIGHT = 300;
+
+// why: puts the given card at `top` in the page's frame, then watches the
+// viewport scroll. The card and its button share one box, as on screen.
+function placeInList(
+  cardButton: HTMLElement,
+  top: number,
+): ReturnType<typeof vi.fn> {
+  const viewport = resultsColumn().querySelector<HTMLElement>(
+    '[data-slot="scroll-area-viewport"]',
+  );
+  if (viewport === null) throw new Error('no scroll area viewport');
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(
+    rect(VIEWPORT.top, VIEWPORT.height),
+  );
+  for (const [property, value] of [
+    ['clientHeight', VIEWPORT.height],
+    ['scrollTop', VIEWPORT.scrollTop],
+    ['scrollHeight', VIEWPORT.scrollHeight],
+  ] as const) {
+    Object.defineProperty(viewport, property, { configurable: true, value });
+  }
+  const card = cardButton.closest<HTMLElement>('[data-slot="card"]');
+  if (card === null) throw new Error('no card around the button');
+  for (const element of [card, cardButton]) {
+    vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(
+      rect(top, CARD_HEIGHT),
+    );
+  }
+  const scroll = vi.fn();
+  viewport.scrollTo = scroll;
+  return scroll;
+}
+
+// why: whether focus moved by a script shows its ring is the browser's call
+// (after a key press it does, after a pointer press it does not), and jsdom's
+// heuristic ignores the key press. This gives the browser's answer.
+function focusRingShows(element: HTMLElement, shows: boolean): void {
+  const matches = element.matches.bind(element);
+  vi.spyOn(element, 'matches').mockImplementation((selector: string) =>
+    selector === ':focus-visible'
+      ? shows && document.activeElement === element
+      : matches(selector),
+  );
+}
+
+function clickWithMouse(target: HTMLElement): void {
+  target.focus();
+  for (const type of ['mousedown', 'mouseup', 'click']) {
+    target.dispatchEvent(
+      new MouseEvent(type, { bubbles: true, cancelable: true, detail: 1 }),
+    );
+  }
+}
+
+function shownCardButton(): HTMLButtonElement {
+  const button = resultsColumn().querySelector<HTMLButtonElement>(
+    'button[aria-current="true"]',
+  );
+  if (button === null) throw new Error('no card marked as shown');
+  return button;
+}
+
+function otherCardButtons(): HTMLButtonElement[] {
+  return [
+    ...resultsColumn().querySelectorAll<HTMLButtonElement>(
+      'ol > li [data-slot="card"] > button',
+    ),
+  ];
+}
 
 function pressKey(key: string, target: Element = document.body): void {
   act(() => {
@@ -400,7 +579,63 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     expect(sheet?.classList).toContain('data-[side=bottom]:h-[85svh]');
     expect(sheet?.classList).not.toContain('data-[side=bottom]:h-auto');
   });
+
+  // why: Base UI returns focus to where it was before the sheet opened, which
+  // is not the result the sheet was showing.
+  it.each([
+    [
+      'its close button',
+      (close: HTMLButtonElement): void => {
+        close.click();
+      },
+    ],
+    [
+      'Escape',
+      (close: HTMLButtonElement): void => {
+        close.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      },
+    ],
+  ])("returns focus to the shown result's card when the sheet closes on %s", async (_, closeSheet) => {
+    onScreen(40);
+    await renderClosable({ shown: SECOND });
+    const card = shownCardButton();
+    const focus = vi.spyOn(card, 'focus');
+    const scroll = placeInList(card, VIEWPORT.top + 50);
+    focusRingShows(card, true);
+    const close = sheetContent().querySelector<HTMLButtonElement>(
+      'button[aria-label="Fermer le détail"]',
+    );
+    if (close === null) throw new Error('no close button in the sheet');
+    act(() => {
+      close.focus();
+    });
+    expect(sheetContent().contains(document.activeElement)).toBe(true);
+
+    await act(async () => {
+      closeSheet(close);
+      await nextFrame();
+    });
+
+    expect(card.getAttribute('aria-current')).toBeNull();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
+  });
 });
+
+function sheetContent(): HTMLElement {
+  const sheet = document.querySelector<HTMLElement>(
+    '[data-slot="sheet-content"]',
+  );
+  if (sheet === null) throw new Error('no detail sheet');
+  return sheet;
+}
 
 const READY_MAP = {
   kind: 'ready',

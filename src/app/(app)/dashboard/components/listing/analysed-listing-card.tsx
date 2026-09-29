@@ -1,7 +1,19 @@
 'use client';
 
-import { ExternalLink } from 'lucide-react';
+import {
+  Building2,
+  CalendarDays,
+  DoorOpen,
+  ExternalLink,
+  House,
+  LandPlot,
+  Layers,
+  type LucideIcon,
+  MapPin,
+  Ruler,
+} from 'lucide-react';
 import { useFormatter, useTranslations } from 'next-intl';
+import { Badge } from '@/components/ui/badge';
 import {
   Card,
   CardAction,
@@ -12,6 +24,9 @@ import {
 } from '@/components/ui/card';
 import { listingDisplayUrl } from '@/core/listing/listing-summary';
 import type { ExtractedListing } from '@/core/listing/types';
+import { ListingPortalIcon } from './listing-portal-icon';
+
+type ListingChip = { id: string; icon: LucideIcon; label: string };
 
 export function AnalysedListingCard({
   listing,
@@ -58,15 +73,35 @@ export function AnalysedListingCard({
   const title = [type, rooms, surface]
     .filter((part) => part !== null)
     .join(' ');
-  const facts = [
-    type,
-    surface,
-    floor,
+  const land =
+    fields.landSurfaceM2 === null
+      ? null
+      : t('addressLand', {
+          surface: format.number(fields.landSurfaceM2, {
+            maximumFractionDigits: 0,
+          }),
+        });
+  const yearBuilt =
     fields.yearBuilt === null
       ? null
-      : t('addressYearBuilt', { year: String(fields.yearBuilt) }),
-    place,
-  ].filter((fact) => fact !== null);
+      : t('addressYearBuilt', { year: String(fields.yearBuilt) });
+  const chips: ListingChip[] = [
+    type === null
+      ? null
+      : {
+          id: 'type',
+          icon: fields.propertyType === 'house' ? House : Building2,
+          label: type,
+        },
+    rooms === null ? null : { id: 'rooms', icon: DoorOpen, label: rooms },
+    surface === null ? null : { id: 'surface', icon: Ruler, label: surface },
+    land === null ? null : { id: 'land', icon: LandPlot, label: land },
+    floor === null ? null : { id: 'floor', icon: Layers, label: floor },
+    yearBuilt === null
+      ? null
+      : { id: 'year-built', icon: CalendarDays, label: yearBuilt },
+    place === null ? null : { id: 'place', icon: MapPin, label: place },
+  ].filter((chip) => chip !== null);
   const displayUrl =
     listingDisplayUrl(fields.canonicalUrl) ?? fields.canonicalUrl;
 
@@ -97,14 +132,27 @@ export function AnalysedListingCard({
           </CardAction>
         </CardHeader>
         <CardContent className="flex flex-col gap-1.5">
-          {facts.length > 0 && (
-            <p className="text-[13px] text-muted-foreground">
-              {facts.join(' · ')}
-            </p>
+          {chips.length > 0 && (
+            <ul className="flex flex-wrap gap-1.5">
+              {chips.map(({ id, icon: Icon, label }) => (
+                <li key={id} className="min-w-0 max-w-full">
+                  <Badge
+                    variant="secondary"
+                    className="max-w-full text-graphite"
+                  >
+                    <Icon aria-hidden data-icon="inline-start" />
+                    <span className="truncate">{label}</span>
+                  </Badge>
+                </li>
+              ))}
+            </ul>
           )}
-          <p className="truncate text-[12px] text-muted-foreground underline-offset-2 group-hover/listing:underline">
-            {displayUrl}
-            <span className="sr-only"> {t('listingNewTab')}</span>
+          <p className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+            <ListingPortalIcon portal={fields.portal} />
+            <span className="min-w-0 truncate underline-offset-2 group-hover/listing:underline">
+              {displayUrl}
+              <span className="sr-only"> {t('listingNewTab')}</span>
+            </span>
           </p>
         </CardContent>
       </Card>

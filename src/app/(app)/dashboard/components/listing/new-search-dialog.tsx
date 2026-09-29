@@ -1,0 +1,137 @@
+'use client';
+
+import { ArrowRight, Search, XIcon } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
+import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
+import {
+  isSearching,
+  type ListingSearchResult,
+  linkMessage,
+  searchMessage,
+  useListingSearch,
+} from './use-listing-search';
+
+export function NewSearchDialog({
+  onFound,
+}: {
+  onFound: (result: ListingSearchResult) => void;
+}) {
+  const t = useTranslations('Listing');
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const search = useListingSearch({
+    onFound: (result) => {
+      setOpen(false);
+      onFound(result);
+    },
+  });
+  const searching = isSearching(search.status);
+  const message = searchMessage({
+    status: search.status,
+    rejection: search.rejection,
+  });
+  const linkInError =
+    linkMessage({ status: search.status, rejection: search.rejection })
+      ?.tone === 'error';
+
+  // why: closing abandons the search in flight. Its answer must never replace
+  // the results on screen, and the next opening starts from an empty field.
+  function changeOpen(next: boolean): void {
+    if (!next) search.reset();
+    setOpen(next);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={changeOpen}>
+      <DialogTrigger render={<Button variant="outline" className="w-full" />}>
+        <Search />
+        {t('resultsNewSearch')}
+      </DialogTrigger>
+      <DialogContent
+        {...SUSPENDS_DETAIL_SHORTCUTS}
+        showCloseButton={false}
+        initialFocus={inputRef}
+        className="sm:max-w-[480px]"
+      >
+        <DialogHeader className="pr-8">
+          <DialogTitle>{t('newSearchTitle')}</DialogTitle>
+          <DialogDescription>{t('newSearchDescription')}</DialogDescription>
+        </DialogHeader>
+        <div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (!searching) void search.submit();
+            }}
+            className="flex items-start gap-2"
+          >
+            <Input
+              ref={inputRef}
+              type="url"
+              inputMode="url"
+              autoComplete="off"
+              spellCheck={false}
+              value={search.url}
+              onChange={(event) => {
+                search.changeUrl(event.target.value);
+              }}
+              placeholder={t('placeholder')}
+              aria-label={t('heading')}
+              aria-invalid={linkInError}
+              aria-describedby="new-search-status"
+              className="h-9 flex-1"
+            />
+            {/* why: a disabled button drops focus to <body>, outside the modal. */}
+            <Button
+              type="submit"
+              size="sm"
+              loading={searching}
+              focusableWhenDisabled
+              className="h-9 shrink-0 aria-disabled:opacity-50"
+            >
+              {t('submit')}
+              <ArrowRight className="size-3.5" />
+            </Button>
+          </form>
+          <p
+            id="new-search-status"
+            aria-live="polite"
+            className={cn(
+              'mt-2 text-[13px] tracking-[-0.08px]',
+              message?.tone === 'error'
+                ? 'text-destructive'
+                : 'text-slate-neutral',
+            )}
+          >
+            {message === null ? null : t(message.key)}
+          </p>
+        </div>
+        <DialogClose
+          aria-label={t('newSearchClose')}
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="absolute top-2 right-2"
+            />
+          }
+        >
+          <XIcon />
+        </DialogClose>
+      </DialogContent>
+    </Dialog>
+  );
+}

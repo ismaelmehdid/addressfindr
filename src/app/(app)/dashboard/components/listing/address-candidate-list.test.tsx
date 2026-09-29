@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { NextIntlClientProvider } from 'next-intl';
-import { act, type ComponentProps } from 'react';
+import { act, type ComponentProps, type ReactNode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AddressCandidate, DpeRecord } from '@/core/ademe/types';
@@ -14,10 +14,23 @@ import { AddressCandidateList } from './address-candidate-list';
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
-// why: jsdom does not implement scrollIntoView, which a card calls when the
-// selection arrives on it.
-const scrollIntoView = vi.fn();
-HTMLElement.prototype.scrollIntoView = scrollIntoView;
+// why: jsdom implements neither element scrolling nor media queries. A card
+// scrolls its ScrollArea viewport when it is clicked or the selection
+// arrives on it, and reads the reduced-motion preference to do so.
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+const scrollTo = vi.fn();
+HTMLElement.prototype.scrollTo = scrollTo;
+let reducedMotion = false;
+window.matchMedia = (query: string): MediaQueryList => ({
+  matches: query === REDUCED_MOTION && reducedMotion,
+  media: query,
+  onchange: null,
+  addEventListener: () => {},
+  removeEventListener: () => {},
+  addListener: () => {},
+  removeListener: () => {},
+  dispatchEvent: () => false,
+});
 
 const TRUSTED_POINT = { latitude: 45.7578, longitude: 4.8515 };
 const STREET_VIEW_SRC = new URL(
@@ -82,8 +95,10 @@ let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
-  scrollIntoView.mockClear();
+  scrollTo.mockClear();
+  reducedMotion = false;
   container = document.createElement('div');
+  container.dataset.slot = 'scroll-area-viewport';
   document.body.append(container);
   root = createRoot(container);
 });
@@ -95,9 +110,7 @@ afterEach(() => {
   container.remove();
 });
 
-function render(
-  props: Partial<ComponentProps<typeof AddressCandidateList>>,
-): void {
+function renderNode(node: ReactNode): void {
   act(() => {
     root.render(
       <NextIntlClientProvider
@@ -105,16 +118,24 @@ function render(
         messages={messages}
         timeZone="Europe/Paris"
       >
-        <AddressCandidateList
-          candidates={[TOP]}
-          selectedDpeNumber={null}
-          onSelect={() => {}}
-          streetViewEnabled
-          {...props}
-        />
+        {node}
       </NextIntlClientProvider>,
     );
   });
+}
+
+function render(
+  props: Partial<ComponentProps<typeof AddressCandidateList>>,
+): void {
+  renderNode(
+    <AddressCandidateList
+      candidates={[TOP]}
+      selectedDpeNumber={null}
+      onSelect={() => {}}
+      streetViewEnabled
+      {...props}
+    />,
+  );
 }
 
 function cards(): HTMLElement[] {
@@ -291,7 +312,7 @@ describe('AddressCandidateList card', () => {
       selectedDpeNumber: TOP.record.dpeNumber,
     });
     const [top, second] = cards();
-    expect(scrollIntoView).toHaveBeenCalledOnce();
+    expect(scrollTo).toHaveBeenCalledOnce();
     expect(classes(top ?? null)).toEqual(
       expect.arrayContaining(['ring-(--score)', 'bg-(--score-tint)']),
     );
@@ -326,5 +347,144 @@ describe('AddressCandidateList score colour', () => {
         expect(classes(badge)).not.toContain('text-white');
       }
     }
+  });
+});
+
+function rect(top: number, height: number): DOMRect {
+  return {
+    x: 0,
+    y: top,
+    width: 360,
+    height,
+    top,
+    right: 360,
+    bottom: top + height,
+    left: 0,
+    toJSON: () => ({}),
+  };
+}
+
+// why: jsdom lays nothing out. The viewport shows 400 px of a 2000 px column
+// scrolled by 100 px, and the card starts 600 px below the viewport's top
+// edge: 700 px into the column, so centring its 200 px scrolls to 600 px.
+function layOut(card: HTMLElement | undefined): void {
+  if (card === undefined) throw new Error('no card to lay out');
+  Object.defineProperties(container, {
+    clientHeight: { value: 400 },
+    scrollHeight: { value: 2000 },
+    scrollTop: { value: 100 },
+  });
+  vi.spyOn(container, 'getBoundingClientRect').mockReturnValue(rect(50, 400));
+  vi.spyOn(card, 'getBoundingClientRect').mockReturnValue(rect(650, 200));
+}
+
+const CENTRED = { top: 600, behavior: 'smooth' };
+
+function click(card: HTMLElement | undefined): void {
+  const button = card?.querySelector('button') ?? null;
+  if (button === null) throw new Error('no card button to click');
+  act(() => {
+    button.click();
+  });
+}
+
+function SelectingList() {
+  const [selected, setSelected] = useState<string | null>(null);
+  return (
+    <AddressCandidateList
+      candidates={[TOP, SECOND]}
+      selectedDpeNumber={selected}
+      onSelect={setSelected}
+      streetViewEnabled
+    />
+  );
+}
+
+describe('AddressCandidateList scroll', () => {
+  it('centres a clicked card in its scroll area and scrolls nothing else', () => {
+    render({ candidates: [TOP, SECOND] });
+    const [, second] = cards();
+    layOut(second);
+
+    click(second);
+
+    expect(scrollTo).toHaveBeenCalledOnce();
+    expect(scrollTo).toHaveBeenCalledWith(CENTRED);
+    expect(scrollTo.mock.contexts).toEqual([container]);
+  });
+
+  it('centres the selected card again each time it is clicked', () => {
+    render({
+      candidates: [TOP, SECOND],
+      selectedDpeNumber: SECOND.record.dpeNumber,
+    });
+    const [, second] = cards();
+    layOut(second);
+
+    click(second);
+    click(second);
+
+    expect(scrollTo).toHaveBeenCalledTimes(2);
+    expect(scrollTo).toHaveBeenLastCalledWith(CENTRED);
+  });
+
+  it('scrolls once when the click is what selects the card', () => {
+    renderNode(<SelectingList />);
+    const [, second] = cards();
+    layOut(second);
+
+    click(second);
+
+    expect(second?.querySelector('button')?.getAttribute('aria-current')).toBe(
+      'true',
+    );
+    expect(scrollTo).toHaveBeenCalledOnce();
+    expect(scrollTo).toHaveBeenCalledWith(CENTRED);
+  });
+
+  it('centres the card the selection moves to without a click', () => {
+    render({
+      candidates: [TOP, SECOND],
+      selectedDpeNumber: TOP.record.dpeNumber,
+    });
+    const [, second] = cards();
+    layOut(second);
+
+    render({
+      candidates: [TOP, SECOND],
+      selectedDpeNumber: SECOND.record.dpeNumber,
+    });
+
+    expect(scrollTo).toHaveBeenCalledOnce();
+    expect(scrollTo).toHaveBeenCalledWith(CENTRED);
+  });
+
+  it('does not scroll on first render, even with a card selected', () => {
+    render({
+      candidates: [TOP, SECOND],
+      selectedDpeNumber: SECOND.record.dpeNumber,
+    });
+
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+
+  it('jumps without animation when the user prefers reduced motion', () => {
+    reducedMotion = true;
+    render({ candidates: [TOP, SECOND] });
+    const [, second] = cards();
+    layOut(second);
+
+    click(second);
+
+    expect(scrollTo).toHaveBeenCalledWith({ top: 600, behavior: 'auto' });
+  });
+
+  it('scrolls nothing when the list is not inside a scroll area', () => {
+    container.removeAttribute('data-slot');
+    render({});
+
+    click(onlyCard());
+
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 });

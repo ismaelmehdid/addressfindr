@@ -114,11 +114,9 @@ async function render(
         <ResultDetailPanel
           candidate={candidate({})}
           rank={2}
-          total={3}
-          onPrevious={() => {}}
-          onNext={() => {}}
           onClose={() => {}}
           streetViewEnabled={false}
+          streetViewEmbedKey=""
           listing={LISTING}
           feedback={FEEDBACK}
           {...props}
@@ -155,6 +153,13 @@ function copyStatus(): HTMLElement {
   const status = container.querySelector<HTMLElement>('[role="status"]');
   if (status === null) throw new Error('no copy status');
   return status;
+}
+
+function visibleText(): string {
+  const copy = container.cloneNode(true);
+  if (!(copy instanceof HTMLElement)) throw new Error('no container copy');
+  for (const hidden of copy.querySelectorAll('.sr-only')) hidden.remove();
+  return copy.textContent;
 }
 
 async function clickCopy(): Promise<void> {
@@ -264,7 +269,7 @@ describe('ResultDetailPanel address', () => {
     );
   });
 
-  it('shows a check and "Adresse copiée" for two seconds after a copy', async () => {
+  it('shows a check for two seconds after a copy, announcing it to screen readers only', async () => {
     vi.useFakeTimers();
     onTestFinished(() => {
       vi.useRealTimers();
@@ -276,13 +281,16 @@ describe('ResultDetailPanel address', () => {
 
     await clickCopy();
 
-    expect(copyStatus().textContent).toBe('Adresse copiée');
     expect(copyButton().querySelector('.lucide-check')).not.toBeNull();
+    expect(copyStatus().textContent).toBe('Adresse copiée');
+    expect(copyStatus().classList).toContain('sr-only');
+    expect(copyStatus().classList).not.toContain('mt-1');
+    expect(visibleText()).not.toContain('Adresse copiée');
 
     act(() => {
       vi.advanceTimersByTime(1999);
     });
-    expect(copyStatus().textContent).toBe('Adresse copiée');
+    expect(copyButton().querySelector('.lucide-check')).not.toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(1);
@@ -291,7 +299,7 @@ describe('ResultDetailPanel address', () => {
     expect(copyButton().querySelector('.lucide-copy')).not.toBeNull();
   });
 
-  it('says so in the destructive colour when the copy fails', async () => {
+  it('shows the failure in the destructive colour when the copy fails', async () => {
     stubClipboard(() => Promise.reject(new Error('denied')));
     await render({});
 
@@ -299,6 +307,8 @@ describe('ResultDetailPanel address', () => {
 
     expect(copyStatus().textContent).toBe('Impossible de copier l’adresse');
     expect(copyStatus().classList).toContain('text-destructive');
+    expect(copyStatus().classList).not.toContain('sr-only');
+    expect(visibleText()).toContain('Impossible de copier l’adresse');
     expect(copyButton().querySelector('.lucide-check')).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 import { House, MapPinOff } from 'lucide-react';
 import Image from 'next/image';
 import { useFormatter, useTranslations } from 'next-intl';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { reliableFloor, streetLine } from '@/core/ademe/record-facts';
 import { scoreBand, scoreFromConfidence } from '@/core/ademe/score-scale';
 import type { AddressCandidate } from '@/core/ademe/types';
 import { cn } from '@/lib/utils';
+import { centerInScrollArea } from './center-in-scroll-area';
 import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
 import { useCandidatePhoto } from './use-candidate-photo';
 
@@ -111,17 +112,22 @@ function CandidateCard({
   const dimmed = selectedDpeNumber !== null && !selected;
   const score = scoreFromConfidence(candidate.confidence);
   const floor = reliableFloor(record);
-  const wasSelected = useRef(selected);
+  const [centerRequest, setCenterRequest] = useState(0);
+  const previous = useRef({ selected, centerRequest });
 
-  // why: scroll only when the selection arrives on this card. On first render
-  // the top card is already at the top; scrolling would hide the section title
-  // on a phone, where a card is taller than the panel.
+  // why: centre on every click, and when the selection arrives without one
+  // (the arrow-key shortcuts), once the render that selects the card is
+  // committed; a click that also selects it scrolls once. Never on first
+  // render: the top card is already at the top; scrolling would hide the
+  // section title on a phone, where a card is taller than the panel.
   useEffect(() => {
-    if (selected && !wasSelected.current) {
-      cardRef.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    const arrived = selected && !previous.current.selected;
+    const clicked = centerRequest !== previous.current.centerRequest;
+    previous.current = { selected, centerRequest };
+    if ((arrived || clicked) && cardRef.current !== null) {
+      centerInScrollArea(cardRef.current);
     }
-    wasSelected.current = selected;
-  }, [selected]);
+  }, [selected, centerRequest]);
 
   const meta = [
     record.city,
@@ -175,6 +181,7 @@ function CandidateCard({
         aria-current={selected ? 'true' : undefined}
         onClick={() => {
           onSelect(record.dpeNumber);
+          setCenterRequest((current) => current + 1);
         }}
         className="group/candidate flex w-full cursor-pointer flex-col text-left outline-none transition-colors hover:bg-foreground/3"
       >

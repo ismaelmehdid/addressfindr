@@ -1,6 +1,7 @@
 import type { GeoPoint } from '@/core/geo/types';
 import type { ExtractedValues } from '@/core/listing/types';
 import { addressGroupKey } from './address-identity';
+import { scoreFromConfidence } from './score-scale';
 import {
   type AddressCandidate,
   type AddressMatch,
@@ -397,6 +398,10 @@ function carriesEvidence(candidate: AddressCandidate): boolean {
   );
 }
 
+function showsAboveZero(candidate: AddressCandidate): boolean {
+  return scoreFromConfidence(candidate.confidence) > 0;
+}
+
 function supports(candidate: AddressCandidate): boolean {
   return candidate.diverged.length === 0 && candidate.matched.length > 0;
 }
@@ -479,11 +484,16 @@ export function rankCandidates(input: {
   // carrying evidence let a shortlist of rows that only agreed on the search
   // filters through. A row whose only agreement is the surface and the DPE
   // letter says nothing about this dwelling, so it is never returned at all.
-  const shortlist = candidates
-    .filter(carriesEvidence)
+  const withEvidence = candidates.filter(carriesEvidence);
+  // why: a candidate shown as 0/100 is one the evidence contradicts at least
+  // as much as it supports. It is dropped before the cut, on the display's own
+  // rounding, so it never takes a slot; rows that all read 0 are no match,
+  // not a lack of evidence.
+  const shortlist = withEvidence
+    .filter(showsAboveZero)
     .slice(0, MAX_CANDIDATES_RETURNED);
   const refusedFor: MatchRefusal | null =
-    candidates.length > 0 && shortlist.length === 0
+    candidates.length > 0 && withEvidence.length === 0
       ? 'insufficient-evidence'
       : null;
 
