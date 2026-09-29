@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { NextIntlClientProvider } from 'next-intl';
-import { act, type ComponentProps } from 'react';
+import { act, type ComponentProps, type ReactElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import * as v from 'valibot';
 import {
@@ -23,7 +23,7 @@ import {
   type ExtractedListing,
 } from '@/core/listing/types';
 import messages from '@/i18n/messages/fr.json';
-import { ResultsWorkspace } from './results-workspace';
+import { type DetailPreference, ResultsWorkspace } from './results-workspace';
 
 // why: tells React that act() drives the updates, so it flushes them there.
 (
@@ -122,11 +122,44 @@ afterEach(() => {
   container.remove();
 });
 
+type WorkspaceProps = ComponentProps<typeof ResultsWorkspace>;
+
+const DEFAULT_PROPS: WorkspaceProps = {
+  listing: LISTING,
+  match: match([FIRST, SECOND, THIRD]),
+  shown: FIRST,
+  focusRequest: 0,
+  detailPreference: 'open',
+  map: { kind: 'unavailable' },
+  accessToken: '',
+  streetViewEnabled: false,
+  streetViewEmbedKey: '',
+  onSelect: () => {},
+  onCloseDetail: () => {},
+  onMapFailure: () => {},
+  onNewSearch: () => {},
+};
+
+// why: mirrors the dashboard, where closing the detail sets the preference to
+// 'closed'; the panel then unmounts and the card loses aria-current.
+function ClosableWorkspace(props: Partial<WorkspaceProps>) {
+  const [detailPreference, setDetailPreference] =
+    useState<DetailPreference>('open');
+  return (
+    <ResultsWorkspace
+      {...DEFAULT_PROPS}
+      {...props}
+      detailPreference={detailPreference}
+      onCloseDetail={() => {
+        setDetailPreference('closed');
+      }}
+    />
+  );
+}
+
 // why: the scroll area measures itself in a microtask after mounting; an
 // async act() flushes that update too.
-async function render(
-  props: Partial<ComponentProps<typeof ResultsWorkspace>>,
-): Promise<void> {
+async function mount(workspace: ReactElement): Promise<void> {
   await act(async () => {
     root.render(
       <NextIntlClientProvider
@@ -134,25 +167,18 @@ async function render(
         messages={messages}
         timeZone="Europe/Paris"
       >
-        <ResultsWorkspace
-          listing={LISTING}
-          match={match([FIRST, SECOND, THIRD])}
-          shown={FIRST}
-          focusRequest={0}
-          detailPreference="open"
-          map={{ kind: 'unavailable' }}
-          accessToken=""
-          streetViewEnabled={false}
-          streetViewEmbedKey=""
-          onSelect={() => {}}
-          onCloseDetail={() => {}}
-          onMapFailure={() => {}}
-          onNewSearch={() => {}}
-          {...props}
-        />
+        {workspace}
       </NextIntlClientProvider>,
     );
   });
+}
+
+async function render(props: Partial<WorkspaceProps>): Promise<void> {
+  await mount(<ResultsWorkspace {...DEFAULT_PROPS} {...props} />);
+}
+
+async function renderClosable(props: Partial<WorkspaceProps>): Promise<void> {
+  await mount(<ClosableWorkspace {...props} />);
 }
 
 // why: results are browsed from the list and with the arrow keys; no
@@ -218,9 +244,10 @@ describe('ResultsWorkspace detail header', () => {
   // why: selecting a result centres it in the list, behind the bottom sheet on
   // a phone; returning focus on close must not scroll the list back up.
   it("returns focus to the shown result's card on close without scrolling the list", async () => {
-    await render({ shown: SECOND });
+    await renderClosable({ shown: SECOND });
     const card = shownCardButton();
     const focus = vi.spyOn(card, 'focus');
+    const scroll = placeInList(card, { top: 50, height: 300 });
     const close = detailButton('Fermer le détail');
     act(() => {
       close.focus();
@@ -231,14 +258,38 @@ describe('ResultsWorkspace detail header', () => {
       await nextFrame();
     });
 
+    expect(container.querySelector('aside')).toBeNull();
+    expect(card.getAttribute('aria-current')).toBeNull();
     expect(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
     expect(document.activeElement).toBe(card);
+    expect(scroll).not.toHaveBeenCalled();
+  });
+
+  // why: the close button is reached by tabbing past every later card, which
+  // scrolls the list until the shown card is out of its view.
+  it("brings the shown result's card back into the list's view when it was scrolled away", async () => {
+    await renderClosable({ shown: FIRST });
+    const card = shownCardButton();
+    const scroll = placeInList(card, { top: -500, height: 300 });
+    const close = detailButton('Fermer le détail');
+    act(() => {
+      close.focus();
+    });
+
+    await act(async () => {
+      close.click();
+      await nextFrame();
+    });
+
+    expect(document.activeElement).toBe(card);
+    expect(scroll).toHaveBeenCalledOnce();
   });
 
   // why: a click does not focus a button in Safari, so focus can already sit
   // on <body> when the detail closes.
   it("moves focus that fell to the page to the shown result's card on close", async () => {
-    await render({ shown: SECOND });
+    await renderClosable({ shown: SECOND });
+    const card = shownCardButton();
     act(() => {
       if (document.activeElement instanceof HTMLElement) {
         document.activeElement.blur();
@@ -251,7 +302,8 @@ describe('ResultsWorkspace detail header', () => {
       await nextFrame();
     });
 
-    expect(document.activeElement).toBe(shownCardButton());
+    expect(container.querySelector('aside')).toBeNull();
+    expect(document.activeElement).toBe(card);
   });
 
   it('leaves focus on the card where Escape closes the detail', async () => {
@@ -289,6 +341,44 @@ async function nextFrame(): Promise<void> {
       resolve();
     });
   });
+}
+
+function rect(top: number, height: number): DOMRect {
+  return {
+    x: 0,
+    y: top,
+    top,
+    bottom: top + height,
+    left: 0,
+    right: 336,
+    width: 336,
+    height,
+    toJSON: () => ({}),
+  };
+}
+
+// why: jsdom lays nothing out. This gives the list a 400px viewport at the top
+// of the page and puts the card at the given place, then watches the viewport
+// scroll.
+function placeInList(
+  card: HTMLElement,
+  place: { top: number; height: number },
+): ReturnType<typeof vi.fn> {
+  const viewport = resultsColumn().querySelector<HTMLElement>(
+    '[data-slot="scroll-area-viewport"]',
+  );
+  if (viewport === null) throw new Error('no scroll area viewport');
+  vi.spyOn(viewport, 'getBoundingClientRect').mockReturnValue(rect(0, 400));
+  Object.defineProperty(viewport, 'clientHeight', {
+    configurable: true,
+    value: 400,
+  });
+  vi.spyOn(card, 'getBoundingClientRect').mockReturnValue(
+    rect(place.top, place.height),
+  );
+  const scroll = vi.fn();
+  viewport.scrollTo = scroll;
+  return scroll;
 }
 
 function shownCardButton(): HTMLButtonElement {
@@ -396,7 +486,63 @@ describe('ResultsWorkspace detail sheet below lg', () => {
     expect(sheet?.classList).toContain('data-[side=bottom]:h-[85svh]');
     expect(sheet?.classList).not.toContain('data-[side=bottom]:h-auto');
   });
+
+  // why: Base UI returns focus to where it was before the sheet opened, which
+  // is not the result the sheet was showing.
+  it.each([
+    [
+      'its close button',
+      (close: HTMLButtonElement): void => {
+        close.click();
+      },
+    ],
+    [
+      'Escape',
+      (close: HTMLButtonElement): void => {
+        close.dispatchEvent(
+          new KeyboardEvent('keydown', {
+            key: 'Escape',
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+      },
+    ],
+  ])("returns focus to the shown result's card when the sheet closes on %s", async (_, closeSheet) => {
+    wideScreen = false;
+    onTestFinished(() => {
+      wideScreen = true;
+    });
+    await renderClosable({ shown: SECOND });
+    const card = shownCardButton();
+    const focus = vi.spyOn(card, 'focus');
+    const close = sheetContent().querySelector<HTMLButtonElement>(
+      'button[aria-label="Fermer le détail"]',
+    );
+    if (close === null) throw new Error('no close button in the sheet');
+    act(() => {
+      close.focus();
+    });
+    expect(sheetContent().contains(document.activeElement)).toBe(true);
+
+    await act(async () => {
+      closeSheet(close);
+      await nextFrame();
+    });
+
+    expect(card.getAttribute('aria-current')).toBeNull();
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+    expect(document.activeElement).toBe(card);
+  });
 });
+
+function sheetContent(): HTMLElement {
+  const sheet = document.querySelector<HTMLElement>(
+    '[data-slot="sheet-content"]',
+  );
+  if (sheet === null) throw new Error('no detail sheet');
+  return sheet;
+}
 
 const FeedbackRequestSchema = v.object({
   searchId: v.string(),

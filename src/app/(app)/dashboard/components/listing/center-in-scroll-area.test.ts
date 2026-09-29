@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { centeredScrollTop } from './center-in-scroll-area';
+import { centeredScrollTop, isInView } from './center-in-scroll-area';
 
 describe('centeredScrollTop', () => {
   it('puts the middle of the item at the middle of the viewport', () => {
@@ -57,5 +57,39 @@ describe('centeredScrollTop', () => {
         itemHeight: 450,
       }),
     ).toBe(800);
+  });
+});
+
+describe('isInView', () => {
+  const viewport = { viewportTop: 100, viewportHeight: 400 };
+
+  it('accepts an item wholly inside the viewport', () => {
+    expect(isInView({ ...viewport, itemTop: 100, itemHeight: 400 })).toBe(true);
+    expect(isInView({ ...viewport, itemTop: 250, itemHeight: 100 })).toBe(true);
+  });
+
+  it('rejects an item scrolled above or below the viewport', () => {
+    expect(isInView({ ...viewport, itemTop: -300, itemHeight: 300 })).toBe(
+      false,
+    );
+    expect(isInView({ ...viewport, itemTop: 600, itemHeight: 300 })).toBe(
+      false,
+    );
+  });
+
+  it('rejects an item cut by an edge of the viewport', () => {
+    expect(isInView({ ...viewport, itemTop: 0, itemHeight: 300 })).toBe(false);
+    expect(isInView({ ...viewport, itemTop: 400, itemHeight: 300 })).toBe(
+      false,
+    );
+  });
+
+  // why: a result card is taller than the list panel on a phone; centring
+  // aligns its top, where it then covers the whole viewport.
+  it('accepts an item taller than the viewport once it covers it', () => {
+    expect(isInView({ ...viewport, itemTop: 100, itemHeight: 600 })).toBe(true);
+    expect(isInView({ ...viewport, itemTop: 150, itemHeight: 600 })).toBe(
+      false,
+    );
   });
 });

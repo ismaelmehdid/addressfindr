@@ -25,6 +25,7 @@ import { useMediaQuery } from '@/hooks/use-media-query';
 import { cn } from '@/lib/utils';
 import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
+import { revealInScrollArea } from './center-in-scroll-area';
 import { MapErrorBoundary } from './map-error-boundary';
 import { MissingListingFeedback } from './missing-listing-feedback';
 import { NewSearchDialog } from './new-search-dialog';
@@ -160,9 +161,10 @@ export function ResultsWorkspace({
   // why: closing the detail (its close button, Escape, or the mobile Sheet's
   // onOpenChange(false)) can unmount the panel that held focus. Focus then
   // returns to the shown result's card, the one marked current while the
-  // detail is open, without scrolling the list away from where its centring
-  // left it. Focus outside the detail, such as on a card where Escape was
-  // pressed, stays where it is.
+  // detail is open. preventScroll keeps the page still; the list moves only
+  // when the card is out of its view, as after tabbing past every later card
+  // to reach the detail. Focus outside the detail, such as on a card where
+  // Escape was pressed, stays where it is.
   function closeDetail(): void {
     const focused = document.activeElement;
     const focusInDetail =
@@ -181,7 +183,9 @@ export function ResultsWorkspace({
       if (!focusInDetail && !fellToBody) return;
       const target =
         shownCard?.isConnected === true ? shownCard : headingRef.current;
-      target?.focus({ preventScroll: true });
+      if (target === null) return;
+      target.focus({ preventScroll: true });
+      revealInScrollArea(target);
     });
   }
 
