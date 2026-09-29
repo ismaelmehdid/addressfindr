@@ -114,9 +114,6 @@ async function render(
         <ResultDetailPanel
           candidate={candidate({})}
           rank={2}
-          total={3}
-          onPrevious={() => {}}
-          onNext={() => {}}
           onClose={() => {}}
           streetViewEnabled={false}
           listing={LISTING}

@@ -29,7 +29,6 @@ import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
 import { MissingListingFeedback } from './missing-listing-feedback';
 import { ResultDetailPanel } from './result-detail-panel';
-import { ResultsPager } from './results-pager';
 import { useDetailShortcuts } from './use-detail-shortcuts';
 import { useSearchFeedback } from './use-search-feedback';
 
@@ -123,8 +122,8 @@ export function ResultsWorkspace({
       (candidate) => candidate.record.dpeNumber === shown.record.dpeNumber,
     ),
   );
-  // why: the pagers wrap around, so as soon as there are two results every
-  // one of them has a neighbour on both sides.
+  // why: the arrow-key shortcuts wrap around, so as soon as there are two
+  // results every one of them has a neighbour on both sides.
   const previous =
     total > 1 ? candidates[(index - 1 + total) % total] : undefined;
   const next = total > 1 ? candidates[(index + 1) % total] : undefined;
@@ -176,9 +175,6 @@ export function ResultsWorkspace({
     <ResultDetailPanel
       candidate={shown}
       rank={rank}
-      total={total}
-      onPrevious={selectPrevious}
-      onNext={selectNext}
       onClose={closeDetail}
       streetViewEnabled={streetViewEnabled}
       listing={listing.fields}
@@ -204,24 +200,14 @@ export function ResultsWorkspace({
               {t('resultsNewSearch')}
             </Button>
             <AnalysedListingCard listing={listing} />
-            <div className="flex min-h-7 items-center justify-between gap-2">
-              <h2
-                id="results-heading"
-                ref={headingRef}
-                tabIndex={-1}
-                className="text-[15px] font-semibold text-ink outline-none"
-              >
-                {t('addressHeading')}
-              </h2>
-              {detailOpen && selectPrevious !== null && selectNext !== null && (
-                <ResultsPager
-                  rank={rank}
-                  total={total}
-                  onPrevious={selectPrevious}
-                  onNext={selectNext}
-                />
-              )}
-            </div>
+            <h2
+              id="results-heading"
+              ref={headingRef}
+              tabIndex={-1}
+              className="text-[15px] font-semibold text-ink outline-none"
+            >
+              {t('addressHeading')}
+            </h2>
             {needsVerification(match) && (
               <Alert role="status">
                 <Info />

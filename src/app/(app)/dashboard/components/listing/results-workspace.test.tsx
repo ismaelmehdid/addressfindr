@@ -154,80 +154,17 @@ async function render(
   });
 }
 
-function headingRow(): HTMLElement {
-  const row = container.querySelector('#results-heading')?.parentElement;
-  if (row === null || row === undefined) throw new Error('no results heading');
-  return row;
-}
-
-function headingPager(): HTMLElement | null {
-  return headingRow().querySelector<HTMLElement>('[role="group"]');
-}
-
-function pagerButton(label: string): HTMLButtonElement {
-  const button = headingPager()?.querySelector<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
-  );
-  if (button === null || button === undefined) {
-    throw new Error(`no "${label}" button in the heading pager`);
-  }
-  return button;
-}
-
-describe('ResultsWorkspace heading pager', () => {
-  it('shows the rank among the results while a detail is open', async () => {
+// why: results are browsed from the list and with the arrow keys; no
+// "2 / 3" pager sits beside the results heading.
+describe('ResultsWorkspace results heading', () => {
+  it('shows no pager while a detail is open on several results', async () => {
     await render({ shown: SECOND });
 
-    expect(headingPager()?.getAttribute('aria-label')).toBe(
-      'Parcourir les résultats',
+    expect(container.querySelector('#results-heading')?.textContent).toBe(
+      messages.Listing.addressHeading,
     );
-    expect(headingPager()?.textContent).toBe('2 / 3');
-  });
-
-  it('is hidden while no detail is open', async () => {
-    await render({ detailPreference: 'closed' });
-
-    expect(headingRow().querySelectorAll('button')).toHaveLength(0);
-  });
-
-  it('is hidden when there is a single result', async () => {
-    await render({ match: match([FIRST]) });
-
-    expect(headingRow().querySelectorAll('button')).toHaveLength(0);
-  });
-
-  it('wraps from the first result to the last', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: FIRST, onSelect });
-
-    act(() => {
-      pagerButton('Résultat précédent').click();
-    });
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith(THIRD.record.dpeNumber);
-  });
-
-  it('wraps from the last result to the first', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: THIRD, onSelect });
-
-    act(() => {
-      pagerButton('Résultat suivant').click();
-    });
-    expect(onSelect).toHaveBeenCalledExactlyOnceWith(FIRST.record.dpeNumber);
-  });
-
-  it('steps to the neighbours inside the list', async () => {
-    const onSelect = vi.fn();
-    await render({ shown: SECOND, onSelect });
-
-    act(() => {
-      pagerButton('Résultat précédent').click();
-      pagerButton('Résultat suivant').click();
-    });
-    expect(onSelect.mock.calls).toEqual([
-      [FIRST.record.dpeNumber],
-      [THIRD.record.dpeNumber],
-    ]);
+    expect(resultsColumn().querySelector('[role="group"]')).toBeNull();
+    expect(resultsColumn().textContent).not.toContain('2 / 3');
   });
 });
 
@@ -249,23 +186,14 @@ function detailButton(label: string): HTMLButtonElement {
 }
 
 describe('ResultsWorkspace detail header', () => {
-  it('names the result and shows its rank among the results', async () => {
+  it('names the result and offers only the close button', async () => {
     await render({ shown: SECOND });
 
     expect(container.querySelector('aside')?.getAttribute('aria-label')).toBe(
       'Résultat 2',
     );
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
-    expect(detailHeader().querySelector('[role="group"]')?.textContent).toBe(
-      '2 / 3',
-    );
-    expect(detailButton('Fermer le détail')).toBeDefined();
-  });
-
-  it('hides the pager when there is a single result', async () => {
-    await render({ match: match([FIRST]) });
-
-    expect(detailHeader().querySelector('[role="group"]')).toBeNull();
+    expect(detailHeader().textContent).not.toContain('2 / 3');
     expect(
       [...detailHeader().querySelectorAll('button')].map((button) =>
         button.getAttribute('aria-label'),
@@ -273,16 +201,16 @@ describe('ResultsWorkspace detail header', () => {
     ).toEqual(['Fermer le détail']);
   });
 
-  it('keeps focus on the pager button when the shown result changes', async () => {
+  it('keeps focus on the close button when the shown result changes', async () => {
     await render({ shown: FIRST });
-    const next = detailButton('Résultat suivant');
+    const close = detailButton('Fermer le détail');
     act(() => {
-      next.focus();
+      close.focus();
     });
 
     await render({ shown: SECOND });
 
-    expect(document.activeElement).toBe(next);
+    expect(document.activeElement).toBe(close);
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 2');
   });
 });
