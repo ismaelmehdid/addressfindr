@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { type MapView, pickedMapView } from './map-view';
 
 const OPTION_CLASS =
-  'h-7 rounded-xl px-2.5 text-xs font-semibold text-muted-foreground aria-pressed:bg-primary aria-pressed:text-primary-foreground lg:h-8 lg:px-3 lg:text-[13px]';
+  'h-7 rounded-xl px-2.5 text-xs font-semibold text-graphite aria-pressed:bg-primary aria-pressed:text-primary-foreground lg:h-8 lg:px-3 lg:text-[13px]';
 
 export function MapViewSwitch({
   view,
