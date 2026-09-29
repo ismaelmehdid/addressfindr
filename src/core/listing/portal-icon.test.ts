@@ -26,10 +26,13 @@ describe('portalIconUrl', () => {
 });
 
 describe('bundled portal icons', () => {
+  // why: Finder drops a gitignored .DS_Store into any folder it opens.
   it('holds exactly one icon per portal, and nothing else', () => {
-    expect(readdirSync(PORTAL_ICONS_DIR).sort()).toEqual(
-      PORTAL_IDS.map((portal) => `${portal}.png`).sort(),
-    );
+    const icons = readdirSync(PORTAL_ICONS_DIR)
+      .filter((name) => !name.startsWith('.'))
+      .sort();
+
+    expect(icons).toEqual(PORTAL_IDS.map((portal) => `${portal}.png`).sort());
   });
 
   it.each(PORTAL_IDS)('holds a PNG image for %s', (portal) => {

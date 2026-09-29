@@ -260,9 +260,14 @@ describe('revealInScrollArea', () => {
 
     revealInScrollArea(element('button'));
 
-    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({
+      top: 510,
+      behavior: 'smooth',
+    });
   });
 
+  // why: the card that encloses the whole list always covers its viewport, so
+  // measuring it would call a heading scrolled out of view visible.
   it('measures an element outside any card on its own', () => {
     const { scroll, element } = list(`
       <div data-slot="card">
@@ -270,12 +275,19 @@ describe('revealInScrollArea', () => {
           <h2 tabindex="-1">Adresse</h2>
         </div>
       </div>`);
-    place(element('[data-slot="card"]'), -900, 3000);
-    place(element('h2'), VIEWPORT.top + 40, 24);
+    place(
+      element('[data-slot="card"]'),
+      VIEWPORT.top - 40,
+      VIEWPORT.height + 80,
+    );
+    place(element('h2'), VIEWPORT.top + VIEWPORT.height + 100, 24);
 
     revealInScrollArea(element('h2'));
 
-    expect(scroll).not.toHaveBeenCalled();
+    expect(scroll).toHaveBeenCalledExactlyOnceWith({
+      top: 912,
+      behavior: 'smooth',
+    });
   });
 
   it('does nothing outside a scroll area', () => {
