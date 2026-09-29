@@ -34,7 +34,7 @@ import { ResultsWorkspace } from './results-workspace';
 // narrows the screen, so by default the view lays itself out as on a wide
 // screen (lg and xl).
 let wideScreen = true;
-HTMLElement.prototype.scrollIntoView = vi.fn();
+HTMLElement.prototype.scrollTo = vi.fn();
 window.matchMedia = (query: string): MediaQueryList => ({
   matches: wideScreen,
   media: query,
