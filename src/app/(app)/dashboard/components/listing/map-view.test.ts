@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { mapStyleUrl, pickedMapView, showsBuildings } from './map-view';
+import {
+  cameraAngle,
+  mapStyleUrl,
+  pickedMapView,
+  showsBuildings,
+} from './map-view';
 
 describe('mapStyleUrl', () => {
   it.each([
@@ -17,6 +22,29 @@ describe('showsBuildings', () => {
 
   it('leaves the real roofs visible on the satellite view', () => {
     expect(showsBuildings('satellite')).toBe(false);
+  });
+});
+
+describe('cameraAngle', () => {
+  it('tilts the map view over a pinned address', () => {
+    expect(cameraAngle('map', 'address')).toEqual({
+      pitch: 45,
+      bearing: -17.6,
+    });
+  });
+
+  it('looks straight down, north up, at a pinned address in the satellite view', () => {
+    expect(cameraAngle('satellite', 'address')).toEqual({
+      pitch: 0,
+      bearing: 0,
+    });
+  });
+
+  it.each([
+    'map',
+    'satellite',
+  ] as const)('keeps the %s overview flat, north up', (view) => {
+    expect(cameraAngle(view, 'overview')).toEqual({ pitch: 0, bearing: 0 });
   });
 });
 

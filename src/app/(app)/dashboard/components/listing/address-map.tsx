@@ -5,9 +5,14 @@ import mapboxgl, {
   type PaddingOptions,
 } from 'mapbox-gl';
 import { useTranslations } from 'next-intl';
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import type { GeoPoint } from '@/core/geo/types';
-import { type MapView, mapStyleUrl, showsBuildings } from './map-view';
+import {
+  cameraAngle,
+  type MapView,
+  mapStyleUrl,
+  showsBuildings,
+} from './map-view';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const BUILDINGS_LAYER: FillExtrusionLayerSpecification = {
@@ -41,8 +46,9 @@ const BUILDINGS_LAYER: FillExtrusionLayerSpecification = {
   },
 };
 
-const PINNED_VIEW = { zoom: 17, pitch: 45, bearing: -17.6 };
-const OVERVIEW_VIEW = { zoom: 12, pitch: 0, bearing: 0 };
+const PINNED_ZOOM = 17;
+const OVERVIEW_ZOOM = 12;
+const VIEW_SWITCH_EASE_MS = 500;
 
 function firstLabelLayerId(map: mapboxgl.Map): string | undefined {
   return map
@@ -53,12 +59,47 @@ function firstLabelLayerId(map: mapboxgl.Map): string | undefined {
     )?.id;
 }
 
-function cameraFor(point: GeoPoint | null, overview: GeoPoint) {
+type Destination = { point: GeoPoint | null; overview: GeoPoint };
+
+function cameraFor({
+  point,
+  overview,
+  view,
+}: Destination & {
+  view: MapView;
+}) {
   const target = point ?? overview;
   return {
     center: [target.longitude, target.latitude] as [number, number],
-    ...(point === null ? OVERVIEW_VIEW : PINNED_VIEW),
+    zoom: point === null ? OVERVIEW_ZOOM : PINNED_ZOOM,
+    ...cameraAngle(view, point === null ? 'overview' : 'address'),
   };
+}
+
+// why: `flyTo` and `easeTo` stop the camera move in progress without
+// finishing it. The destination is kept until this flight's `moveend`
+// (landed, or stopped by a drag or a later move), so a view switch can send
+// the flight on instead of stranding the camera partway.
+function fly({
+  map,
+  destination,
+  view,
+  padding,
+  flightRef,
+}: {
+  map: mapboxgl.Map;
+  destination: Destination;
+  view: MapView;
+  padding: PaddingOptions;
+  flightRef: RefObject<Destination | null>;
+}) {
+  map.flyTo({ ...cameraFor({ ...destination, view }), padding });
+  // why: with reduced motion Mapbox jumps instead, so nothing is in flight.
+  if (!map.isEasing()) return;
+  flightRef.current = destination;
+  map.once('moveend', () => {
+    flightRef.current = null;
+  });
 }
 
 export function AddressMap({
@@ -80,8 +121,10 @@ export function AddressMap({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markerRef = useRef<mapboxgl.Marker | null>(null);
-  const initialCameraRef = useRef(cameraFor(point, overview));
+  const initialCameraRef = useRef(cameraFor({ point, overview, view }));
   const styledViewRef = useRef(view);
+  const flightRef = useRef<Destination | null>(null);
+  const cameraTarget = point === null ? 'overview' : 'address';
 
   // why: every `new mapboxgl.Map()` is a billed map load. The map is built once
   // and moved afterwards, never recreated per address.
@@ -124,13 +167,17 @@ export function AddressMap({
       map.remove();
       markerRef.current = null;
       mapRef.current = null;
+      flightRef.current = null;
     };
   }, [accessToken]);
 
   // why: `setStyle` restyles the map already loaded, so unlike a new map it
   // is not billed. Without a diff, Mapbox rebuilds the style and fires
-  // `style.load` again, where the buildings follow the new view; the camera,
-  // the marker and the attribution stay as they are.
+  // `style.load` again, where the buildings follow the new view; the marker
+  // and the attribution stay as they are. A flight still in the air goes on
+  // to its destination at the new view's angle. Otherwise the camera only
+  // turns: an ease without a center or zoom keeps the spot the user is
+  // looking at.
   useEffect(() => {
     const map = mapRef.current;
     if (map === null || styledViewRef.current === view) return;
@@ -142,13 +189,25 @@ export function AddressMap({
       localFontFamily: null,
       localIdeographFontFamily: 'sans-serif',
     });
-  }, [view]);
+    const flight = flightRef.current;
+    if (flight !== null) {
+      fly({ map, destination: flight, view, padding, flightRef });
+      return;
+    }
+    map.easeTo({
+      ...cameraAngle(view, cameraTarget),
+      padding,
+      duration: VIEW_SWITCH_EASE_MS,
+    });
+  }, [view, cameraTarget, padding]);
 
   const latitude = point?.latitude ?? null;
   const longitude = point?.longitude ?? null;
 
   // why: the padding travels with every flight. `setPadding` alone would stop
-  // a flight halfway when the panel moves over the map.
+  // a flight halfway when the panel moves over the map. The view is read
+  // through `styledViewRef`, so a view switch never re-runs this flight and
+  // never recentres a map the user has moved.
   // biome-ignore lint/correctness/useExhaustiveDependencies: focusRequest changes when the shown address is picked again, so the map recentres on it after the user panned away.
   useEffect(() => {
     const map = mapRef.current;
@@ -162,12 +221,18 @@ export function AddressMap({
     } else {
       marker.setLngLat([pinned.longitude, pinned.latitude]).addTo(map);
     }
-    map.flyTo({
-      ...cameraFor(pinned, {
-        latitude: overview.latitude,
-        longitude: overview.longitude,
-      }),
+    fly({
+      map,
+      destination: {
+        point: pinned,
+        overview: {
+          latitude: overview.latitude,
+          longitude: overview.longitude,
+        },
+      },
+      view: styledViewRef.current,
       padding,
+      flightRef,
     });
   }, [
     latitude,

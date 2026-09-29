@@ -23,6 +23,23 @@ export function showsBuildings(view: MapView): boolean {
   return MAP_STYLES[view].buildings;
 }
 
+export type CameraTarget = 'address' | 'overview';
+
+export type CameraAngle = Readonly<{ pitch: number; bearing: number }>;
+
+const TOP_DOWN: CameraAngle = { pitch: 0, bearing: 0 };
+
+// why: satellite imagery is shot from straight above, so tilting it only
+// stretches the roofs; that view looks straight down, north up.
+const ADDRESS_ANGLES: Record<MapView, CameraAngle> = {
+  map: { pitch: 45, bearing: -17.6 },
+  satellite: TOP_DOWN,
+};
+
+export function cameraAngle(view: MapView, target: CameraTarget): CameraAngle {
+  return target === 'address' ? ADDRESS_ANGLES[view] : TOP_DOWN;
+}
+
 // why: a single-choice toggle group reports an empty value when its pressed
 // option is pressed again; the map always shows one view, so that is no pick.
 export function pickedMapView(values: readonly string[]): MapView | null {
