@@ -37,6 +37,7 @@ export function StreetViewPanoramaDialog({
   const t = useTranslations('Listing');
   const [open, setOpen] = useState(false);
   const lookup = useStreetViewPanorama({ point, enabled: open });
+  const panorama = lookup.kind === 'located' ? lookup.panorama : null;
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -54,7 +55,7 @@ export function StreetViewPanoramaDialog({
             {t('streetViewDialogTitle', { address })}
           </DialogTitle>
           <a
-            href={streetViewPanoramaUrl(point)}
+            href={streetViewPanoramaUrl({ point, panorama })}
             target="_blank"
             rel="noopener noreferrer"
             className={buttonVariants({ variant: 'ghost', size: 'sm' })}
@@ -82,11 +83,7 @@ export function StreetViewPanoramaDialog({
           // why: the key is restricted by referrer, so Google must receive this origin.
           <iframe
             title={t('streetViewDialogFrame')}
-            src={streetViewEmbedUrl({
-              point,
-              apiKey,
-              panorama: lookup.panorama,
-            })}
+            src={streetViewEmbedUrl({ point, apiKey, panorama })}
             allowFullScreen
             loading="lazy"
             referrerPolicy="strict-origin-when-cross-origin"

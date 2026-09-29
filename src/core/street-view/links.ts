@@ -30,18 +30,41 @@ export function streetViewPanoramaLookupPath(point: GeoPoint): string {
   return `${STREET_VIEW_PANORAMA_ROUTE}?${pointQuery(point).toString()}`;
 }
 
-export function streetViewPanoramaUrl(point: GeoPoint): string {
+function latLon(point: GeoPoint): string {
+  return `${coordinate(point.latitude)},${coordinate(point.longitude)}`;
+}
+
+function panoramaView(
+  panorama: StreetViewPanorama | null,
+): Record<string, string> {
+  return panorama === null
+    ? {}
+    : { pano: panorama.panoId, heading: String(panorama.heading) };
+}
+
+// why: with a known panorama, Google Maps opens the capture the photo shows
+// instead of whichever one sits closest to the point, photospheres included;
+// `viewpoint` is only its fallback when that id cannot be found.
+export function streetViewPanoramaUrl({
+  point,
+  panorama,
+}: {
+  point: GeoPoint;
+  panorama: StreetViewPanorama | null;
+}): string {
   const query = new URLSearchParams({
     api: '1',
     map_action: 'pano',
-    viewpoint: `${coordinate(point.latitude)},${coordinate(point.longitude)}`,
+    viewpoint: latLon(point),
+    ...panoramaView(panorama),
   });
   return `https://www.google.com/maps/@?${query.toString()}`;
 }
 
 // why: the embed opens on the photo's own panorama, aimed at the point, when
-// it is known; otherwise on the outdoor panorama nearest the point. Its key is
-// a browser key restricted by referrer, never the server's Street View key.
+// it is known. The outdoor search around the point is always sent too: Google
+// only uses it when there is no id or the id no longer resolves. Its key is a
+// browser key restricted by referrer, never the server's Street View key.
 export function streetViewEmbedUrl({
   point,
   apiKey,
@@ -51,14 +74,12 @@ export function streetViewEmbedUrl({
   apiKey: string;
   panorama: StreetViewPanorama | null;
 }): string {
-  const view: Record<string, string> =
-    panorama === null
-      ? {
-          location: `${coordinate(point.latitude)},${coordinate(point.longitude)}`,
-          radius: PHOTO_SEARCH_RADIUS_M,
-          source: PHOTO_SOURCE,
-        }
-      : { pano: panorama.panoId, heading: String(panorama.heading) };
-  const query = new URLSearchParams({ key: apiKey, ...view });
+  const query = new URLSearchParams({
+    key: apiKey,
+    location: latLon(point),
+    radius: PHOTO_SEARCH_RADIUS_M,
+    source: PHOTO_SOURCE,
+    ...panoramaView(panorama),
+  });
   return `https://www.google.com/maps/embed/v1/streetview?${query.toString()}`;
 }

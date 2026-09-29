@@ -216,25 +216,96 @@ describe('ResultsWorkspace detail header', () => {
   });
 
   // why: selecting a result centres it in the list, behind the bottom sheet on
-  // a phone; focusing the heading on close must not scroll the list back up.
-  it('moves focus to the results heading on close without scrolling the list', async () => {
-    await render({});
-    const heading = container.querySelector<HTMLElement>('#results-heading');
-    if (heading === null) throw new Error('no results heading');
-    const focus = vi.spyOn(heading, 'focus');
+  // a phone; returning focus on close must not scroll the list back up.
+  it("returns focus to the shown result's card on close without scrolling the list", async () => {
+    await render({ shown: SECOND });
+    const card = shownCardButton();
+    const focus = vi.spyOn(card, 'focus');
+    const close = detailButton('Fermer le détail');
+    act(() => {
+      close.focus();
+    });
 
     await act(async () => {
-      detailButton('Fermer le détail').click();
-      await new Promise<void>((resolve) => {
-        requestAnimationFrame(() => {
-          resolve();
-        });
-      });
+      close.click();
+      await nextFrame();
     });
 
     expect(focus).toHaveBeenCalledExactlyOnceWith({ preventScroll: true });
+    expect(document.activeElement).toBe(card);
+  });
+
+  // why: a click does not focus a button in Safari, so focus can already sit
+  // on <body> when the detail closes.
+  it("moves focus that fell to the page to the shown result's card on close", async () => {
+    await render({ shown: SECOND });
+    act(() => {
+      if (document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+    });
+    expect(document.activeElement).toBe(document.body);
+
+    await act(async () => {
+      detailButton('Fermer le détail').click();
+      await nextFrame();
+    });
+
+    expect(document.activeElement).toBe(shownCardButton());
+  });
+
+  it('leaves focus on the card where Escape closes the detail', async () => {
+    const onCloseDetail = vi.fn();
+    await render({ shown: SECOND, onCloseDetail });
+    const card = otherCardButtons()[1];
+    if (card === undefined) throw new Error('no third card');
+    const heading = container.querySelector<HTMLElement>('#results-heading');
+    if (heading === null) throw new Error('no results heading');
+    const headingFocus = vi.spyOn(heading, 'focus');
+    act(() => {
+      card.focus();
+    });
+
+    await act(async () => {
+      card.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Escape',
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+      await nextFrame();
+    });
+
+    expect(onCloseDetail).toHaveBeenCalledOnce();
+    expect(headingFocus).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(card);
   });
 });
+
+async function nextFrame(): Promise<void> {
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      resolve();
+    });
+  });
+}
+
+function shownCardButton(): HTMLButtonElement {
+  const button = resultsColumn().querySelector<HTMLButtonElement>(
+    'button[aria-current="true"]',
+  );
+  if (button === null) throw new Error('no card marked as shown');
+  return button;
+}
+
+function otherCardButtons(): HTMLButtonElement[] {
+  return [
+    ...resultsColumn().querySelectorAll<HTMLButtonElement>(
+      'ol > li [data-slot="card"] > button',
+    ),
+  ];
+}
 
 function pressKey(key: string, target: Element = document.body): void {
   act(() => {

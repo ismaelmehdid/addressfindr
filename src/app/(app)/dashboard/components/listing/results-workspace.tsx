@@ -117,6 +117,9 @@ export function ResultsWorkspace({
     candidates: match.candidates,
   });
   const headingRef = useRef<HTMLHeadingElement | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
+  const asideRef = useRef<HTMLElement | null>(null);
+  const sheetRef = useRef<HTMLDivElement | null>(null);
   const { candidates } = match;
   const total = candidates.length;
   const index = Math.max(
@@ -154,15 +157,31 @@ export function ResultsWorkspace({
     headingRef.current?.focus();
   }, []);
 
-  // why: closing the detail (close button, or the mobile Sheet's
-  // onOpenChange(false)) can unmount the panel that held focus. Moving focus
-  // to the results heading right after the close renders keeps it from
-  // dropping to <body>, without scrolling the list away from the result it
-  // centred.
+  // why: closing the detail (its close button, Escape, or the mobile Sheet's
+  // onOpenChange(false)) can unmount the panel that held focus. Focus then
+  // returns to the shown result's card, the one marked current while the
+  // detail is open, without scrolling the list away from where its centring
+  // left it. Focus outside the detail, such as on a card where Escape was
+  // pressed, stays where it is.
   function closeDetail(): void {
+    const focused = document.activeElement;
+    const focusInDetail =
+      focused !== null &&
+      [asideRef.current, sheetRef.current].some(
+        (panel) => panel?.contains(focused) === true,
+      );
+    const shownCard =
+      resultsRef.current?.querySelector<HTMLElement>(
+        'button[aria-current="true"]',
+      ) ?? null;
     onCloseDetail();
     requestAnimationFrame(() => {
-      headingRef.current?.focus({ preventScroll: true });
+      const active = document.activeElement;
+      const fellToBody = active === null || active === document.body;
+      if (!focusInDetail && !fellToBody) return;
+      const target =
+        shownCard?.isConnected === true ? shownCard : headingRef.current;
+      target?.focus({ preventScroll: true });
     });
   }
 
@@ -195,6 +214,7 @@ export function ResultsWorkspace({
       )}
     >
       <section
+        ref={resultsRef}
         aria-labelledby="results-heading"
         className="order-2 flex min-h-0 flex-col border-t border-border bg-linen lg:order-none lg:border-t-0 lg:border-r"
       >
@@ -310,6 +330,7 @@ export function ResultsWorkspace({
 
       {isLg && detailOpen && (
         <aside
+          ref={asideRef}
           aria-label={t('detailTitle', { rank })}
           className="absolute inset-y-3 right-3 z-20 flex w-[400px] min-h-0 xl:static xl:inset-auto xl:z-auto xl:w-auto"
         >
@@ -327,6 +348,7 @@ export function ResultsWorkspace({
           }}
         >
           <SheetContent
+            ref={sheetRef}
             side="bottom"
             showCloseButton={false}
             // why: replaces the primitive's same-variant h-auto, under which the detail's scroll area never scrolls

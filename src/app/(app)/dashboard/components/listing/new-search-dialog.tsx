@@ -19,6 +19,7 @@ import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
 import {
   isSearching,
   type ListingSearchResult,
+  linkMessage,
   searchMessage,
   useListingSearch,
 } from './use-listing-search';
@@ -42,6 +43,9 @@ export function NewSearchDialog({
     status: search.status,
     rejection: search.rejection,
   });
+  const linkInError =
+    linkMessage({ status: search.status, rejection: search.rejection })
+      ?.tone === 'error';
 
   // why: closing abandons the search in flight. Its answer must never replace
   // the results on screen, and the next opening starts from an empty field.
@@ -86,9 +90,7 @@ export function NewSearchDialog({
               }}
               placeholder={t('placeholder')}
               aria-label={t('heading')}
-              aria-invalid={
-                search.rejection !== null || search.status.kind === 'failed'
-              }
+              aria-invalid={linkInError}
               aria-describedby="new-search-status"
               className="h-9 flex-1"
             />

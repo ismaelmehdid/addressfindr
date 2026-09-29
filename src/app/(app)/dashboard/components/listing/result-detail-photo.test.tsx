@@ -54,6 +54,7 @@ afterEach(() => {
   });
   container.remove();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function render(
@@ -130,7 +131,7 @@ describe('ResultDetailPhoto', () => {
     const link = container.querySelector('a');
     expect(photo()?.src).toBe(STREET_VIEW_SRC);
     expect(link?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl(TRUSTED_POINT),
+      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: null }),
     );
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.textContent).toContain('Street View');
@@ -179,7 +180,7 @@ describe('ResultDetailPhoto', () => {
     );
     const outbound = opened.querySelector('a');
     expect(outbound?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl(TRUSTED_POINT),
+      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: PANORAMA }),
     );
     expect(outbound?.getAttribute('target')).toBe('_blank');
     expect(outbound?.textContent).toBe(
@@ -222,6 +223,44 @@ describe('ResultDetailPhoto', () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     await openPanorama();
+
+    expect(frame().getAttribute('src')).toBe(
+      streetViewEmbedUrl({
+        point: TRUSTED_POINT,
+        apiKey: EMBED_KEY,
+        panorama: null,
+      }),
+    );
+  });
+
+  // why: the lookup route can hang for its whole maxDuration, or for good on
+  // a stalled connection; past 5 s the frame opens on the outdoor search.
+  it('falls back to the outdoor panorama nearest the point when the lookup times out after 5 s', async () => {
+    const deadline = new AbortController();
+    const timeout = vi
+      .spyOn(AbortSignal, 'timeout')
+      .mockReturnValue(deadline.signal);
+    lookup.mockImplementation(
+      (_, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => {
+            reject(init.signal?.reason);
+          });
+        }),
+    );
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await openPanorama();
+    expect(timeout).toHaveBeenCalledExactlyOnceWith(5000);
+    expect(lookup.mock.calls[0]?.[1]?.signal).toBe(deadline.signal);
+    expect(openedDialog().querySelector('iframe')).toBeNull();
+
+    await act(async () => {
+      deadline.abort(new DOMException('timed out', 'TimeoutError'));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
 
     expect(frame().getAttribute('src')).toBe(
       streetViewEmbedUrl({

@@ -446,7 +446,7 @@ describe('New search dialog', () => {
     expect(dialogInput().getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('keeps the submit button focusable while the search runs', async () => {
+  it('keeps the submit button focusable while the search runs, and Escape on it abandons the search', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
@@ -467,6 +467,7 @@ describe('New search dialog', () => {
     await pressKey('Escape', button);
     expect(dialog()).toBeNull();
     await answer(EXTRACT, 200, listing(SECOND_URL));
+    expect(held).toHaveLength(0);
     expect(resultsColumn().textContent).toContain(FIRST_STREET);
   });
 

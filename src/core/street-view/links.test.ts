@@ -22,11 +22,29 @@ describe('streetViewImagePath', () => {
   });
 });
 
+const PANORAMA = { panoId: 'CAoSLEFGMVFpcE1', heading: 212 };
+
 describe('streetViewPanoramaUrl', () => {
   it('opens the interactive panorama at the point', () => {
-    const url = new URL(streetViewPanoramaUrl(LYON_3E));
+    const url = new URL(
+      streetViewPanoramaUrl({ point: LYON_3E, panorama: null }),
+    );
     expect(url.origin).toBe('https://www.google.com');
     expect(url.searchParams.get('map_action')).toBe('pano');
+    expect(url.searchParams.get('viewpoint')).toBe('45.757123,4.865200');
+    expect(url.searchParams.get('pano')).toBeNull();
+    expect(url.searchParams.get('heading')).toBeNull();
+  });
+
+  // why: `viewpoint` alone opens the capture closest to the point, which can
+  // be a photosphere; the id opens the one the photo shows.
+  it("opens the photo's panorama aimed at the point, the point as fallback", () => {
+    const url = new URL(
+      streetViewPanoramaUrl({ point: LYON_3E, panorama: PANORAMA }),
+    );
+    expect(url.searchParams.get('map_action')).toBe('pano');
+    expect(url.searchParams.get('pano')).toBe('CAoSLEFGMVFpcE1');
+    expect(url.searchParams.get('heading')).toBe('212');
     expect(url.searchParams.get('viewpoint')).toBe('45.757123,4.865200');
   });
 });
@@ -45,7 +63,7 @@ describe('streetViewEmbedUrl', () => {
       streetViewEmbedUrl({
         point: LYON_3E,
         apiKey: 'embed-key',
-        panorama: { panoId: 'CAoSLEFGMVFpcE1', heading: 212 },
+        panorama: PANORAMA,
       }),
     );
     expect(`${url.origin}${url.pathname}`).toBe(
@@ -54,7 +72,21 @@ describe('streetViewEmbedUrl', () => {
     expect(url.searchParams.get('key')).toBe('embed-key');
     expect(url.searchParams.get('pano')).toBe('CAoSLEFGMVFpcE1');
     expect(url.searchParams.get('heading')).toBe('212');
-    expect(url.searchParams.get('location')).toBeNull();
+  });
+
+  // why: Google only reads `location` when it cannot find the id, e.g. once
+  // the imagery is refreshed; the frame then searches the way the photo did.
+  it('keeps the outdoor search around the point as the fallback for a known panorama', () => {
+    const url = new URL(
+      streetViewEmbedUrl({
+        point: LYON_3E,
+        apiKey: 'embed-key',
+        panorama: PANORAMA,
+      }),
+    );
+    expect(url.searchParams.get('location')).toBe('45.757123,4.865200');
+    expect(url.searchParams.get('source')).toBe('outdoor');
+    expect(url.searchParams.get('radius')).toBe('50');
   });
 
   // why: the card photo only ever comes from an outdoor panorama within 50 m;

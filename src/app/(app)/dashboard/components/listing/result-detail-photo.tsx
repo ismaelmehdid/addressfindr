@@ -115,12 +115,14 @@ export function ResultDetailPhoto({
   }
 
   // why: without a browser embed key, the interactive panorama opens on
-  // Google Maps in a new tab rather than inside the app. The panel clips an
-  // outer focus ring and the positioned photo covers an inset outline, so the
-  // ring is a pseudo-element stacked above the photo.
+  // Google Maps in a new tab rather than inside the app, on the capture
+  // closest to the point: resolving the photo's own panorama would spend a
+  // lookup on every photo shown. The panel clips an outer focus ring and the
+  // positioned photo covers an inset outline, so the ring is a pseudo-element
+  // stacked above the photo.
   return (
     <a
-      href={streetViewPanoramaUrl(photo.point)}
+      href={streetViewPanoramaUrl({ point: photo.point, panorama: null })}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('detailStreetViewOpen')}
