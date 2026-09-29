@@ -1,12 +1,11 @@
 'use client';
 
-import { ChevronDown, Info, MapPin, MapPinOff, Search } from 'lucide-react';
+import { ChevronDown, Info, MapPin, MapPinOff } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useTranslations } from 'next-intl';
 import { useEffect, useRef } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import {
   Collapsible,
@@ -28,8 +27,10 @@ import { AddressCandidateList } from './address-candidate-list';
 import { AnalysedListingCard } from './analysed-listing-card';
 import { MapErrorBoundary } from './map-error-boundary';
 import { MissingListingFeedback } from './missing-listing-feedback';
+import { NewSearchDialog } from './new-search-dialog';
 import { ResultDetailPanel } from './result-detail-panel';
 import { useDetailShortcuts } from './use-detail-shortcuts';
+import type { ListingSearchResult } from './use-listing-search';
 import { useSearchFeedback } from './use-search-feedback';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
@@ -106,7 +107,7 @@ export function ResultsWorkspace({
   onSelect: (dpeNumber: string) => void;
   onCloseDetail: () => void;
   onMapFailure: () => void;
-  onNewSearch: () => void;
+  onNewSearch: (result: ListingSearchResult) => void;
 }) {
   const t = useTranslations('Listing');
   const isLg = useMediaQuery(LG_QUERY);
@@ -198,10 +199,7 @@ export function ResultsWorkspace({
       >
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-4 p-3">
-            <Button variant="outline" className="w-full" onClick={onNewSearch}>
-              <Search />
-              {t('resultsNewSearch')}
-            </Button>
+            <NewSearchDialog onFound={onNewSearch} />
             <AnalysedListingCard listing={listing} />
             <h2
               id="results-heading"
