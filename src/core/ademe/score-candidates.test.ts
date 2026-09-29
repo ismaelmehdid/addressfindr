@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_EXTRACTED_VALUES } from '@/core/listing/types';
+import {
+  EMPTY_EXTRACTED_VALUES,
+  type ExtractedValues,
+} from '@/core/listing/types';
 import {
   admitsOutsideCommune,
   rankCandidates,
   scoreCandidate,
 } from './score-candidates';
+import { scoreFromConfidence } from './score-scale';
 import type { DpeRecord } from './types';
 
 function record(over: Partial<DpeRecord> & { dpeNumber: string }): DpeRecord {
@@ -1154,5 +1158,155 @@ describe('scoreCandidate — listing map pin', () => {
       truncated: false,
     });
     expect(ranked.candidates[0]?.record.dpeNumber).toBe('zzz-under-pin');
+  });
+});
+
+describe('rankCandidates — results shown as 0/100', () => {
+  // why: every signal compared contradicts the listing, so the score clamps
+  // to zero while the row still carries discriminating evidence.
+  const CONTRADICTED = {
+    dpeClass: 'A',
+    gesClass: 'A',
+    dpeKwhM2Year: 40,
+    gesKgCo2M2Year: 2,
+    yearBuilt: 1850,
+  } as const;
+
+  // why: agreements and contradictions cancel out but for the weakest surface
+  // credit, 0.5 over 25 of weight, and a geocoding score of 0 applies the
+  // worst factor, 0.6: a confidence of 0.012, shown as 1/100.
+  const FAINT_LISTING = {
+    ...LISTING,
+    buildingFloors: 5,
+    annualEnergyCostMinEur: 1000,
+    annualEnergyCostMaxEur: 1020,
+    dpeDate: '2026-01-07',
+  };
+  const FAINT = {
+    surfaceM2: 70,
+    dpeClass: 'C',
+    gesClass: 'D',
+    dpeKwhM2Year: 208,
+    gesKgCo2M2Year: 50,
+    yearBuilt: 1992,
+    buildingFloors: 2,
+    annualEnergyCostEur: 1040,
+    establishedOn: '2026-02-01',
+    visitedOn: '2026-02-01',
+    geocodingScore: 0,
+  } as const;
+
+  function contradicted(dpeNumber: string, banId: string): DpeRecord {
+    return record({
+      dpeNumber,
+      banId,
+      address: `${dpeNumber} Rue Contraire 69003 Lyon`,
+      ...CONTRADICTED,
+    });
+  }
+
+  function shownScore(values: ExtractedValues, row: DpeRecord): number {
+    return scoreFromConfidence(
+      scoreCandidate({ values, record: row }).confidence,
+    );
+  }
+
+  it('never returns a candidate whose score reads 0/100', () => {
+    const zero = contradicted('zero', '69383_0007_00001');
+    expect(shownScore(LISTING, zero)).toBe(0);
+
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [
+        zero,
+        record({
+          dpeNumber: 'strong',
+          address: '2 Rue Forte 69003 Lyon',
+          banId: '69383_0007_00002',
+        }),
+      ],
+      truncated: false,
+    });
+
+    expect(ranked.candidates.map((c) => c.record.dpeNumber)).toEqual([
+      'strong',
+    ]);
+    expect(ranked.inspected).toBe(2);
+  });
+
+  it('keeps a candidate whose score reads 1/100', () => {
+    const faint = record({
+      dpeNumber: 'faint',
+      address: '3 Rue Faible 69003 Lyon',
+      banId: '69383_0007_00003',
+      ...FAINT,
+    });
+    expect(shownScore(FAINT_LISTING, faint)).toBe(1);
+
+    const ranked = rankCandidates({
+      values: FAINT_LISTING,
+      records: [faint],
+      truncated: false,
+    });
+
+    expect(ranked.candidates.map((c) => c.record.dpeNumber)).toEqual(['faint']);
+    expect(ranked.refusedFor).toBeNull();
+  });
+
+  // why: the rows were compared on discriminating evidence and it
+  // contradicted them all. That is no match, not a lack of evidence.
+  it('returns no address, without an evidence refusal, when every score reads 0/100', () => {
+    const zeros = Array.from({ length: 3 }, (_, i) =>
+      contradicted(`zero-${i}`, `69383_0008_0000${i}`),
+    );
+    expect(zeros.map((row) => shownScore(LISTING, row))).toEqual([0, 0, 0]);
+
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: zeros,
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBeNull();
+    expect(ranked.inspected).toBe(3);
+  });
+
+  it('still refuses for lack of evidence when no row carries any', () => {
+    const ranked = rankCandidates({
+      values: {
+        ...EMPTY_EXTRACTED_VALUES,
+        propertyType: 'apartment',
+        surfaceM2: 63,
+      },
+      records: [contradicted('mute', '69383_0008_00009')],
+      truncated: false,
+    });
+
+    expect(ranked.candidates).toEqual([]);
+    expect(ranked.refusedFor).toBe('insufficient-evidence');
+  });
+
+  it('never lets a 0/100 candidate take one of the returned slots', () => {
+    const zeros = Array.from({ length: 3 }, (_, i) =>
+      contradicted(`zero-${i}`, `69383_0009_0000${i}`),
+    );
+    const positives = Array.from({ length: 9 }, (_, i) =>
+      record({
+        dpeNumber: `kept-${i}`,
+        address: `${i} Rue Gardee 69003 Lyon`,
+        banId: `69383_0010_0000${i}`,
+      }),
+    );
+
+    const ranked = rankCandidates({
+      values: LISTING,
+      records: [...zeros, ...positives],
+      truncated: false,
+    });
+
+    expect(ranked.candidates.map((c) => c.record.dpeNumber).sort()).toEqual(
+      positives.map((row) => row.dpeNumber).sort(),
+    );
   });
 });
