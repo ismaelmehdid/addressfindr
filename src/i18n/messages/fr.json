@@ -119,8 +119,6 @@
     "detailStreetViewExplore": "Explorer le panorama Street View",
     "streetViewPanoramaLabel": "Street View · {address}",
     "streetViewPanoramaFrame": "Panorama Street View interactif",
-    "streetViewPanoramaOpenInMaps": "Ouvrir dans Google Maps<hidden> (nouvel onglet)</hidden>",
-    "streetViewPanoramaBack": "Retour à la photo",
     "detailDpe": "DPE <square>{letter}</square>",
     "detailGes": "GES <square>{letter}</square>",
     "detailFactAgrees": "Conforme à l’annonce",

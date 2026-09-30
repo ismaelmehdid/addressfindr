@@ -634,16 +634,18 @@ describe('ResultsWorkspace detail shortcuts', () => {
         setTimeout(resolve, 0);
       });
     });
-    const back = document.activeElement;
-    if (back === null) throw new Error('nothing focused');
-    expect(back.textContent).toBe('Retour à la photo');
+    const panorama = document.activeElement;
+    if (panorama === null) throw new Error('nothing focused');
+    expect(panorama.getAttribute('aria-label')).toBe(
+      `Street View · ${FIRST.record.address}`,
+    );
 
-    pressKey('ArrowRight', back);
-    pressKey('ArrowLeft', back);
+    pressKey('ArrowRight', panorama);
+    pressKey('ArrowLeft', panorama);
 
     expect(detailHeader().querySelector('p')?.textContent).toBe('Résultat 1');
     expect(container.querySelector('aside iframe')).not.toBeNull();
-    expect(document.activeElement).toBe(back);
+    expect(document.activeElement).toBe(panorama);
   });
 });
 
@@ -749,12 +751,14 @@ describe('ResultsWorkspace detail sheet below lg', () => {
         setTimeout(resolve, 0);
       });
     });
-    const back = document.activeElement;
-    expect(back?.textContent).toBe('Retour à la photo');
+    const panorama = document.activeElement;
+    expect(panorama?.getAttribute('aria-label')).toBe(
+      `Street View · ${shown.record.address}`,
+    );
     expect(sheetContent().querySelector('iframe')).not.toBeNull();
 
     await act(async () => {
-      back?.dispatchEvent(
+      panorama?.dispatchEvent(
         new KeyboardEvent('keydown', {
           key: 'Escape',
           bubbles: true,

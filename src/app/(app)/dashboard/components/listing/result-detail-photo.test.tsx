@@ -102,16 +102,16 @@ function frame(): HTMLIFrameElement {
   return element;
 }
 
-function backButton(): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')].find(
-    (candidate) => candidate.textContent === 'Retour à la photo',
-  );
-  if (button === undefined) throw new Error('no back button');
-  return button;
+function panorama(): HTMLElement {
+  const group = container.querySelector<HTMLElement>('[role="group"]');
+  if (group === null) throw new Error('no panorama shown');
+  return group;
 }
 
-function openInMaps(): HTMLAnchorElement | null {
-  return container.querySelector('a');
+function photoArea(): HTMLElement {
+  const area = container.firstElementChild;
+  if (!(area instanceof HTMLElement)) throw new Error('no photo area');
+  return area;
 }
 
 function pressEscape(target: Element): KeyboardEvent {
@@ -194,7 +194,7 @@ describe('ResultDetailPhoto', () => {
   it('swaps the photo for the interactive panorama in place with an embed key', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
-    expect(openInMaps()).toBeNull();
+    expect(container.querySelector('a')).toBeNull();
     expect(panoramaTrigger()?.textContent).toBe('');
     expect(container.textContent).toContain('Explorer le panorama');
     expect(container.querySelector('iframe')).toBeNull();
@@ -202,9 +202,9 @@ describe('ResultDetailPhoto', () => {
     await explore();
 
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(
-      container.querySelector('[role="group"]')?.getAttribute('aria-label'),
-    ).toBe(`Street View · ${RECORD.address}`);
+    expect(panorama().getAttribute('aria-label')).toBe(
+      `Street View · ${RECORD.address}`,
+    );
     expect(photo()).toBeNull();
     expect(panoramaTrigger()).toBeNull();
     expect(frame().getAttribute('title')).toBe(
@@ -215,31 +215,39 @@ describe('ResultDetailPhoto', () => {
     expect(frame().getAttribute('referrerpolicy')).toBe(
       'strict-origin-when-cross-origin',
     );
-    expect(document.activeElement).toBe(backButton());
-    expect(openInMaps()?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: PANORAMA }),
-    );
-    expect(openInMaps()?.getAttribute('target')).toBe('_blank');
-    expect(openInMaps()?.textContent).toBe(
-      'Ouvrir dans Google Maps (nouvel onglet)',
-    );
   });
 
   // why: the embed lays its own controls along its edges, more of them on a
-  // phone (motion tracking, compass, zoom); ours sit in a bar outside the
-  // frame, so they can never cover one.
-  it('keeps its own controls out of the panorama frame', async () => {
+  // phone (motion tracking, compass, zoom); nothing of ours is drawn beside
+  // or over them, and the panorama keeps the photo's size.
+  it('fills the photo area with the panorama frame alone', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    const photoClasses = photoArea().className.split(/\s+/);
+
+    await explore();
+
+    expect(photoArea()).toBe(panorama());
+    expect([...panorama().children]).toEqual([frame()]);
+    expect(
+      container.querySelectorAll('button, a, [tabindex="0"]'),
+    ).toHaveLength(0);
+    expect(panorama().className.split(/\s+/)).toEqual(
+      expect.arrayContaining(photoClasses),
+    );
+    expect(container.textContent).toBe('');
+  });
+
+  // why: the photo's trigger unmounts as the panorama replaces it, which
+  // would drop keyboard focus to <body>; the panorama itself takes it, so
+  // Escape and the arrow keys reach it at once.
+  it('moves focus onto the panorama when exploring starts', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     await explore();
 
-    const frameArea = frame().parentElement;
-    expect([...(frameArea?.children ?? [])]).toEqual([frame()]);
-    expect(frameArea?.contains(backButton())).toBe(false);
-    expect(frameArea?.contains(openInMaps())).toBe(false);
-    expect(
-      container.querySelector('[role="group"]')?.contains(backButton()),
-    ).toBe(true);
+    expect(document.activeElement).toBe(panorama());
+    expect(panorama().tabIndex).toBe(-1);
+    expect(panorama().classList).toContain('outline-none');
   });
 
   // why: the screenshot is the panorama nearest the point, aimed at it; the
@@ -285,9 +293,6 @@ describe('ResultDetailPhoto', () => {
         panorama: null,
       }),
     );
-    expect(openInMaps()?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: null }),
-    );
   });
 
   // why: the lookup route can hang for its whole maxDuration, or for good on
@@ -328,28 +333,30 @@ describe('ResultDetailPhoto', () => {
     );
   });
 
-  it('shows a placeholder and only the way back while the panorama is being located', async () => {
+  it('shows only a placeholder while the panorama is being located', async () => {
     lookup.mockImplementation(() => new Promise<Response>(() => {}));
     render({ streetViewEmbedKey: EMBED_KEY });
 
     await explore();
 
     expect(container.querySelector('iframe')).toBeNull();
-    expect(container.querySelector('[data-slot="skeleton"]')).not.toBeNull();
+    expect([...panorama().children]).toEqual([
+      container.querySelector('[data-slot="skeleton"]'),
+    ]);
     expect(photo()).toBeNull();
-    expect(openInMaps()).toBeNull();
-    expect(document.activeElement).toBe(backButton());
+    expect(container.querySelectorAll('button, a')).toHaveLength(0);
+    expect(document.activeElement).toBe(panorama());
   });
 
-  it('brings the photo back from its back button, focus on the photo', async () => {
+  it('brings the photo back on Escape while the panorama is being located', async () => {
+    lookup.mockImplementation(() => new Promise<Response>(() => {}));
     render({ streetViewEmbedKey: EMBED_KEY });
     await explore();
 
-    act(() => {
-      backButton().click();
-    });
+    const keydown = pressEscape(panorama());
 
-    expect(container.querySelector('iframe')).toBeNull();
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(container.querySelector('[role="group"]')).toBeNull();
     expect(photo()?.src).toBe(STREET_VIEW_SRC);
     expect(document.activeElement).toBe(panoramaTrigger());
   });
@@ -358,7 +365,7 @@ describe('ResultDetailPhoto', () => {
     render({ streetViewEmbedKey: EMBED_KEY });
     await explore();
 
-    const keydown = pressEscape(backButton());
+    const keydown = pressEscape(panorama());
 
     expect(keydown.defaultPrevented).toBe(true);
     expect(container.querySelector('iframe')).toBeNull();
@@ -377,9 +384,7 @@ describe('ResultDetailPhoto', () => {
   it('explores the same panorama again without a second lookup', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
     await explore();
-    act(() => {
-      backButton().click();
-    });
+    pressEscape(panorama());
 
     await explore();
 
@@ -391,7 +396,7 @@ describe('ResultDetailPhoto', () => {
         panorama: PANORAMA,
       }),
     );
-    expect(document.activeElement).toBe(backButton());
+    expect(document.activeElement).toBe(panorama());
   });
 
   it('never offers the panorama on the orthophoto', () => {
