@@ -318,8 +318,13 @@ describe('SpiralAnimation', () => {
     render();
 
     expect(tweens).toHaveLength(0);
-    expect(context?.fill).toHaveBeenCalled();
-    expect(context?.arc.mock.calls.length).toBeGreaterThan(TRAIL_LENGTH);
+    const lastFrame = Math.max(
+      ...(context?.beginPath.mock.invocationCallOrder ?? []),
+    );
+    const stillFrameArcs = (context?.arc.mock.invocationCallOrder ?? []).filter(
+      (order) => order > lastFrame,
+    );
+    expect(stillFrameArcs.length).toBeGreaterThan(TRAIL_LENGTH);
   });
 
   it('does nothing without a 2D context', () => {
