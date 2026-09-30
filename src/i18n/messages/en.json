@@ -85,7 +85,7 @@
     "streetViewAlt": "Street View toward {address}",
     "resultsNewSearch": "New search",
     "newSearchTitle": "New search",
-    "newSearchDescription": "Paste the link of another listing. The current results stay on screen until the new ones are found.",
+    "newSearchDescription": "Paste the link of another listing. The current results are kept if no address is found.",
     "newSearchClose": "Close",
     "listingAnalysedLabel": "Analysed listing",
     "listingUntitled": "Listing",

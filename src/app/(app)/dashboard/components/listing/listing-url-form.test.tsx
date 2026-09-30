@@ -253,6 +253,15 @@ function dialogStatus(): string {
   return openDialog().querySelector('[aria-live="polite"]')?.textContent ?? '';
 }
 
+function newSearchDialog(): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
+      (element) =>
+        element.textContent?.includes(messages.Listing.newSearchTitle),
+    ) ?? null
+  );
+}
+
 function progressOverlay(): HTMLElement | null {
   return (
     [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
@@ -403,27 +412,17 @@ describe('New search dialog', () => {
     expect(resultsColumn().textContent).toContain(FIRST_STREET);
   });
 
-  it('keeps the results on screen and shows progress while the search runs', async () => {
+  it('steps aside for the search progress while the results stay behind it', async () => {
     await showFirstResult();
     await pressNewSearch();
 
     await searchInDialog(SECOND_URL);
     expect(progressStep()).toBe(messages.Listing.analyzing);
-    expect(dialogStatus()).toBe('');
-    expect(
-      openDialog()
-        .querySelector('button[type="submit"]')
-        ?.hasAttribute('data-loading'),
-    ).toBe(true);
+    expect(newSearchDialog()).toBeNull();
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
     expect(progressStep()).toBe(messages.Listing.addressSearching);
-    expect(dialogStatus()).toBe('');
-    expect(
-      openDialog()
-        .querySelector('button[type="submit"]')
-        ?.hasAttribute('data-loading'),
-    ).toBe(true);
+    expect(newSearchDialog()).toBeNull();
     expect(resultsColumn().textContent).toContain(FIRST_STREET);
   });
 
@@ -477,23 +476,20 @@ describe('New search dialog', () => {
     expect(resultsColumn().textContent).toContain(SECOND_STREET);
   });
 
-  // why: a link corrected while its search runs is the one the user wants;
-  // the old search must neither block it nor answer in its place.
-  it('abandons the search in flight when the link is edited, so the edited link is searched at once', async () => {
+  // why: a mistyped link is corrected by cancelling its search; the old
+  // search must neither block the corrected one nor answer in its place.
+  it('searches a link corrected after cancelling, and never shows the cancelled answer', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(MISTYPED_URL);
 
-    typeInto(dialogInput(), SECOND_URL);
-    expect(dialogStatus()).toBe('');
-    expect(submitLoading(openDialog())).toBe(false);
-
-    await submit(openDialog());
+    await cancelSearch();
+    expect(dialogInput().value).toBe(MISTYPED_URL);
+    await searchInDialog(SECOND_URL);
     expect(held.map((request) => request.body)).toEqual([
       { url: MISTYPED_URL },
       { url: SECOND_URL },
     ]);
-    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(MISTYPED_URL));
     expect(held.map((request) => request.body)).toEqual([{ url: SECOND_URL }]);
@@ -503,21 +499,6 @@ describe('New search dialog', () => {
     await answer(MATCH, 200, SECOND_MATCH);
     expect(dialog()).toBeNull();
     expect(resultsColumn().textContent).toContain(SECOND_STREET);
-  });
-
-  it('never shows the answer of a search abandoned by editing the link while it matches', async () => {
-    await showFirstResult();
-    await pressNewSearch();
-    await searchInDialog(MISTYPED_URL);
-    await answer(EXTRACT, 200, listing(MISTYPED_URL));
-
-    typeInto(dialogInput(), SECOND_URL);
-    await answer(MATCH, 200, SECOND_MATCH);
-
-    expect(dialogStatus()).toBe('');
-    expect(dialogInput().value).toBe(SECOND_URL);
-    expect(resultsColumn().textContent).toContain(FIRST_STREET);
-    expect(resultsColumn().textContent).not.toContain(SECOND_STREET);
   });
 
   it.each(
@@ -531,32 +512,6 @@ describe('New search dialog', () => {
 
     expect(dialogStatus()).toBe('');
     expect(dialogInput().getAttribute('aria-invalid')).toBe('false');
-  });
-
-  it('keeps the submit button focusable while the search runs, and Escape on it abandons only the search', async () => {
-    await showFirstResult();
-    await pressNewSearch();
-    await searchInDialog(SECOND_URL);
-
-    const button = openDialog().querySelector<HTMLButtonElement>(
-      'button[type="submit"]',
-    );
-    if (button === null) throw new Error('no submit button');
-    expect(button.hasAttribute('disabled')).toBe(false);
-    expect(button.getAttribute('aria-disabled')).toBe('true');
-
-    await submit(openDialog());
-    expect(held.filter((request) => request.path === EXTRACT)).toHaveLength(1);
-
-    act(() => {
-      button.focus();
-    });
-    await pressKey('Escape', button);
-    expect(progressOverlay()).toBeNull();
-    expect(dialogInput().value).toBe(SECOND_URL);
-    await answer(EXTRACT, 200, listing(SECOND_URL));
-    expect(held).toHaveLength(0);
-    expect(resultsColumn().textContent).toContain(FIRST_STREET);
   });
 
   // why: focus can fall to <body> inside the dialog; a key pressed there is
@@ -578,7 +533,7 @@ describe('New search dialog', () => {
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
 
-    await pressKey('Escape', dialogInput());
+    await pressKey('Escape', openProgressOverlay());
     expect(progressOverlay()).toBeNull();
     expect(dialogInput().value).toBe(SECOND_URL);
     expect(dialogStatus()).toBe('');
@@ -592,7 +547,7 @@ describe('New search dialog', () => {
     expect(dialog()).toBeNull();
   });
 
-  it('covers the dialog with the search progress, and cancelling keeps the dialog open with its link', async () => {
+  it('cancelling the search brings the dialog back with its link, focused', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
@@ -602,8 +557,12 @@ describe('New search dialog', () => {
     expect(progressStep()).toBe(messages.Listing.addressSearching);
 
     await cancelSearch();
+    await act(async () => {
+      await nextFrame();
+    });
     expect(progressOverlay()).toBeNull();
     expect(dialogInput().value).toBe(SECOND_URL);
+    expect(document.activeElement).toBe(dialogInput());
     expect(dialogStatus()).toBe('');
     expect(submitLoading(openDialog())).toBe(false);
 
@@ -612,11 +571,12 @@ describe('New search dialog', () => {
     expect(resultsColumn().textContent).not.toContain(SECOND_STREET);
   });
 
-  it('ignores the answer of a search closed while matching, and reopens empty', async () => {
+  it('ignores the answer of a search cancelled while matching, and reopens empty once closed', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
     await answer(EXTRACT, 200, listing(SECOND_URL));
+    await cancelSearch();
 
     const close = closeButton();
     await act(async () => {
@@ -662,6 +622,7 @@ describe('Home search form', () => {
     typeInto(homeInput(), FIRST_URL);
     await submit(container);
     expect(progressStep()).toBe(messages.Listing.analyzing);
+    expect(homeForm().className).toContain('opacity-0');
     expect(container.textContent).not.toContain(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(FIRST_URL));
@@ -740,11 +701,18 @@ describe('Home search form', () => {
 
     await answer(EXTRACT, 422, { error: 'validation' });
     expect(progressOverlay()).toBeNull();
+    expect(homeForm().className).not.toContain('opacity-0');
     expect(container.textContent).toContain(
       messages.Listing.errorNotExtractable,
     );
     expect(document.activeElement).toBe(homeInput());
   });
+
+  function homeForm(): HTMLElement {
+    const form = container.querySelector('h1')?.parentElement;
+    if (form == null) throw new Error('no home form');
+    return form;
+  }
 
   function homeInput(): HTMLInputElement {
     const input = container.querySelector('input');

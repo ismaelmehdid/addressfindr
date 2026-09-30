@@ -55,11 +55,15 @@ export function SearchProgressOverlay({
         // why: focus on the popup, not on Cancel, so an Enter pressed again
         // right after submitting does not abandon the search.
         initialFocus={popupRef}
-        // why: after a search that found addresses the field is gone (or its
-        // dialog is closing) and the results heading takes focus; focus goes
-        // back to the field only when it is still there to correct the link.
+        // why: after a search that found addresses the home field is gone and
+        // the results heading takes focus, and a new search's dialog reopens
+        // on its own field; focus goes back to the home field only when it is
+        // still there to correct the link.
         finalFocus={() => returnFocusTo() ?? false}
-        className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col items-center justify-end gap-0 overflow-hidden rounded-none bg-charcoal-deep p-0 text-linen ring-0 duration-300 data-closed:duration-100 sm:max-w-none"
+        // why: the page's own background, with no dimmed or blurred backdrop,
+        // so the search fades in and out without the screen changing colour.
+        overlayClassName="bg-transparent supports-backdrop-filter:backdrop-blur-none"
+        className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col items-center justify-end gap-0 overflow-hidden rounded-none bg-linen p-0 text-ink ring-0 duration-300 sm:max-w-none"
       >
         <SpiralAnimation className="absolute inset-0" />
         <div className="relative flex flex-col items-center gap-5 px-4 pb-[max(3rem,env(safe-area-inset-bottom))] text-center">
@@ -68,19 +72,11 @@ export function SearchProgressOverlay({
           </DialogTitle>
           <DialogDescription
             aria-live="polite"
-            className="text-[13px] font-medium uppercase tracking-[0.2em] text-linen/80 motion-safe:animate-pulse"
+            className="text-[13px] font-medium uppercase tracking-[0.2em] text-graphite motion-safe:animate-pulse"
           >
             {t(shownStep)}
           </DialogDescription>
-          <DialogClose
-            render={
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-linen/70 hover:bg-linen/10 hover:text-linen focus-visible:border-linen/40 focus-visible:ring-linen/20"
-              />
-            }
-          >
+          <DialogClose render={<Button variant="ghost" size="sm" />}>
             {t('searchCancel')}
           </DialogClose>
         </div>
