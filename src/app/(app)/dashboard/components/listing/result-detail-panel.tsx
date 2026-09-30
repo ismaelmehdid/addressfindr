@@ -28,11 +28,9 @@ import type {
   HeatingEnergy,
 } from '@/core/listing/types';
 import { cn } from '@/lib/utils';
-import { ConfirmListingButton } from './confirm-listing-button';
 import { ResultDetailPhoto } from './result-detail-photo';
 import { SCORE_LABEL_KEY, scoreStyle } from './score-style';
 import { useCopyAddress } from './use-copy-address';
-import type { SearchFeedback } from './use-search-feedback';
 import { VerifyElsewhere } from './verify-elsewhere';
 
 type LetterColour = { background: string; letter: 'ink' | 'white' };
@@ -93,7 +91,6 @@ export function ResultDetailPanel({
   streetViewEnabled,
   streetViewEmbedKey,
   listing,
-  feedback,
 }: {
   candidate: AddressCandidate;
   rank: number;
@@ -101,7 +98,6 @@ export function ResultDetailPanel({
   streetViewEnabled: boolean;
   streetViewEmbedKey: string;
   listing: DetailListing;
-  feedback: SearchFeedback;
 }) {
   const t = useTranslations('Listing');
 
@@ -135,7 +131,6 @@ export function ResultDetailPanel({
         candidate={candidate}
         rank={rank}
         listing={listing}
-        feedback={feedback}
       />
     </div>
   );
@@ -175,12 +170,10 @@ function ResultDetailBody({
   candidate,
   rank,
   listing,
-  feedback,
 }: {
   candidate: AddressCandidate;
   rank: number;
   listing: DetailListing;
-  feedback: SearchFeedback;
 }) {
   const t = useTranslations('Listing');
   const format = useFormatter();
@@ -370,10 +363,6 @@ function ResultDetailBody({
           </div>
         )}
         <VerifyElsewhere record={record} />
-        <ConfirmListingButton
-          feedback={feedback}
-          dpeNumber={record.dpeNumber}
-        />
       </div>
     </ScrollArea>
   );

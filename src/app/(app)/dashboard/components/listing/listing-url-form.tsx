@@ -20,7 +20,7 @@ import {
 } from './use-listing-search';
 
 // why: numbered per search, so the results workspace remounts for each one
-// and nothing of the previous listing (selection, verdict, map) carries over.
+// and nothing of the previous listing (selection, map) carries over.
 type ShownResult = ListingSearchResult & { search: number };
 
 type Selection = { dpeNumber: string | null; request: number };

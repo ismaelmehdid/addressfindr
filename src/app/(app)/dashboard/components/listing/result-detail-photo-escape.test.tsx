@@ -64,17 +64,9 @@ async function explore(): Promise<Element> {
       setTimeout(resolve, 0);
     });
   });
-  const back = [...document.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Retour à la photo',
-  );
-  if (back === undefined) throw new Error('no panorama shown');
-  return back;
-}
-
-function openInMaps(): HTMLAnchorElement {
-  const link = document.querySelector<HTMLAnchorElement>('a[target="_blank"]');
-  if (link === null) throw new Error('no Google Maps link');
-  return link;
+  const panorama = document.querySelector('[role="group"]');
+  if (panorama === null) throw new Error('no panorama shown');
+  return panorama;
 }
 
 // why: Next.js mounts React on `document`, where the detail shortcuts listen
@@ -116,11 +108,11 @@ it('leaves the panorama on Escape without closing the detail, which the next Esc
   const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
   await mountOnDocument(shortcuts);
 
-  const back = await explore();
-  expect(document.activeElement).toBe(back);
+  const panorama = await explore();
+  expect(document.activeElement).toBe(panorama);
   expect(document.querySelector('iframe')).not.toBeNull();
 
-  await press(back, 'Escape');
+  await press(panorama, 'Escape');
   expect(shortcuts.onClose).not.toHaveBeenCalled();
   expect(document.querySelector('iframe')).toBeNull();
   expect(document.activeElement).toBe(panoramaTrigger());
@@ -137,31 +129,24 @@ it('keeps the arrow keys from paging the results while the panorama is explored'
   const shortcuts = { onClose: vi.fn(), onPrevious: vi.fn(), onNext: vi.fn() };
   await mountOnDocument(shortcuts);
 
-  const back = await explore();
+  const panorama = await explore();
   const claimed = [
-    await press(back, 'ArrowLeft'),
-    await press(back, 'ArrowRight'),
-    await press(openInMaps(), 'ArrowLeft'),
-    await press(openInMaps(), 'ArrowRight'),
+    await press(panorama, 'ArrowLeft'),
+    await press(panorama, 'ArrowRight'),
   ];
 
-  expect(claimed.map((event) => event.defaultPrevented)).toEqual([
-    true,
-    true,
-    true,
-    true,
-  ]);
+  expect(claimed.map((event) => event.defaultPrevented)).toEqual([true, true]);
   expect(shortcuts.onPrevious).not.toHaveBeenCalled();
   expect(shortcuts.onNext).not.toHaveBeenCalled();
   expect(document.querySelector('iframe')).not.toBeNull();
-  expect(document.activeElement).toBe(back);
+  expect(document.activeElement).toBe(panorama);
 
   // why: a modified arrow is no shortcut, and Alt+Left is the browser's Back.
   expect(
-    (await press(back, 'ArrowLeft', { altKey: true })).defaultPrevented,
+    (await press(panorama, 'ArrowLeft', { altKey: true })).defaultPrevented,
   ).toBe(false);
 
-  await press(back, 'Escape');
+  await press(panorama, 'Escape');
   await press(panoramaTrigger(), 'ArrowRight');
   expect(shortcuts.onNext).toHaveBeenCalledOnce();
 });

@@ -2,11 +2,11 @@
 
 import { type RefObject, useEffect, useRef } from 'react';
 
-// why: a control replaced by other content (a feedback control by its status
-// line once the server records it, the Street View photo by its panorama)
-// would drop keyboard focus to <body>. Focus moves to the new content, but
-// only after the user acted on this control: content that mounts again later
-// (paging back to a confirmed result) must not steal focus.
+// why: a control replaced by other content (the Street View photo by its
+// panorama, and the panorama by the photo) would drop keyboard focus to
+// <body>. Focus moves to the new content, but only after the user acted on
+// this control: content that mounts again later (the photo of the next
+// result shown) must not steal focus.
 export function useFocusWhenShown(
   targetRef: RefObject<HTMLElement | null>,
   shown: boolean,

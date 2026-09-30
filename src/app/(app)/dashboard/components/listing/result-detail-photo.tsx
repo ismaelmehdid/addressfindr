@@ -1,11 +1,10 @@
 'use client';
 
-import { ArrowLeft, ArrowUpRight, ImageOff, Rotate3d } from 'lucide-react';
+import { ArrowUpRight, ImageOff, Rotate3d } from 'lucide-react';
 import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { DpeRecord } from '@/core/ademe/types';
 import type { GeoPoint } from '@/core/geo/types';
@@ -19,9 +18,8 @@ import { useFocusWhenShown } from './use-focus-when-shown';
 import { useStreetViewPanorama } from './use-street-view-panorama';
 
 // why: in the 85svh mobile sheet a full 320px photo can leave the body no height.
-const PHOTO_HEIGHT_CLASS = 'h-[min(320px,40svh)] lg:h-[320px]';
-
-const PHOTO_AREA_CLASS = `relative block ${PHOTO_HEIGHT_CLASS} shrink-0 overflow-hidden border-b border-border bg-mist`;
+const PHOTO_AREA_CLASS =
+  'relative block h-[min(320px,40svh)] shrink-0 overflow-hidden border-b border-border bg-mist lg:h-[320px]';
 
 // why: a <button> may not hold the photo's block elements, so the panorama
 // trigger is an empty button laid over the photo; on top, it shows its own
@@ -29,12 +27,11 @@ const PHOTO_AREA_CLASS = `relative block ${PHOTO_HEIGHT_CLASS} shrink-0 overflow
 const PANORAMA_TRIGGER_CLASS =
   'absolute inset-0 z-10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-charcoal';
 
-// why: the embed draws its own controls along its edges, more of them on a
-// phone (motion tracking, compass, zoom) and placed by its own size. Ours sit
-// in a bar below the frame, which keeps the photo's size, so they can never
-// cover one. On the narrowest phones the bar wraps rather than overflow.
-const PANORAMA_BAR_CLASS =
-  'flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2.5 py-1.5';
+// why: the panel clips an outer focus ring and the positioned photo or frame
+// covers an inset outline, so the ring is a pseudo-element stacked above them;
+// it lets clicks through to the Street View frame beneath.
+const FOCUS_RING_ABOVE_CONTENT_CLASS =
+  'after:pointer-events-none after:absolute after:inset-0 after:z-10 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-charcoal';
 
 const BADGE_BOTTOM_RIGHT_CLASS = 'absolute right-2.5 bottom-2.5';
 
@@ -133,19 +130,14 @@ export function ResultDetailPhoto({
   // Google Maps in a new tab rather than inside the app, and the badge says
   // so instead of promising a panorama explored in place. It opens on the
   // capture closest to the point: resolving the photo's own panorama would
-  // spend a lookup on every photo shown. The panel clips an outer focus ring
-  // and the positioned photo covers an inset outline, so the ring is a
-  // pseudo-element stacked above the photo.
+  // spend a lookup on every photo shown.
   return (
     <a
-      href={streetViewPanoramaUrl({ point: photo.point, panorama: null })}
+      href={streetViewPanoramaUrl(photo.point)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('detailStreetViewOpen')}
-      className={cn(
-        PHOTO_AREA_CLASS,
-        'after:pointer-events-none after:absolute after:inset-0 after:z-10 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-charcoal',
-      )}
+      className={cn(PHOTO_AREA_CLASS, FOCUS_RING_ABOVE_CONTENT_CLASS)}
     >
       {image}
       {streetViewBadge}
@@ -157,10 +149,14 @@ export function ResultDetailPhoto({
   );
 }
 
-// why: the panorama replaces the photo in place, so exploring the street
-// never leaves the detail. It points at the photo's own trusted point, and
-// focus follows the swap both ways so a keyboard user is never dropped on
-// <body>.
+// why: the panorama replaces the photo in place and fills the photo area
+// alone, so exploring the street never leaves the detail and no control of
+// ours covers the embed's own. It points at the photo's own trusted point.
+// Focus moves onto the panorama so a keyboard user is never dropped on
+// <body>, and Escape there brings the photo back and refocuses it. That only
+// holds while focus is on the panorama itself: once the user clicks, drags or
+// tabs into Google's cross-origin frame, its keys never reach this page, and
+// the photo returns only when another result is picked or the detail closes.
 function ExplorableStreetView({
   point,
   address,
@@ -175,13 +171,13 @@ function ExplorableStreetView({
   const t = useTranslations('Listing');
   const [exploring, setExploring] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const backRef = useRef<HTMLButtonElement | null>(null);
-  const focusBackWhenShown = useFocusWhenShown(backRef, exploring);
+  const panoramaRef = useRef<HTMLDivElement | null>(null);
+  const focusPanoramaWhenShown = useFocusWhenShown(panoramaRef, exploring);
   const focusTriggerWhenShown = useFocusWhenShown(triggerRef, !exploring);
   const lookup = useStreetViewPanorama({ point, enabled: exploring });
 
   function startExploring(): void {
-    focusBackWhenShown();
+    focusPanoramaWhenShown();
     setExploring(true);
   }
 
@@ -224,51 +220,34 @@ function ExplorableStreetView({
 
   return (
     <div
+      ref={panoramaRef}
       role="group"
+      tabIndex={-1}
       aria-label={t('streetViewPanoramaLabel', { address })}
-      className="shrink-0 border-b border-border"
+      className={cn(
+        PHOTO_AREA_CLASS,
+        FOCUS_RING_ABOVE_CONTENT_CLASS,
+        'outline-none',
+      )}
       onKeyDown={claimKeys}
     >
-      <div
-        className={cn('relative overflow-hidden bg-mist', PHOTO_HEIGHT_CLASS)}
-      >
-        {lookup.kind === 'locating' ? (
-          <Skeleton className="absolute inset-0 rounded-none" />
-        ) : (
-          // why: the key is restricted by referrer, so Google must receive this origin.
-          <iframe
-            title={t('streetViewPanoramaFrame')}
-            src={streetViewEmbedUrl({
-              point,
-              apiKey,
-              panorama: lookup.panorama,
-            })}
-            allowFullScreen
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            className="absolute inset-0 size-full border-0"
-          />
-        )}
-      </div>
-      <div className={PANORAMA_BAR_CLASS}>
-        <Button ref={backRef} variant="ghost" size="sm" onClick={stopExploring}>
-          <ArrowLeft aria-hidden />
-          {t('streetViewPanoramaBack')}
-        </Button>
-        {lookup.kind === 'located' && (
-          <a
-            href={streetViewPanoramaUrl({ point, panorama: lookup.panorama })}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-          >
-            {t.rich('streetViewPanoramaOpenInMaps', {
-              hidden: (chunks) => <span className="sr-only">{chunks}</span>,
-            })}
-            <ArrowUpRight aria-hidden />
-          </a>
-        )}
-      </div>
+      {lookup.kind === 'locating' ? (
+        <Skeleton className="absolute inset-0 rounded-none" />
+      ) : (
+        // why: the key is restricted by referrer, so Google must receive this origin.
+        <iframe
+          title={t('streetViewPanoramaFrame')}
+          src={streetViewEmbedUrl({
+            point,
+            apiKey,
+            panorama: lookup.panorama,
+          })}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="strict-origin-when-cross-origin"
+          className="absolute inset-0 size-full border-0"
+        />
+      )}
     </div>
   );
 }
