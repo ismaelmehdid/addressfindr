@@ -409,7 +409,8 @@ describe('New search dialog', () => {
     await pressNewSearch();
 
     await searchInDialog(SECOND_URL);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
+    expect(dialogStatus()).toBe('');
     expect(
       openDialog()
         .querySelector('button[type="submit"]')
@@ -417,7 +418,8 @@ describe('New search dialog', () => {
     ).toBe(true);
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
-    expect(dialogStatus()).toBe(messages.Listing.addressSearching);
+    expect(progressStep()).toBe(messages.Listing.addressSearching);
+    expect(dialogStatus()).toBe('');
     expect(
       openDialog()
         .querySelector('button[type="submit"]')
@@ -492,11 +494,11 @@ describe('New search dialog', () => {
       { url: MISTYPED_URL },
       { url: SECOND_URL },
     ]);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(MISTYPED_URL));
     expect(held.map((request) => request.body)).toEqual([{ url: SECOND_URL }]);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
     await answer(MATCH, 200, SECOND_MATCH);
@@ -700,9 +702,13 @@ describe('Home search form', () => {
     typeInto(homeInput(), FIRST_URL);
     await submit(container);
     expect(progressStep()).toBe(messages.Listing.analyzing);
+    expect(container.textContent).not.toContain(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(FIRST_URL));
     expect(progressStep()).toBe(messages.Listing.addressSearching);
+    expect(container.textContent).not.toContain(
+      messages.Listing.addressSearching,
+    );
 
     await answer(MATCH, 200, FIRST_MATCH);
     expect(progressOverlay()).toBeNull();
@@ -721,7 +727,6 @@ describe('Home search form', () => {
     expect(progressOverlay()).toBeNull();
     expect(homeInput().value).toBe(FIRST_URL);
     expect(document.activeElement).toBe(homeInput());
-    expect(container.textContent).not.toContain(messages.Listing.analyzing);
     expect(submitLoading(container)).toBe(false);
 
     await answer(EXTRACT, 200, listing(FIRST_URL));
@@ -729,6 +734,43 @@ describe('Home search form', () => {
     expect(
       container.querySelector('section[aria-labelledby="results-heading"]'),
     ).toBeNull();
+  });
+
+  it('focuses the progress itself, so pressing Enter again does not cancel the search', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await act(async () => {
+      await nextFrame();
+    });
+
+    const overlay = openProgressOverlay();
+    expect(document.activeElement).toBe(overlay);
+    await pressKey('Enter', overlay);
+
+    expect(progressOverlay()).not.toBeNull();
+    expect(held.map((request) => request.path)).toEqual([EXTRACT]);
+  });
+
+  it('describes the field with the outcome when no address can be named', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+    await answer(MATCH, 200, {
+      candidates: [],
+      inspected: 30,
+      truncated: false,
+      refusedFor: 'insufficient-evidence',
+    });
+
+    expect(progressOverlay()).toBeNull();
+    expect(document.activeElement).toBe(homeInput());
+    const described = (homeInput().getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ');
+    expect(described).toContain(messages.Listing.addressInsufficientEvidence);
   });
 
   it('removes the search progress when the search fails, and explains under the link', async () => {
@@ -773,10 +815,10 @@ describe('Home search form', () => {
     await renderForm();
     typeInto(homeInput(), MISTYPED_URL);
     await submit(container);
-    expect(container.textContent).toContain(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     typeInto(homeInput(), SECOND_URL);
-    expect(container.textContent).not.toContain(messages.Listing.analyzing);
+    expect(progressOverlay()).toBeNull();
     expect(submitLoading(container)).toBe(false);
 
     await submit(container);
@@ -805,9 +847,7 @@ describe('Home search form', () => {
     expect(
       container.querySelector('section[aria-labelledby="results-heading"]'),
     ).toBeNull();
-    expect(container.textContent).not.toContain(
-      messages.Listing.addressSearching,
-    );
+    expect(progressOverlay()).toBeNull();
     expect(homeInput().value).toBe(SECOND_URL);
   });
 

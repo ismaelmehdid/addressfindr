@@ -52,16 +52,49 @@ function clamp01(value: number): number {
   return Math.min(Math.max(value, 0), 1);
 }
 
-function remap(
-  value: number,
-  from: [number, number],
-  to: [number, number],
-): number {
+type Range = [number, number];
+
+function remap({
+  value,
+  from,
+  to,
+}: {
+  value: number;
+  from: Range;
+  to: Range;
+}): number {
   return to[0] + (to[1] - to[0]) * ((value - from[0]) / (from[1] - from[0]));
 }
 
-function lerp(start: number, end: number, t: number): number {
-  return start * (1 - t) + end * t;
+function lerp({
+  from,
+  to,
+  t,
+}: {
+  from: number;
+  to: number;
+  t: number;
+}): number {
+  return from * (1 - t) + to * t;
+}
+
+function lerpPoint({
+  from,
+  to,
+  t,
+}: {
+  from: Point;
+  to: Point;
+  t: number;
+}): Point {
+  return {
+    x: lerp({ from: from.x, to: to.x, t }),
+    y: lerp({ from: from.y, to: to.y, t }),
+  };
+}
+
+function offset(point: Point, { dx, dy }: { dx: number; dy: number }): Point {
+  return { x: point.x + dx, y: point.y + dy };
 }
 
 function ease(p: number, g: number): number {
@@ -126,11 +159,11 @@ function createStars(): Star[] {
     const rotationDirection = random() > 0.5 ? 1 : -1;
     const expansionRate = 1.2 + random() * 0.8;
     const spiralLocation = (1 - (1 - random()) ** 3) / 1.3;
-    const depth = lerp(
-      0.5 * CAMERA_Z,
-      CAMERA_TRAVEL_DISTANCE + CAMERA_Z,
-      random(),
-    );
+    const depth = lerp({
+      from: 0.5 * CAMERA_Z,
+      to: CAMERA_TRAVEL_DISTANCE + CAMERA_Z,
+      t: random(),
+    });
     return {
       spiral: spiralPath(spiralLocation),
       spiralLocation,
@@ -140,47 +173,43 @@ function createStars(): Star[] {
       dy: distance * Math.sin(angle),
       rotationDirection,
       expansionRate,
-      z: lerp(depth, CAMERA_TRAVEL_DISTANCE / 2, 0.3 * spiralLocation),
+      z: lerp({
+        from: depth,
+        to: CAMERA_TRAVEL_DISTANCE / 2,
+        t: 0.3 * spiralLocation,
+      }),
     };
   });
 }
 
 function starScreenPosition(star: Star, progress: number): Point {
   const { spiral, dx, dy } = star;
+  const near = offset(spiral, { dx: dx * 0.3, dy: dy * 0.3 });
+  const far = offset(spiral, { dx: dx * 0.7, dy: dy * 0.7 });
   if (progress < 0.3) {
-    const t = lerp(progress, progress ** 2, progress / 0.3) / 0.3;
-    return {
-      x: lerp(spiral.x, spiral.x + dx * 0.3, t),
-      y: lerp(spiral.y, spiral.y + dy * 0.3, t),
-    };
+    const eased = lerp({
+      from: progress,
+      to: progress ** 2,
+      t: progress / 0.3,
+    });
+    return lerpPoint({ from: spiral, to: near, t: eased / 0.3 });
   }
   if (progress < 0.7) {
     const t = (progress - 0.3) / 0.4;
     const curve = Math.sin(t * Math.PI) * star.rotationDirection * 1.5;
-    return {
-      x:
-        lerp(spiral.x + dx * 0.3, spiral.x + dx * 0.7, t) -
-        dy * 0.4 * curve * t,
-      y:
-        lerp(spiral.y + dy * 0.3, spiral.y + dy * 0.7, t) +
-        dx * 0.4 * curve * t,
-    };
+    return offset(lerpPoint({ from: near, to: far, t }), {
+      dx: -dy * 0.4 * curve * t,
+      dy: dx * 0.4 * curve * t,
+    });
   }
   const t = (progress - 0.7) / 0.3;
   const targetDistance = star.distance * star.expansionRate * 1.5;
   const angle = star.angle + 1.2 * star.rotationDirection * t * Math.PI;
-  return {
-    x: lerp(
-      spiral.x + dx * 0.7,
-      spiral.x + targetDistance * Math.cos(angle),
-      t,
-    ),
-    y: lerp(
-      spiral.y + dy * 0.7,
-      spiral.y + targetDistance * Math.sin(angle),
-      t,
-    ),
-  };
+  const target = offset(spiral, {
+    dx: targetDistance * Math.cos(angle),
+    dy: targetDistance * Math.sin(angle),
+  });
+  return lerpPoint({ from: far, to: target, t });
 }
 
 function traceDot(
@@ -210,12 +239,16 @@ function traceTrail(
 ): void {
   const wobble = Math.sin(time * Math.PI * 2) * 0.5 + 0.5;
   for (let i = 0; i < TRAIL_LENGTH; i++) {
-    const falloff = remap(i, [0, TRAIL_LENGTH], [1.1, 0.1]);
+    const falloff = remap({
+      value: i,
+      from: [0, TRAIL_LENGTH],
+      to: [1.1, 0.1],
+    });
     const width = (1.3 * (1 - t1) + 3.0 * Math.sin(Math.PI * t1)) * falloff;
     const position = spiralPath(t1 - 0.00015 * i);
     const rotated = rotateAboutMidpoint({
       from: position,
-      to: { x: position.x + 5, y: position.y + 5 },
+      to: offset(position, { dx: 5, dy: 5 }),
       progress: wobble,
       clockwise: i % 2 === 0,
     });
@@ -223,14 +256,22 @@ function traceTrail(
   }
 }
 
-function drawFrame(
-  ctx: CanvasRenderingContext2D,
-  frame: Frame,
-  stars: Star[],
-): void {
+function drawFrame({
+  ctx,
+  frame,
+  stars,
+}: {
+  ctx: CanvasRenderingContext2D;
+  frame: Frame;
+  stars: Star[];
+}): void {
   const { time, width, height } = frame;
-  const t1 = clamp01(remap(time, [0, CHANGE_EVENT_TIME + 0.25], [0, 1]));
-  const t2 = clamp01(remap(time, [CHANGE_EVENT_TIME, 1], [0, 1]));
+  const t1 = clamp01(
+    remap({ value: time, from: [0, CHANGE_EVENT_TIME + 0.25], to: [0, 1] }),
+  );
+  const t2 = clamp01(
+    remap({ value: time, from: [CHANGE_EVENT_TIME, 1], to: [0, 1] }),
+  );
   const cameraZ = CAMERA_Z + ease(t2 ** 1.2, 1.8) * CAMERA_TRAVEL_DISTANCE;
 
   ctx.clearRect(0, 0, width, height);
@@ -284,11 +325,14 @@ export function SpiralAnimation({ className }: { className?: string }) {
       color: getComputedStyle(canvas).color,
     };
     const draw = (): void => {
-      drawFrame(ctx, frame, stars);
+      drawFrame({ ctx, frame, stars });
     };
 
+    // why: layout sizes, not getBoundingClientRect, which includes the
+    // transform of the dialog's zoom-in and would size the buffer 5% short.
     const resize = (): void => {
-      const { width, height } = container.getBoundingClientRect();
+      const width = container.clientWidth;
+      const height = container.clientHeight;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.round(width * dpr);
       canvas.height = Math.round(height * dpr);
@@ -301,6 +345,22 @@ export function SpiralAnimation({ className }: { className?: string }) {
     const observer = new ResizeObserver(resize);
     observer.observe(container);
     resize();
+
+    // why: moving the window to a screen of another pixel density changes the
+    // ratio without resizing the element, so no ResizeObserver entry fires.
+    let resolution: MediaQueryList | null = null;
+    const watchResolution = (): void => {
+      resolution?.removeEventListener('change', onResolutionChange);
+      resolution = window.matchMedia(
+        `(resolution: ${window.devicePixelRatio || 1}dppx)`,
+      );
+      resolution.addEventListener('change', onResolutionChange);
+    };
+    function onResolutionChange(): void {
+      resize();
+      watchResolution();
+    }
+    watchResolution();
 
     const reducedMotion = window.matchMedia(REDUCED_MOTION_QUERY);
     let tween: gsap.core.Tween | null = null;
@@ -325,6 +385,7 @@ export function SpiralAnimation({ className }: { className?: string }) {
     reducedMotion.addEventListener('change', applyMotionPreference);
 
     return () => {
+      resolution?.removeEventListener('change', onResolutionChange);
       reducedMotion.removeEventListener('change', applyMotionPreference);
       tween?.kill();
       observer.disconnect();

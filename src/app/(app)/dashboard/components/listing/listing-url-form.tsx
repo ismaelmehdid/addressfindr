@@ -29,6 +29,25 @@ type Selection = { dpeNumber: string | null; request: number };
 
 const INITIAL_SELECTION: Selection = { dpeNumber: null, request: 0 };
 
+const LINK_STATUS_ID = 'listing-url-status';
+const ADDRESS_STATUS_ID = 'listing-address-status';
+
+// why: focus returns to the field when a search ends without addresses, so
+// the field names the outcome as well as the state of the link.
+function describedBy({
+  message,
+  address,
+}: {
+  message: SearchMessage | null;
+  address: SearchMessage | null;
+}): string | undefined {
+  const ids = [
+    message === null ? null : LINK_STATUS_ID,
+    address === null ? null : ADDRESS_STATUS_ID,
+  ].filter((id) => id !== null);
+  return ids.length === 0 ? undefined : ids.join(' ');
+}
+
 const COLUMN_LAYOUT_CLASS =
   'flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8';
 const WORKSPACE_LAYOUT_CLASS = 'relative flex min-h-0 flex-1 flex-col';
@@ -139,9 +158,7 @@ export function ListingUrlForm({
                   placeholder={t('placeholder')}
                   aria-label={t('heading')}
                   aria-invalid={isError}
-                  aria-describedby={
-                    message === null ? undefined : 'listing-url-status'
-                  }
+                  aria-describedby={describedBy({ message, address })}
                   className="h-9"
                 />
               </div>
@@ -157,7 +174,7 @@ export function ListingUrlForm({
             </form>
             {message !== null && (
               <p
-                id="listing-url-status"
+                id={LINK_STATUS_ID}
                 aria-live="polite"
                 className={
                   isError
@@ -198,6 +215,7 @@ function AddressSection({ message }: { message: SearchMessage }) {
         {t('addressHeading')}
       </h2>
       <p
+        id={ADDRESS_STATUS_ID}
         className={
           message.tone === 'error'
             ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'

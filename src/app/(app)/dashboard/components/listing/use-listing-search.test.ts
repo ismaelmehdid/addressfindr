@@ -113,10 +113,12 @@ describe('searchMessage', () => {
     ).toEqual({ key: 'errorUnsupportedPortal', tone: 'error' });
   });
 
-  it('follows the search through reading and matching', () => {
+  // why: the progress overlay shows the running step; a message under the
+  // link would announce it a second time.
+  it('says nothing while the search reads and matches', () => {
     expect(
       searchMessage({ status: { kind: 'pending' }, rejection: null }),
-    ).toEqual({ key: 'analyzing', tone: 'neutral' });
+    ).toBe(null);
     expect(
       searchMessage({
         status: {
@@ -126,7 +128,7 @@ describe('searchMessage', () => {
         },
         rejection: null,
       }),
-    ).toEqual({ key: 'addressSearching', tone: 'neutral' });
+    ).toBe(null);
   });
 
   it('names the failure of each step as an error', () => {
@@ -186,10 +188,7 @@ describe('linkMessage and addressMessage', () => {
       key: 'errorMalformed',
       tone: 'error',
     });
-    expect(addressMessage(matching)).toEqual({
-      key: 'addressSearching',
-      tone: 'neutral',
-    });
+    expect(addressMessage(matching)).toBe(null);
   });
 
   it('says nothing about the link once it has been read', () => {
@@ -201,10 +200,10 @@ describe('linkMessage and addressMessage', () => {
     expect(addressMessage({ kind: 'failed', failure: 'unknown' })).toBe(null);
   });
 
-  it('describes reading the link and failing to read it', () => {
-    expect(
-      linkMessage({ status: { kind: 'pending' }, rejection: null }),
-    ).toEqual({ key: 'analyzing', tone: 'neutral' });
+  it('says nothing while the link is read, and names a failure to read it', () => {
+    expect(linkMessage({ status: { kind: 'pending' }, rejection: null })).toBe(
+      null,
+    );
     expect(
       linkMessage({
         status: { kind: 'failed', failure: 'rate-limited' },

@@ -133,6 +133,8 @@ function hasAddresses(match: AddressMatch): boolean {
   return match.refusedFor === null && match.candidates.length > 0;
 }
 
+// why: a running search is shown only by the progress overlay, so the step
+// is never also a message under the link (one live region, one announcement).
 export type SearchStep = 'analyzing' | 'addressSearching';
 
 export function searchStep(status: ListingSearchStatus): SearchStep | null {
@@ -151,7 +153,6 @@ type SearchMessageKey =
   | (typeof REJECTION_KEY)[ListingUrlRejection]
   | (typeof FAILURE_KEY)[ExtractionFailure]
   | (typeof MATCH_FAILURE_KEY)[MatchFailure]
-  | SearchStep
   | 'addressNone'
   | 'addressInsufficientEvidence';
 
@@ -160,10 +161,8 @@ export type SearchMessage = {
   tone: 'neutral' | 'error';
 };
 
-function matchMessage(state: MatchState): SearchMessage {
-  if (state.kind === 'pending') {
-    return { key: 'addressSearching', tone: 'neutral' };
-  }
+function matchMessage(state: MatchState): SearchMessage | null {
+  if (state.kind === 'pending') return null;
   if (state.kind === 'failed') {
     return { key: MATCH_FAILURE_KEY[state.failure], tone: 'error' };
   }
@@ -188,7 +187,6 @@ export function linkMessage({
   if (rejection !== null) {
     return { key: REJECTION_KEY[rejection], tone: 'error' };
   }
-  if (status.kind === 'pending') return { key: 'analyzing', tone: 'neutral' };
   if (status.kind === 'failed') {
     return { key: FAILURE_KEY[status.failure], tone: 'error' };
   }

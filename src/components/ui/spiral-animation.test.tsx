@@ -18,9 +18,13 @@ import { SpiralAnimation } from './spiral-animation';
   globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
+const TRAIL_LENGTH = 80;
+const TRAIL_REACH = 170 + 28 + 10;
+
+type Arc = { x: number; y: number; radius: number };
+
 type FakeContext = {
   [method in
-    | 'arc'
     | 'beginPath'
     | 'clearRect'
     | 'fill'
@@ -29,12 +33,19 @@ type FakeContext = {
     | 'rotate'
     | 'save'
     | 'setTransform'
-    | 'translate']: Mock<() => void>;
-} & { fillStyle: string };
+    | 'translate']: Mock<(...args: number[]) => void>;
+} & {
+  arc: Mock<(x: number, y: number, radius: number) => void>;
+  fillStyle: string;
+};
 
+// why: a real context throws on a negative radius; the fake must too, or a
+// broken radius would pass here and throw on every frame in a browser.
 function fakeContext(): FakeContext {
   return {
-    arc: vi.fn(),
+    arc: vi.fn((_x: number, _y: number, radius: number) => {
+      if (radius < 0) throw new RangeError(`negative radius ${radius}`);
+    }),
     beginPath: vi.fn(),
     clearRect: vi.fn(),
     fill: vi.fn(),
@@ -49,31 +60,38 @@ function fakeContext(): FakeContext {
 }
 
 type Tween = { kill: Mock<() => void> };
+type Animated = { time: number };
 
 let context: FakeContext | null;
 let reducedMotion: boolean;
+let size: { width: number; height: number };
 let resizeCallback: (() => void) | null;
 let disconnect: Mock<() => void>;
-let tweens: { vars: gsap.TweenVars; tween: Tween }[];
+let resolutionListeners: Map<string, () => void>;
+let tweens: { target: Animated; vars: gsap.TweenVars; tween: Tween }[];
 let container: HTMLDivElement;
 let root: Root;
 
-// why: jsdom has no 2D canvas, no ResizeObserver and no layout, so each is
-// replaced by a fake the test can drive.
+// why: jsdom has no 2D canvas, no ResizeObserver, no layout and no media
+// queries, so each is replaced by a fake the test can drive.
 beforeEach(() => {
   context = fakeContext();
   reducedMotion = false;
+  size = { width: 300, height: 200 };
   resizeCallback = null;
   disconnect = vi.fn();
+  resolutionListeners = new Map();
   tweens = [];
 
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
     () => context as unknown as CanvasRenderingContext2D,
   );
-  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
-    width: 300,
-    height: 200,
-  } as DOMRect);
+  vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockImplementation(
+    () => size.width,
+  );
+  vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(
+    () => size.height,
+  );
   vi.stubGlobal(
     'ResizeObserver',
     class {
@@ -88,21 +106,25 @@ beforeEach(() => {
   );
   vi.stubGlobal('devicePixelRatio', 2);
   window.matchMedia = (query: string): MediaQueryList => ({
-    matches: reducedMotion,
+    matches: query.includes('reduced-motion') && reducedMotion,
     media: query,
     onchange: null,
-    addEventListener: () => {},
-    removeEventListener: () => {},
+    addEventListener: ((_: string, listener: () => void) => {
+      resolutionListeners.set(query, listener);
+    }) as MediaQueryList['addEventListener'],
+    removeEventListener: () => {
+      resolutionListeners.delete(query);
+    },
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => false,
   });
   vi.spyOn(gsap, 'to').mockImplementation(((
-    _: object,
+    target: Animated,
     vars: gsap.TweenVars,
   ) => {
     const tween = { kill: vi.fn() };
-    tweens.push({ vars, tween });
+    tweens.push({ target, vars, tween });
     return tween;
   }) as unknown as typeof gsap.to);
 
@@ -126,7 +148,7 @@ function render(): void {
   });
 }
 
-function onlyTween(): { vars: gsap.TweenVars; tween: Tween } {
+function onlyTween(): (typeof tweens)[number] {
   const [first, ...others] = tweens;
   if (first === undefined || others.length > 0) {
     throw new Error(`expected one tween, got ${tweens.length}`);
@@ -140,6 +162,20 @@ function canvas(): HTMLCanvasElement {
   return element;
 }
 
+function arcsAt(time: number): Arc[] {
+  const { target, vars } = onlyTween();
+  context?.arc.mockClear();
+  act(() => {
+    target.time = time;
+    vars.onUpdate?.();
+  });
+  return (context?.arc.mock.calls ?? []).map(([x, y, radius]) => ({
+    x,
+    y,
+    radius,
+  }));
+}
+
 describe('SpiralAnimation', () => {
   it('hides the decorative canvas from assistive technology', () => {
     render();
@@ -150,7 +186,7 @@ describe('SpiralAnimation', () => {
     expect(container.firstElementChild?.className).toContain('text-linen');
   });
 
-  it('sizes the canvas to its container at the device pixel ratio', () => {
+  it('sizes the canvas to its container layout at the device pixel ratio', () => {
     render();
 
     expect(canvas().width).toBe(600);
@@ -161,10 +197,7 @@ describe('SpiralAnimation', () => {
 
   it('redraws at the new size when the container is resized', () => {
     render();
-    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockReturnValue({
-      width: 500,
-      height: 400,
-    } as DOMRect);
+    size = { width: 500, height: 400 };
 
     act(() => {
       resizeCallback?.();
@@ -173,6 +206,22 @@ describe('SpiralAnimation', () => {
     expect(canvas().width).toBe(1000);
     expect(canvas().height).toBe(800);
     expect(context?.translate).toHaveBeenLastCalledWith(250, 200);
+  });
+
+  it('resizes the buffer when the pixel ratio changes at the same size', () => {
+    render();
+    const onChange = resolutionListeners.get('(resolution: 2dppx)');
+    expect(onChange).toBeDefined();
+    vi.stubGlobal('devicePixelRatio', 1);
+
+    act(() => {
+      onChange?.();
+    });
+
+    expect(canvas().width).toBe(300);
+    expect(canvas().height).toBe(200);
+    expect(resolutionListeners.has('(resolution: 2dppx)')).toBe(false);
+    expect(resolutionListeners.has('(resolution: 1dppx)')).toBe(true);
   });
 
   it('loops one 15 second linear tween that draws every update', () => {
@@ -197,13 +246,59 @@ describe('SpiralAnimation', () => {
     render();
 
     const beginPaths = context?.beginPath.mock.calls.length ?? 0;
-    const fills = context?.fill.mock.calls.length ?? 0;
     expect(beginPaths).toBeGreaterThan(0);
-    expect(fills).toBe(beginPaths);
-    expect(context?.arc.mock.calls.length).toBeGreaterThan(fills);
+    expect(context?.fill.mock.calls.length).toBe(beginPaths);
   });
 
-  it('stops the animation and the resize observer when unmounted', () => {
+  it('draws only the trail before any star leaves the spiral', () => {
+    render();
+
+    expect(arcsAt(0)).toHaveLength(TRAIL_LENGTH);
+  });
+
+  it('winds the trail around the centre, within the spiral radius', () => {
+    render();
+
+    const heads = [0.05, 0.1, 0.15, 0.2, 0.25].map((time) => {
+      const trail = arcsAt(time).slice(0, TRAIL_LENGTH);
+      for (const { x, y } of trail) {
+        expect(Math.hypot(x, y)).toBeLessThanOrEqual(TRAIL_REACH);
+      }
+      const [head] = trail;
+      if (head === undefined) throw new Error('no trail');
+      return head;
+    });
+
+    expect(heads.some(({ x }) => x < 0)).toBe(true);
+    expect(heads.some(({ x }) => x > 0)).toBe(true);
+    expect(heads.some(({ y }) => y < 0)).toBe(true);
+  });
+
+  it('releases the stars as the spiral unwinds, and the camera flies past them', () => {
+    render();
+
+    const unwinding = arcsAt(0.3).length - TRAIL_LENGTH;
+    const exploded = arcsAt(0.55).length - TRAIL_LENGTH;
+    const passed = arcsAt(0.99).length - TRAIL_LENGTH;
+
+    expect(unwinding).toBeGreaterThan(0);
+    expect(exploded).toBeGreaterThan(unwinding);
+    expect(passed).toBeLessThan(exploded / 10);
+  });
+
+  it('only ever draws finite dots with a non-negative radius', () => {
+    render();
+
+    for (const time of [0, 0.1, 0.32, 0.33, 0.5, 0.75, 0.99]) {
+      for (const { x, y, radius } of arcsAt(time)) {
+        expect(Number.isFinite(x) && Number.isFinite(y)).toBe(true);
+        expect(radius).toBeGreaterThanOrEqual(0);
+        expect(Number.isFinite(radius)).toBe(true);
+      }
+    }
+  });
+
+  it('stops the animation, the resize observer and the ratio watch when unmounted', () => {
     render();
     const { tween } = onlyTween();
 
@@ -213,6 +308,7 @@ describe('SpiralAnimation', () => {
 
     expect(tween.kill).toHaveBeenCalled();
     expect(disconnect).toHaveBeenCalled();
+    expect(resolutionListeners.size).toBe(0);
     root = createRoot(container);
   });
 
@@ -223,6 +319,7 @@ describe('SpiralAnimation', () => {
 
     expect(tweens).toHaveLength(0);
     expect(context?.fill).toHaveBeenCalled();
+    expect(context?.arc.mock.calls.length).toBeGreaterThan(TRAIL_LENGTH);
   });
 
   it('does nothing without a 2D context', () => {
