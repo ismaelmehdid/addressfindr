@@ -27,6 +27,12 @@ const PHOTO_AREA_CLASS =
 const PANORAMA_TRIGGER_CLASS =
   'absolute inset-0 z-10 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-charcoal';
 
+// why: the panel clips an outer focus ring and the positioned photo or frame
+// covers an inset outline, so the ring is a pseudo-element stacked above them;
+// it lets clicks through to the Street View frame beneath.
+const FOCUS_RING_ABOVE_CONTENT_CLASS =
+  'after:pointer-events-none after:absolute after:inset-0 after:z-10 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-charcoal';
+
 const BADGE_BOTTOM_RIGHT_CLASS = 'absolute right-2.5 bottom-2.5';
 
 const PAGING_KEYS: ReadonlySet<string> = new Set(['ArrowLeft', 'ArrowRight']);
@@ -124,19 +130,14 @@ export function ResultDetailPhoto({
   // Google Maps in a new tab rather than inside the app, and the badge says
   // so instead of promising a panorama explored in place. It opens on the
   // capture closest to the point: resolving the photo's own panorama would
-  // spend a lookup on every photo shown. The panel clips an outer focus ring
-  // and the positioned photo covers an inset outline, so the ring is a
-  // pseudo-element stacked above the photo.
+  // spend a lookup on every photo shown.
   return (
     <a
-      href={streetViewPanoramaUrl({ point: photo.point, panorama: null })}
+      href={streetViewPanoramaUrl(photo.point)}
       target="_blank"
       rel="noopener noreferrer"
       aria-label={t('detailStreetViewOpen')}
-      className={cn(
-        PHOTO_AREA_CLASS,
-        'after:pointer-events-none after:absolute after:inset-0 after:z-10 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-charcoal',
-      )}
+      className={cn(PHOTO_AREA_CLASS, FOCUS_RING_ABOVE_CONTENT_CLASS)}
     >
       {image}
       {streetViewBadge}
@@ -149,10 +150,13 @@ export function ResultDetailPhoto({
 }
 
 // why: the panorama replaces the photo in place and fills the photo area
-// alone, so exploring the street never leaves the detail and nothing of ours
-// covers the embed's own controls. It points at the photo's own trusted
-// point, and focus follows the swap both ways (onto the panorama, then back
-// onto the photo) so a keyboard user is never dropped on <body>.
+// alone, so exploring the street never leaves the detail and no control of
+// ours covers the embed's own. It points at the photo's own trusted point.
+// Focus moves onto the panorama so a keyboard user is never dropped on
+// <body>, and Escape there brings the photo back and refocuses it. That only
+// holds while focus is on the panorama itself: once the user clicks, drags or
+// tabs into Google's cross-origin frame, its keys never reach this page, and
+// the photo returns only when another result is picked or the detail closes.
 function ExplorableStreetView({
   point,
   address,
@@ -220,7 +224,11 @@ function ExplorableStreetView({
       role="group"
       tabIndex={-1}
       aria-label={t('streetViewPanoramaLabel', { address })}
-      className={cn(PHOTO_AREA_CLASS, 'outline-none')}
+      className={cn(
+        PHOTO_AREA_CLASS,
+        FOCUS_RING_ABOVE_CONTENT_CLASS,
+        'outline-none',
+      )}
       onKeyDown={claimKeys}
     >
       {lookup.kind === 'locating' ? (

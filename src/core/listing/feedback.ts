@@ -46,16 +46,3 @@ export function isSameAnswer(
     stored.confirmedDpeNumber === requested.confirmedDpeNumber
   );
 }
-
-export function isFeedbackReason(value: unknown): value is FeedbackReason {
-  return FEEDBACK_REASONS.some((reason) => reason === value);
-}
-
-export function toFeedbackCandidates(
-  shown: readonly { record: { dpeNumber: string }; confidence: number }[],
-): FeedbackCandidate[] {
-  return shown.slice(0, MAX_FEEDBACK_CANDIDATES).map((candidate) => ({
-    dpeNumber: candidate.record.dpeNumber,
-    score: candidate.confidence,
-  }));
-}

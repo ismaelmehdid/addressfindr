@@ -30,6 +30,15 @@ const RECORD = {
 };
 const EMBED_KEY = 'browser-embed-key';
 const PANORAMA = { panoId: 'CAoSLEFGMVFpcE1', heading: 212 };
+const FOCUS_RING_ABOVE = [
+  'after:pointer-events-none',
+  'after:absolute',
+  'after:inset-0',
+  'after:z-10',
+  'focus-visible:after:ring-2',
+  'focus-visible:after:ring-inset',
+  'focus-visible:after:ring-charcoal',
+];
 
 let container: HTMLDivElement;
 let root: Root;
@@ -146,7 +155,7 @@ describe('ResultDetailPhoto', () => {
     expect(photo()?.src).toBe(STREET_VIEW_SRC);
     expect(panoramaTrigger()).toBeNull();
     expect(link?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: null }),
+      streetViewPanoramaUrl(TRUSTED_POINT),
     );
     expect(link?.getAttribute('target')).toBe('_blank');
     expect(link?.getAttribute('aria-label')).toBe(
@@ -178,17 +187,7 @@ describe('ResultDetailPhoto', () => {
     render({});
 
     const linkClasses = container.querySelector('a')?.className.split(/\s+/);
-    expect(linkClasses).toEqual(
-      expect.arrayContaining([
-        'after:pointer-events-none',
-        'after:absolute',
-        'after:inset-0',
-        'after:z-10',
-        'focus-visible:after:ring-2',
-        'focus-visible:after:ring-inset',
-        'focus-visible:after:ring-charcoal',
-      ]),
-    );
+    expect(linkClasses).toEqual(expect.arrayContaining(FOCUS_RING_ABOVE));
   });
 
   it('swaps the photo for the interactive panorama in place with an embed key', async () => {
@@ -218,8 +217,8 @@ describe('ResultDetailPhoto', () => {
   });
 
   // why: the embed lays its own controls along its edges, more of them on a
-  // phone (motion tracking, compass, zoom); nothing of ours is drawn beside
-  // or over them, and the panorama keeps the photo's size.
+  // phone (motion tracking, compass, zoom); no control of ours is drawn
+  // beside or over them, and the panorama keeps the photo's size.
   it('fills the photo area with the panorama frame alone', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
     const photoClasses = photoArea().className.split(/\s+/);
@@ -247,7 +246,20 @@ describe('ResultDetailPhoto', () => {
 
     expect(document.activeElement).toBe(panorama());
     expect(panorama().tabIndex).toBe(-1);
-    expect(panorama().classList).toContain('outline-none');
+  });
+
+  // why: the panorama is where Escape and the arrow keys are handled, so a
+  // keyboard user must see it focused. The frame covers an inset outline, so
+  // the ring is a pseudo-element above it that lets clicks through.
+  it('shows the focused panorama with a ring above the frame', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await explore();
+
+    const classes = panorama().className.split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(FOCUS_RING_ABOVE));
+    expect(classes).toContain('outline-none');
+    expect(frame().className).not.toMatch(/\bz-/);
   });
 
   // why: the screenshot is the panorama nearest the point, aimed at it; the

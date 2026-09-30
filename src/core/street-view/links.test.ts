@@ -26,26 +26,12 @@ const PANORAMA = { panoId: 'CAoSLEFGMVFpcE1', heading: 212 };
 
 describe('streetViewPanoramaUrl', () => {
   it('opens the interactive panorama at the point', () => {
-    const url = new URL(
-      streetViewPanoramaUrl({ point: LYON_3E, panorama: null }),
-    );
+    const url = new URL(streetViewPanoramaUrl(LYON_3E));
     expect(url.origin).toBe('https://www.google.com');
     expect(url.searchParams.get('map_action')).toBe('pano');
     expect(url.searchParams.get('viewpoint')).toBe('45.757123,4.865200');
     expect(url.searchParams.get('pano')).toBeNull();
     expect(url.searchParams.get('heading')).toBeNull();
-  });
-
-  // why: `viewpoint` alone opens the capture closest to the point, which can
-  // be a photosphere; the id opens the one the photo shows.
-  it("opens the photo's panorama aimed at the point, the point as fallback", () => {
-    const url = new URL(
-      streetViewPanoramaUrl({ point: LYON_3E, panorama: PANORAMA }),
-    );
-    expect(url.searchParams.get('map_action')).toBe('pano');
-    expect(url.searchParams.get('pano')).toBe('CAoSLEFGMVFpcE1');
-    expect(url.searchParams.get('heading')).toBe('212');
-    expect(url.searchParams.get('viewpoint')).toBe('45.757123,4.865200');
   });
 });
 

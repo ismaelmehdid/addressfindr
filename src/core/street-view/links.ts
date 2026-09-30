@@ -42,21 +42,11 @@ function panoramaView(
     : { pano: panorama.panoId, heading: String(panorama.heading) };
 }
 
-// why: with a known panorama, Google Maps opens the capture the photo shows
-// instead of whichever one sits closest to the point, photospheres included;
-// `viewpoint` is only its fallback when that id cannot be found.
-export function streetViewPanoramaUrl({
-  point,
-  panorama,
-}: {
-  point: GeoPoint;
-  panorama: StreetViewPanorama | null;
-}): string {
+export function streetViewPanoramaUrl(point: GeoPoint): string {
   const query = new URLSearchParams({
     api: '1',
     map_action: 'pano',
     viewpoint: latLon(point),
-    ...panoramaView(panorama),
   });
   return `https://www.google.com/maps/@?${query.toString()}`;
 }
