@@ -60,10 +60,11 @@ export function SearchProgressOverlay({
         // on its own field; focus goes back to the home field only when it is
         // still there to correct the link.
         finalFocus={() => returnFocusTo() ?? false}
-        // why: the page's own background, with no dimmed or blurred backdrop,
-        // so the search fades in and out without the screen changing colour.
+        // why: the page's own background, with no dimmed or blurred backdrop
+        // and no zoom (its moving edge would show over the results), so the
+        // search only fades in and out and the screen never changes colour.
         overlayClassName="bg-transparent supports-backdrop-filter:backdrop-blur-none"
-        className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col items-center justify-end gap-0 overflow-hidden rounded-none bg-linen p-0 text-ink ring-0 duration-300 sm:max-w-none"
+        className="inset-0 flex h-dvh max-w-none translate-x-0 translate-y-0 flex-col items-center justify-end gap-0 overflow-hidden rounded-none bg-linen p-0 text-ink ring-0 duration-300 data-open:[--tw-enter-scale:1]! data-closed:[--tw-exit-scale:1]! sm:max-w-none"
       >
         <SpiralAnimation className="absolute inset-0" />
         <div className="relative flex flex-col items-center gap-5 px-4 pb-[max(3rem,env(safe-area-inset-bottom))] text-center">
