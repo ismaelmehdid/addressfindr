@@ -13,9 +13,9 @@ import {
 } from 'vitest';
 import { scoreColour } from '@/core/ademe/score-scale';
 import type { AddressCandidate, DpeRecord } from '@/core/ademe/types';
+import { streetViewImagePath } from '@/core/street-view/links';
 import messages from '@/i18n/messages/fr.json';
 import { ResultDetailPanel } from './result-detail-panel';
-import type { SearchFeedback } from './use-search-feedback';
 
 // why: tells React that act() drives the updates, so it flushes them there.
 (
@@ -58,17 +58,6 @@ const LISTING: ComponentProps<typeof ResultDetailPanel>['listing'] = {
   yearBuilt: 1931,
   heatingEnergy: 'gas',
   dpeDate: '2022-04-14',
-};
-
-const FEEDBACK: SearchFeedback = {
-  verdict: { kind: 'none' },
-  verdictStatus: 'idle',
-  verdictPending: null,
-  verdictFailure: null,
-  detailStatus: 'idle',
-  confirm: () => {},
-  reportNoneMatch: () => {},
-  sendDetail: () => {},
 };
 
 const TRUSTED_POINT = { latitude: 45.7578, longitude: 4.8515 };
@@ -118,7 +107,6 @@ async function render(
           streetViewEnabled={false}
           streetViewEmbedKey=""
           listing={LISTING}
-          feedback={FEEDBACK}
           {...props}
         />
       </NextIntlClientProvider>,
@@ -166,14 +154,6 @@ async function clickCopy(): Promise<void> {
   await act(async () => {
     copyButton().click();
   });
-}
-
-function confirmButton(): HTMLButtonElement {
-  const button = [...container.querySelectorAll('button')].find(
-    (element) => element.textContent === 'C’est ce logement',
-  );
-  if (button === undefined) throw new Error('no confirm button');
-  return button;
 }
 
 function badge(label: 'DPE' | 'GES'): HTMLElement {
@@ -388,25 +368,66 @@ describe('ResultDetailPanel verify elsewhere', () => {
   });
 });
 
-describe('ResultDetailPanel confirmation', () => {
-  it('ends the body with "C’est ce logement", right after the outbound links', async () => {
+// why: the verdict routes stay on the server, dormant; the detail asks for
+// no verdict, so the outbound links close it.
+describe('ResultDetailPanel end of the body', () => {
+  it('ends with the outbound links, asking for no verdict', async () => {
     await render({ candidate: candidate({ point: TRUSTED_POINT }) });
 
     const section = container.querySelector('section');
-    const confirmation = section?.nextElementSibling;
-    expect(confirmation?.contains(confirmButton())).toBe(true);
-    expect(section?.parentElement?.lastElementChild).toBe(confirmation);
+    expect(section?.parentElement?.lastElementChild).toBe(section);
+    expect(
+      [...container.querySelectorAll('button')].map((button) =>
+        button.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Fermer le détail', 'Copier l’adresse']);
   });
+});
 
-  it('confirms the shown result even without a trusted point', async () => {
-    const confirm = vi.fn<SearchFeedback['confirm']>();
-    await render({ feedback: { ...FEEDBACK, confirm } });
-    expect(container.querySelector('section')).toBeNull();
+describe('ResultDetailPanel Street View panorama', () => {
+  const OTHER_POINT = { latitude: 45.7612, longitude: 4.8567 };
 
-    await act(async () => {
-      confirmButton().click();
+  function panoramaTrigger(): HTMLButtonElement | null {
+    return container.querySelector<HTMLButtonElement>(
+      'button[aria-label="Explorer le panorama Street View"]',
+    );
+  }
+
+  async function renderExplorable(record: Partial<DpeRecord>): Promise<void> {
+    await render({
+      candidate: candidate(record),
+      streetViewEnabled: true,
+      streetViewEmbedKey: 'browser-embed-key',
     });
+  }
 
-    expect(confirm).toHaveBeenCalledExactlyOnceWith('2269E0000001A');
+  // why: a panorama left open would show another address than the one the
+  // detail now names.
+  it('shows the photo again, not the panorama, when the shown result changes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ panoId: 'CAoSLEFGMVFpcE1', heading: 212 }),
+      ),
+    );
+    onTestFinished(() => {
+      vi.unstubAllGlobals();
+    });
+    await renderExplorable({ point: TRUSTED_POINT });
+    await act(async () => {
+      panoramaTrigger()?.click();
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+    expect(container.querySelector('iframe')).not.toBeNull();
+
+    await renderExplorable({ dpeNumber: '2269E0000002B', point: OTHER_POINT });
+
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(panoramaTrigger()).not.toBeNull();
+    expect(container.querySelector('img')?.src).toBe(
+      new URL(streetViewImagePath(OTHER_POINT), document.baseURI).href,
+    );
   });
 });

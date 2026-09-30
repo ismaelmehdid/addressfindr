@@ -40,7 +40,6 @@ window.matchMedia = (query: string): MediaQueryList => ({
 
 const EXTRACT = '/api/listings/extract';
 const MATCH = '/api/listings/match';
-const FEEDBACK = '/api/listings/feedback';
 
 const FIRST_URL = 'https://www.leboncoin.fr/ad/ventes_immobilieres/1';
 const SECOND_URL = 'https://www.leboncoin.fr/ad/ventes_immobilieres/2';
@@ -652,45 +651,6 @@ describe('New search dialog', () => {
     expect(container.querySelector('aside')?.getAttribute('aria-label')).toBe(
       'Résultat 1',
     );
-  });
-
-  it('starts the new results without the verdict given on the previous ones', async () => {
-    await showFirstResult();
-    const detail = container.querySelector<HTMLElement>('aside');
-    if (detail === null) throw new Error('no detail panel');
-    await act(async () => {
-      buttonNamed(detail, messages.ListingFeedback.confirm).click();
-      await settle();
-    });
-    const verdict = takeRequest(FEEDBACK);
-    await act(async () => {
-      verdict.resolve(
-        new Response(
-          JSON.stringify({
-            searchId: (verdict.body as { searchId: string }).searchId,
-            verdict: 'confirmed',
-          }),
-        ),
-      );
-      await settle();
-    });
-    expect(container.querySelector('aside')?.textContent).toContain(
-      messages.ListingFeedback.confirmed,
-    );
-
-    await pressNewSearch();
-    await searchInDialog(SECOND_URL);
-    await answer(EXTRACT, 200, listing(SECOND_URL));
-    await answer(MATCH, 200, SECOND_MATCH);
-
-    const newDetail = container.querySelector<HTMLElement>('aside');
-    if (newDetail === null) throw new Error('no detail panel');
-    expect(newDetail.textContent).not.toContain(
-      messages.ListingFeedback.confirmed,
-    );
-    expect(
-      buttonNamed(newDetail, messages.ListingFeedback.confirm),
-    ).toBeDefined();
   });
 });
 

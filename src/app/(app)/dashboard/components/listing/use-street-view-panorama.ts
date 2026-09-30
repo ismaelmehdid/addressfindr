@@ -15,7 +15,7 @@ export type PanoramaLookup =
 const LOOKUP_TIMEOUT_MS = 5000;
 
 // why: any failure answers null, and the embed then searches the point the
-// way the photo did; the dialog never waits on the lookup for good.
+// way the photo did; the panorama never waits on the lookup for good.
 async function requestPanorama(
   path: string,
 ): Promise<StreetViewPanorama | null> {
@@ -31,7 +31,7 @@ async function requestPanorama(
   }
 }
 
-// why: looked up only once the dialog opens; paging through the results
+// why: looked up only once exploring starts; paging through the results
 // never spends a request on a panorama nobody explores.
 export function useStreetViewPanorama({
   point,

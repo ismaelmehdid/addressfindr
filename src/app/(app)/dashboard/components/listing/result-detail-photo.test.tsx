@@ -30,6 +30,15 @@ const RECORD = {
 };
 const EMBED_KEY = 'browser-embed-key';
 const PANORAMA = { panoId: 'CAoSLEFGMVFpcE1', heading: 212 };
+const FOCUS_RING_ABOVE = [
+  'after:pointer-events-none',
+  'after:absolute',
+  'after:inset-0',
+  'after:z-10',
+  'focus-visible:after:ring-2',
+  'focus-visible:after:ring-inset',
+  'focus-visible:after:ring-charcoal',
+];
 
 let container: HTMLDivElement;
 let root: Root;
@@ -84,18 +93,8 @@ function panoramaTrigger(): HTMLButtonElement | null {
   );
 }
 
-function dialog(): HTMLElement | null {
-  return document.querySelector<HTMLElement>('[role="dialog"]');
-}
-
-function openedDialog(): HTMLElement {
-  const opened = dialog();
-  if (opened === null) throw new Error('no panorama dialog open');
-  return opened;
-}
-
-// why: the dialog looks the panorama up once it opens, then shows the frame.
-async function openPanorama(): Promise<void> {
+// why: exploring looks the panorama up first, then shows the frame in place.
+async function explore(): Promise<void> {
   const trigger = panoramaTrigger();
   if (trigger === null) throw new Error('no panorama trigger');
   await act(async () => {
@@ -107,9 +106,33 @@ async function openPanorama(): Promise<void> {
 }
 
 function frame(): HTMLIFrameElement {
-  const element = openedDialog().querySelector('iframe');
+  const element = container.querySelector('iframe');
   if (element === null) throw new Error('no panorama frame');
   return element;
+}
+
+function panorama(): HTMLElement {
+  const group = container.querySelector<HTMLElement>('[role="group"]');
+  if (group === null) throw new Error('no panorama shown');
+  return group;
+}
+
+function photoArea(): HTMLElement {
+  const area = container.firstElementChild;
+  if (!(area instanceof HTMLElement)) throw new Error('no photo area');
+  return area;
+}
+
+function pressEscape(target: Element): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    key: 'Escape',
+    bubbles: true,
+    cancelable: true,
+  });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
 }
 
 function photo(): HTMLImageElement | null {
@@ -130,12 +153,31 @@ describe('ResultDetailPhoto', () => {
 
     const link = container.querySelector('a');
     expect(photo()?.src).toBe(STREET_VIEW_SRC);
+    expect(panoramaTrigger()).toBeNull();
     expect(link?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: null }),
+      streetViewPanoramaUrl(TRUSTED_POINT),
     );
     expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.textContent).toContain('Street View');
-    expect(link?.textContent).toContain('Explorer le panorama');
+    expect(link?.getAttribute('aria-label')).toBe(
+      'Street View, ouvrir dans Google Maps (nouvel onglet)',
+    );
+  });
+
+  // why: without the key the click leaves the app, so the photo must not
+  // promise a panorama explored in place; what it shows is in its name.
+  it('says the photo opens Google Maps, not the panorama in place, without an embed key', () => {
+    render({});
+
+    const link = container.querySelector('a');
+    const name = link?.getAttribute('aria-label')?.toLowerCase() ?? '';
+    const badges = [
+      ...(link?.querySelectorAll('[data-slot="badge"]') ?? []),
+    ].map((badge) => badge.textContent);
+    expect(badges).toEqual(['Street View', 'Ouvrir dans Google Maps']);
+    for (const badge of badges) {
+      expect(name).toContain(badge?.toLowerCase());
+    }
+    expect(link?.textContent).not.toContain('Explorer le panorama');
   });
 
   // why: the panel clips an outer ring and the absolutely positioned photo
@@ -145,31 +187,25 @@ describe('ResultDetailPhoto', () => {
     render({});
 
     const linkClasses = container.querySelector('a')?.className.split(/\s+/);
-    expect(linkClasses).toEqual(
-      expect.arrayContaining([
-        'after:pointer-events-none',
-        'after:absolute',
-        'after:inset-0',
-        'after:z-10',
-        'focus-visible:after:ring-2',
-        'focus-visible:after:ring-inset',
-        'focus-visible:after:ring-charcoal',
-      ]),
-    );
+    expect(linkClasses).toEqual(expect.arrayContaining(FOCUS_RING_ABOVE));
   });
 
-  it('opens the panorama in a dialog inside the app with an embed key', async () => {
+  it('swaps the photo for the interactive panorama in place with an embed key', async () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     expect(container.querySelector('a')).toBeNull();
     expect(panoramaTrigger()?.textContent).toBe('');
     expect(container.textContent).toContain('Explorer le panorama');
-    expect(dialog()).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
 
-    await openPanorama();
+    await explore();
 
-    const opened = openedDialog();
-    expect(opened.textContent).toContain(`Street View · ${RECORD.address}`);
+    expect(document.querySelector('[role="dialog"]')).toBeNull();
+    expect(panorama().getAttribute('aria-label')).toBe(
+      `Street View · ${RECORD.address}`,
+    );
+    expect(photo()).toBeNull();
+    expect(panoramaTrigger()).toBeNull();
     expect(frame().getAttribute('title')).toBe(
       'Panorama Street View interactif',
     );
@@ -178,14 +214,52 @@ describe('ResultDetailPhoto', () => {
     expect(frame().getAttribute('referrerpolicy')).toBe(
       'strict-origin-when-cross-origin',
     );
-    const outbound = opened.querySelector('a');
-    expect(outbound?.getAttribute('href')).toBe(
-      streetViewPanoramaUrl({ point: TRUSTED_POINT, panorama: PANORAMA }),
+  });
+
+  // why: the embed lays its own controls along its edges, more of them on a
+  // phone (motion tracking, compass, zoom); no control of ours is drawn
+  // beside or over them, and the panorama keeps the photo's size.
+  it('fills the photo area with the panorama frame alone', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    const photoClasses = photoArea().className.split(/\s+/);
+
+    await explore();
+
+    expect(photoArea()).toBe(panorama());
+    expect([...panorama().children]).toEqual([frame()]);
+    expect(
+      container.querySelectorAll('button, a, [tabindex="0"]'),
+    ).toHaveLength(0);
+    expect(panorama().className.split(/\s+/)).toEqual(
+      expect.arrayContaining(photoClasses),
     );
-    expect(outbound?.getAttribute('target')).toBe('_blank');
-    expect(outbound?.textContent).toBe(
-      'Ouvrir dans Google Maps (nouvel onglet)',
-    );
+    expect(container.textContent).toBe('');
+  });
+
+  // why: the photo's trigger unmounts as the panorama replaces it, which
+  // would drop keyboard focus to <body>; the panorama itself takes it, so
+  // Escape and the arrow keys reach it at once.
+  it('moves focus onto the panorama when exploring starts', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await explore();
+
+    expect(document.activeElement).toBe(panorama());
+    expect(panorama().tabIndex).toBe(-1);
+  });
+
+  // why: the panorama is where Escape and the arrow keys are handled, so a
+  // keyboard user must see it focused. The frame covers an inset outline, so
+  // the ring is a pseudo-element above it that lets clicks through.
+  it('shows the focused panorama with a ring above the frame', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+
+    await explore();
+
+    const classes = panorama().className.split(/\s+/);
+    expect(classes).toEqual(expect.arrayContaining(FOCUS_RING_ABOVE));
+    expect(classes).toContain('outline-none');
+    expect(frame().className).not.toMatch(/\bz-/);
   });
 
   // why: the screenshot is the panorama nearest the point, aimed at it; the
@@ -194,7 +268,7 @@ describe('ResultDetailPhoto', () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     expect(lookup).not.toHaveBeenCalled();
-    await openPanorama();
+    await explore();
 
     expect(lookup).toHaveBeenCalledOnce();
     expect(lookup.mock.calls[0]?.[0]).toBe(
@@ -222,7 +296,7 @@ describe('ResultDetailPhoto', () => {
     answerLookupWith(response);
     render({ streetViewEmbedKey: EMBED_KEY });
 
-    await openPanorama();
+    await explore();
 
     expect(frame().getAttribute('src')).toBe(
       streetViewEmbedUrl({
@@ -250,10 +324,10 @@ describe('ResultDetailPhoto', () => {
     );
     render({ streetViewEmbedKey: EMBED_KEY });
 
-    await openPanorama();
+    await explore();
     expect(timeout).toHaveBeenCalledExactlyOnceWith(5000);
     expect(lookup.mock.calls[0]?.[1]?.signal).toBe(deadline.signal);
-    expect(openedDialog().querySelector('iframe')).toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
 
     await act(async () => {
       deadline.abort(new DOMException('timed out', 'TimeoutError'));
@@ -271,34 +345,73 @@ describe('ResultDetailPhoto', () => {
     );
   });
 
-  it('shows no frame while the panorama is being located', async () => {
+  it('shows only a placeholder while the panorama is being located', async () => {
     lookup.mockImplementation(() => new Promise<Response>(() => {}));
     render({ streetViewEmbedKey: EMBED_KEY });
 
-    await openPanorama();
+    await explore();
 
-    expect(openedDialog().querySelector('iframe')).toBeNull();
-    expect(
-      openedDialog().querySelector('[data-slot="skeleton"]'),
-    ).not.toBeNull();
+    expect(container.querySelector('iframe')).toBeNull();
+    expect([...panorama().children]).toEqual([
+      container.querySelector('[data-slot="skeleton"]'),
+    ]);
+    expect(photo()).toBeNull();
+    expect(container.querySelectorAll('button, a')).toHaveLength(0);
+    expect(document.activeElement).toBe(panorama());
   });
 
-  it('closes the panorama dialog from its close button', async () => {
+  it('brings the photo back on Escape while the panorama is being located', async () => {
+    lookup.mockImplementation(() => new Promise<Response>(() => {}));
     render({ streetViewEmbedKey: EMBED_KEY });
-    await openPanorama();
-    const close = openedDialog().querySelector<HTMLButtonElement>(
-      'button[aria-label="Fermer le panorama"]',
-    );
-    if (close === null) throw new Error('no close button in the dialog');
+    await explore();
 
-    act(() => {
-      close.click();
-    });
+    const keydown = pressEscape(panorama());
 
-    expect(dialog()).toBeNull();
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(container.querySelector('[role="group"]')).toBeNull();
+    expect(photo()?.src).toBe(STREET_VIEW_SRC);
+    expect(document.activeElement).toBe(panoramaTrigger());
   });
 
-  it('never offers the panorama dialog on the orthophoto', () => {
+  it('brings the photo back on Escape, marking the key handled', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    await explore();
+
+    const keydown = pressEscape(panorama());
+
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(photo()?.src).toBe(STREET_VIEW_SRC);
+    expect(document.activeElement).toBe(panoramaTrigger());
+  });
+
+  it('leaves Escape alone while the photo is shown', () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    const trigger = panoramaTrigger();
+    if (trigger === null) throw new Error('no panorama trigger');
+
+    expect(pressEscape(trigger).defaultPrevented).toBe(false);
+  });
+
+  it('explores the same panorama again without a second lookup', async () => {
+    render({ streetViewEmbedKey: EMBED_KEY });
+    await explore();
+    pressEscape(panorama());
+
+    await explore();
+
+    expect(lookup).toHaveBeenCalledOnce();
+    expect(frame().getAttribute('src')).toBe(
+      streetViewEmbedUrl({
+        point: TRUSTED_POINT,
+        apiKey: EMBED_KEY,
+        panorama: PANORAMA,
+      }),
+    );
+    expect(document.activeElement).toBe(panorama());
+  });
+
+  it('never offers the panorama on the orthophoto', () => {
     render({ streetViewEmbedKey: EMBED_KEY });
 
     failPhoto();
