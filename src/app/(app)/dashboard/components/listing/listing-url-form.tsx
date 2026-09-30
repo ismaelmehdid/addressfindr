@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { candidateOnMap } from '@/core/ademe/candidate-on-map';
@@ -11,11 +11,13 @@ import {
   mapAvailability,
   ResultsWorkspace,
 } from './results-workspace';
+import { SearchProgressOverlay } from './search-progress-overlay';
 import {
   addressMessage,
   type ListingSearchResult,
   linkMessage,
   type SearchMessage,
+  searchStep,
   useListingSearch,
 } from './use-listing-search';
 
@@ -46,6 +48,7 @@ export function ListingUrlForm({
   const [detailPreference, setDetailPreference] =
     useState<DetailPreference>('default');
   const [mapFailed, setMapFailed] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   function showResult(result: ListingSearchResult): void {
     setFound((current) => ({ ...result, search: (current?.search ?? 0) + 1 }));
@@ -54,9 +57,10 @@ export function ListingUrlForm({
     setMapFailed(false);
   }
 
-  const { url, rejection, status, changeUrl, submit } = useListingSearch({
-    onFound: showResult,
-  });
+  const { url, rejection, status, changeUrl, submit, cancel } =
+    useListingSearch({
+      onFound: showResult,
+    });
 
   const message = linkMessage({ status, rejection });
   const isError = message?.tone === 'error';
@@ -123,6 +127,7 @@ export function ListingUrlForm({
             >
               <div className="flex-1">
                 <Input
+                  ref={inputRef}
                   type="url"
                   inputMode="url"
                   autoComplete="off"
@@ -167,6 +172,11 @@ export function ListingUrlForm({
           {address !== null && <AddressSection message={address} />}
         </div>
       )}
+      <SearchProgressOverlay
+        step={searchStep(status)}
+        onCancel={cancel}
+        returnFocusTo={() => inputRef.current}
+      />
       <p className="sr-only" aria-live="polite">
         {found !== null
           ? t('addressFoundAnnouncement', {

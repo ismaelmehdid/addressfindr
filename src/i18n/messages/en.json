@@ -67,6 +67,8 @@
     "errorMalformed": "That link isn't valid. Make sure it starts with https://",
     "errorUnsupportedPortal": "That site isn't supported yet. Try a listing from SeLoger, Leboncoin, PAP or Bien'ici.",
     "analyzing": "Reading the listing…",
+    "searchProgressTitle": "Finding the address",
+    "searchCancel": "Cancel",
     "errorNotExtractable": "Couldn't read this listing. It may not be a home, or the page hides the details.",
     "errorRateLimited": "Too many analyses. Wait a moment and try again.",
     "errorUnknown": "Something went wrong reading that listing. Try again.",

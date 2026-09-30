@@ -67,6 +67,8 @@
     "errorMalformed": "Ce lien n'est pas valide. Vérifiez qu'il commence par https://",
     "errorUnsupportedPortal": "Ce site n'est pas encore pris en charge. Essayez une annonce SeLoger, Leboncoin, PAP ou Bien'ici.",
     "analyzing": "Lecture de l'annonce…",
+    "searchProgressTitle": "Recherche de l'adresse",
+    "searchCancel": "Annuler",
     "errorNotExtractable": "Impossible de lire cette annonce. Ce n'est peut-être pas un logement, ou la page masque les détails.",
     "errorRateLimited": "Trop d'analyses. Patientez un instant et réessayez.",
     "errorUnknown": "Une erreur est survenue pendant la lecture de l'annonce. Réessayez.",

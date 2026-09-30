@@ -10,7 +10,9 @@ import {
   isSearching,
   type ListingSearchStatus,
   linkMessage,
+  type SearchStep,
   searchMessage,
+  searchStep,
 } from './use-listing-search';
 
 const LISTING: ExtractedListing = {
@@ -28,6 +30,39 @@ const LISTING: ExtractedListing = {
 function noAddress(refusedFor: AddressMatch['refusedFor']): AddressMatch {
   return { candidates: [], inspected: 12, truncated: false, refusedFor };
 }
+
+describe('searchStep', () => {
+  it.each<[string, ListingSearchStatus, SearchStep | null]>([
+    ['idle', { kind: 'idle' }, null],
+    ['reading the listing', { kind: 'pending' }, 'analyzing'],
+    [
+      'searching the register',
+      { kind: 'extracted', listing: LISTING, match: { kind: 'pending' } },
+      'addressSearching',
+    ],
+    ['failed to read', { kind: 'failed', failure: 'rate-limited' }, null],
+    [
+      'failed to match',
+      {
+        kind: 'extracted',
+        listing: LISTING,
+        match: { kind: 'failed', failure: 'unknown' },
+      },
+      null,
+    ],
+    [
+      'answered without an address',
+      {
+        kind: 'extracted',
+        listing: LISTING,
+        match: { kind: 'found', match: noAddress('insufficient-evidence') },
+      },
+      null,
+    ],
+  ])('is %s → %s', (_, status, expected) => {
+    expect(searchStep(status)).toBe(expected);
+  });
+});
 
 describe('isSearching', () => {
   it.each<[string, ListingSearchStatus, boolean]>([

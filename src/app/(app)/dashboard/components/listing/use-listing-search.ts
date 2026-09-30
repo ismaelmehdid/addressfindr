@@ -133,19 +133,25 @@ function hasAddresses(match: AddressMatch): boolean {
   return match.refusedFor === null && match.candidates.length > 0;
 }
 
+export type SearchStep = 'analyzing' | 'addressSearching';
+
+export function searchStep(status: ListingSearchStatus): SearchStep | null {
+  if (status.kind === 'pending') return 'analyzing';
+  if (status.kind === 'extracted' && status.match.kind === 'pending') {
+    return 'addressSearching';
+  }
+  return null;
+}
+
 export function isSearching(status: ListingSearchStatus): boolean {
-  return (
-    status.kind === 'pending' ||
-    (status.kind === 'extracted' && status.match.kind === 'pending')
-  );
+  return searchStep(status) !== null;
 }
 
 type SearchMessageKey =
   | (typeof REJECTION_KEY)[ListingUrlRejection]
   | (typeof FAILURE_KEY)[ExtractionFailure]
   | (typeof MATCH_FAILURE_KEY)[MatchFailure]
-  | 'analyzing'
-  | 'addressSearching'
+  | SearchStep
   | 'addressNone'
   | 'addressInsufficientEvidence';
 
@@ -205,6 +211,7 @@ export type ListingSearch = {
   status: ListingSearchStatus;
   changeUrl: (url: string) => void;
   submit: () => Promise<void>;
+  cancel: () => void;
   reset: () => void;
 };
 
@@ -231,11 +238,17 @@ export function useListingSearch({
     setStatus({ kind: 'idle' });
   }
 
-  function reset(): void {
+  // why: cancelling abandons the search in flight but keeps the link, so it
+  // can be corrected or searched again.
+  function cancel(): void {
     latestSubmission.current += 1;
-    setUrl('');
     setRejection(null);
     setStatus({ kind: 'idle' });
+  }
+
+  function reset(): void {
+    cancel();
+    setUrl('');
   }
 
   async function submit(): Promise<void> {
@@ -283,5 +296,5 @@ export function useListingSearch({
     });
   }
 
-  return { url, rejection, status, changeUrl, submit, reset };
+  return { url, rejection, status, changeUrl, submit, cancel, reset };
 }
