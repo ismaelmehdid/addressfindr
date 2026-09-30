@@ -564,7 +564,6 @@ describe('New search dialog', () => {
     expect(dialogInput().value).toBe(SECOND_URL);
     expect(document.activeElement).toBe(dialogInput());
     expect(dialogStatus()).toBe('');
-    expect(submitLoading(openDialog())).toBe(false);
 
     await answer(MATCH, 200, SECOND_MATCH);
     expect(resultsColumn().textContent).toContain(FIRST_STREET);

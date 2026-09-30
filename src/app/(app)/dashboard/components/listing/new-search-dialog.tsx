@@ -40,8 +40,7 @@ export function NewSearchDialog({ search }: { search: ListingSearch }) {
     linkMessage({ status: search.status, rejection: search.rejection })
       ?.tone === 'error';
 
-  // why: closing abandons the search in flight. Its answer must never replace
-  // the results on screen, and the next opening starts from an empty field.
+  // why: the next opening starts from an empty field, not the last link.
   function changeOpen(next: boolean): void {
     if (!next) search.reset();
     setOpen(next);
@@ -70,7 +69,7 @@ export function NewSearchDialog({ search }: { search: ListingSearch }) {
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              if (!searching) void search.submit();
+              void search.submit();
             }}
             className="flex items-start gap-2"
           >
@@ -90,14 +89,7 @@ export function NewSearchDialog({ search }: { search: ListingSearch }) {
               aria-describedby="new-search-status"
               className="h-9 flex-1"
             />
-            {/* why: a disabled button drops focus to <body>, outside the modal. */}
-            <Button
-              type="submit"
-              size="sm"
-              loading={searching}
-              focusableWhenDisabled
-              className="h-9 shrink-0 aria-disabled:opacity-50"
-            >
+            <Button type="submit" size="sm" className="h-9 shrink-0">
               {t('submit')}
               <ArrowRight className="size-3.5" />
             </Button>
