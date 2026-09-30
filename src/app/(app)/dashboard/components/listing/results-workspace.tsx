@@ -29,12 +29,10 @@ import { revealInScrollArea } from './center-in-scroll-area';
 import { MapErrorBoundary } from './map-error-boundary';
 import { DEFAULT_MAP_VIEW, type MapView } from './map-view';
 import { MapViewSwitch } from './map-view-switch';
-import { MissingListingFeedback } from './missing-listing-feedback';
 import { NewSearchDialog } from './new-search-dialog';
 import { ResultDetailPanel } from './result-detail-panel';
 import { useDetailShortcuts } from './use-detail-shortcuts';
 import type { ListingSearchResult } from './use-listing-search';
-import { useSearchFeedback } from './use-search-feedback';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -115,10 +113,6 @@ export function ResultsWorkspace({
   const t = useTranslations('Listing');
   const isLg = useMediaQuery(LG_QUERY);
   const isXl = useMediaQuery(XL_QUERY);
-  const feedback = useSearchFeedback({
-    listingUrl: listing.fields.canonicalUrl,
-    candidates: match.candidates,
-  });
   const headingRef = useRef<HTMLHeadingElement | null>(null);
   const resultsRef = useRef<HTMLElement | null>(null);
   const asideRef = useRef<HTMLElement | null>(null);
@@ -210,7 +204,6 @@ export function ResultsWorkspace({
       streetViewEnabled={streetViewEnabled}
       streetViewEmbedKey={streetViewEmbedKey}
       listing={listing.fields}
-      feedback={feedback}
     />
   );
 
@@ -263,7 +256,6 @@ export function ResultsWorkspace({
               onSelect={onSelect}
               streetViewEnabled={streetViewEnabled}
             />
-            <MissingListingFeedback feedback={feedback} />
           </div>
         </ScrollArea>
       </section>

@@ -2,7 +2,6 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { act, type ComponentProps, type ReactElement, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import * as v from 'valibot';
 import {
   afterEach,
   beforeEach,
@@ -244,6 +243,28 @@ async function render(props: Partial<WorkspaceProps>): Promise<void> {
 async function renderClosable(props: Partial<WorkspaceProps>): Promise<void> {
   await mount(<ClosableWorkspace {...props} />);
 }
+
+function resultsColumn(): HTMLElement {
+  const column = container.querySelector<HTMLElement>(
+    'section[aria-labelledby="results-heading"]',
+  );
+  if (column === null) throw new Error('no results column');
+  return column;
+}
+
+// why: the verdict routes stay on the server, dormant; the results view
+// asks for no verdict, so the candidate list closes the left column.
+describe('ResultsWorkspace without feedback', () => {
+  it('ends the left column with the candidate list', async () => {
+    await render({});
+
+    const column = container.querySelector('#results-heading')?.parentElement;
+    expect(column?.lastElementChild?.querySelector('h3')?.textContent).toBe(
+      messages.Listing.addressTopLabel,
+    );
+    expect(container.querySelector('textarea, [role="radiogroup"]')).toBeNull();
+  });
+});
 
 // why: results are browsed from the list and with the arrow keys; no
 // "2 / 3" pager sits beside the results heading.
@@ -942,174 +963,5 @@ describe('ResultsWorkspace map view switch', () => {
         FIRST.record.address,
       ),
     );
-  });
-});
-
-const FeedbackRequestSchema = v.object({
-  searchId: v.string(),
-  listingUrl: v.string(),
-  verdict: v.string(),
-  confirmedDpeNumber: v.nullable(v.string()),
-  candidates: v.array(v.object({ dpeNumber: v.string(), score: v.number() })),
-});
-
-// why: answers every verdict with the receipt the real route sends back.
-function stubFeedbackRoute() {
-  const route = vi.fn<typeof fetch>((_path, init) => {
-    const request = v.parse(
-      FeedbackRequestSchema,
-      JSON.parse(String(init?.body)),
-    );
-    return Promise.resolve(
-      new Response(
-        JSON.stringify({
-          searchId: request.searchId,
-          verdict: request.verdict,
-        }),
-      ),
-    );
-  });
-  vi.stubGlobal('fetch', route);
-  onTestFinished(() => {
-    vi.unstubAllGlobals();
-  });
-  return route;
-}
-
-// why: a verdict resolves through fetch and response.json(); one macrotask
-// inside act() lets that chain and its state updates finish.
-async function press(button: HTMLButtonElement | undefined): Promise<void> {
-  if (button === undefined) throw new Error('no button to press');
-  await act(async () => {
-    button.click();
-    await new Promise((resolve) => {
-      setTimeout(resolve, 0);
-    });
-  });
-}
-
-function resultsColumn(): HTMLElement {
-  const column = container.querySelector<HTMLElement>(
-    'section[aria-labelledby="results-heading"]',
-  );
-  if (column === null) throw new Error('no results column');
-  return column;
-}
-
-function detailPanel(): HTMLElement {
-  const panel = container.querySelector<HTMLElement>('aside');
-  if (panel === null) throw new Error('no detail panel');
-  return panel;
-}
-
-function missingListingBox(): HTMLElement {
-  const title = [
-    ...resultsColumn().querySelectorAll('[data-slot="card-title"]'),
-  ].find(
-    (element) => element.textContent === messages.ListingFeedback.missingTitle,
-  );
-  const box = title?.closest<HTMLElement>('[data-slot="card"]');
-  if (box === null || box === undefined) {
-    throw new Error('no missing-listing box');
-  }
-  return box;
-}
-
-function buttonIn(
-  scope: HTMLElement,
-  name: string,
-): HTMLButtonElement | undefined {
-  return [...scope.querySelectorAll('button')].find(
-    (button) => button.textContent === name,
-  );
-}
-
-const CONFIRM = messages.ListingFeedback.confirm;
-const NONE_MATCH = messages.ListingFeedback.noneMatch;
-
-describe('ResultsWorkspace feedback', () => {
-  it('ends the left column with the missing-listing box, right after the candidate list', async () => {
-    await render({});
-
-    const box = missingListingBox();
-    expect(box.parentElement?.lastElementChild).toBe(box);
-    expect(box.previousElementSibling?.querySelector('h3')?.textContent).toBe(
-      messages.Listing.addressTopLabel,
-    );
-    expect(buttonIn(box, NONE_MATCH)).toBeDefined();
-  });
-
-  it('ends the detail with "C’est ce logement"', async () => {
-    await render({ shown: SECOND });
-
-    expect(buttonIn(detailPanel(), CONFIRM)).toBeDefined();
-  });
-
-  it('sends the shown result with the listing and every candidate on screen', async () => {
-    const route = stubFeedbackRoute();
-    await render({ shown: SECOND });
-
-    await press(buttonIn(detailPanel(), CONFIRM));
-
-    expect(route).toHaveBeenCalledOnce();
-    const [path, init] = route.mock.calls[0] ?? [];
-    expect(path).toBe('/api/listings/feedback');
-    expect(
-      v.parse(FeedbackRequestSchema, JSON.parse(String(init?.body))),
-    ).toMatchObject({
-      listingUrl: LISTING.fields.canonicalUrl,
-      verdict: 'confirmed',
-      confirmedDpeNumber: SECOND.record.dpeNumber,
-      candidates: [
-        { dpeNumber: FIRST.record.dpeNumber, score: FIRST.confidence },
-        { dpeNumber: SECOND.record.dpeNumber, score: SECOND.confidence },
-        { dpeNumber: THIRD.record.dpeNumber, score: THIRD.confidence },
-      ],
-    });
-  });
-
-  it('withdraws "Aucun emplacement ne correspond" once the detail confirms a result', async () => {
-    stubFeedbackRoute();
-    await render({ shown: SECOND });
-
-    await press(buttonIn(detailPanel(), CONFIRM));
-
-    expect(detailPanel().textContent).toContain(
-      messages.ListingFeedback.confirmed,
-    );
-    expect(buttonIn(missingListingBox(), NONE_MATCH)).toBeUndefined();
-  });
-
-  it('withdraws "C’est ce logement" once no location is reported to match', async () => {
-    stubFeedbackRoute();
-    await render({});
-
-    await press(buttonIn(missingListingBox(), NONE_MATCH));
-
-    expect(missingListingBox().textContent).toContain(
-      messages.ListingFeedback.thanks,
-    );
-    expect(buttonIn(detailPanel(), CONFIRM)).toBeUndefined();
-  });
-
-  it('leaves the keys to the comment field and the reasons of the form', async () => {
-    stubFeedbackRoute();
-    const onSelect = vi.fn();
-    const onCloseDetail = vi.fn();
-    await render({ onSelect, onCloseDetail });
-    await press(buttonIn(missingListingBox(), NONE_MATCH));
-
-    const comment = missingListingBox().querySelector('textarea');
-    const reason = missingListingBox().querySelector('[role="radio"]');
-    if (comment === null || reason === null) {
-      throw new Error('no none-match form');
-    }
-    for (const target of [comment, reason]) {
-      pressKey('ArrowLeft', target);
-      pressKey('ArrowRight', target);
-      pressKey('Escape', target);
-    }
-    expect(onSelect).not.toHaveBeenCalled();
-    expect(onCloseDetail).not.toHaveBeenCalled();
   });
 });

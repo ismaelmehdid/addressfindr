@@ -41,24 +41,6 @@
     "backDashboard": "Back to dashboard",
     "backHome": "Back to home"
   },
-  "ListingFeedback": {
-    "confirm": "This is the property",
-    "confirmed": "Property confirmed, thank you!",
-    "failed": "Your feedback could not be saved, please try again later.",
-    "missingTitle": "Is the property not in the list?",
-    "missingBody": "The listing may describe it poorly, or it may not be in the public data yet. Reporting it improves the service, one search at a time.",
-    "noneMatch": "No location matches",
-    "thanks": "Thank you.",
-    "reasonLegend": "What was wrong?",
-    "reasonWrongCommune": "The town is wrong",
-    "reasonWrongDwellings": "The suggested homes do not fit the listing",
-    "reasonAddressMissing": "I know the right address, it was not there",
-    "reasonUnsure": "I could not say",
-    "commentLabel": "Anything else? (optional)",
-    "commentNote": "Do not include any name or contact details.",
-    "send": "Send",
-    "detailSent": "Noted, thank you."
-  },
   "Listing": {
     "heading": "Paste a property listing link",
     "placeholder": "https://www.seloger.com/annonces/...",
