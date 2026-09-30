@@ -2,7 +2,7 @@
 
 import { ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { candidateOnMap } from '@/core/ademe/candidate-on-map';
@@ -11,11 +11,13 @@ import {
   mapAvailability,
   ResultsWorkspace,
 } from './results-workspace';
+import { SearchProgressOverlay } from './search-progress-overlay';
 import {
   addressMessage,
   type ListingSearchResult,
   linkMessage,
   type SearchMessage,
+  searchStep,
   useListingSearch,
 } from './use-listing-search';
 
@@ -26,6 +28,25 @@ type ShownResult = ListingSearchResult & { search: number };
 type Selection = { dpeNumber: string | null; request: number };
 
 const INITIAL_SELECTION: Selection = { dpeNumber: null, request: 0 };
+
+const LINK_STATUS_ID = 'listing-url-status';
+const ADDRESS_STATUS_ID = 'listing-address-status';
+
+// why: focus returns to the field when a search ends without addresses, so
+// the field names the outcome as well as the state of the link.
+function describedBy({
+  message,
+  address,
+}: {
+  message: SearchMessage | null;
+  address: SearchMessage | null;
+}): string | undefined {
+  const ids = [
+    message === null ? null : LINK_STATUS_ID,
+    address === null ? null : ADDRESS_STATUS_ID,
+  ].filter((id) => id !== null);
+  return ids.length === 0 ? undefined : ids.join(' ');
+}
 
 const COLUMN_LAYOUT_CLASS =
   'flex min-h-0 flex-1 items-center justify-center overflow-y-auto px-4 py-8';
@@ -46,6 +67,7 @@ export function ListingUrlForm({
   const [detailPreference, setDetailPreference] =
     useState<DetailPreference>('default');
   const [mapFailed, setMapFailed] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   function showResult(result: ListingSearchResult): void {
     setFound((current) => ({ ...result, search: (current?.search ?? 0) + 1 }));
@@ -54,9 +76,10 @@ export function ListingUrlForm({
     setMapFailed(false);
   }
 
-  const { url, rejection, status, changeUrl, submit } = useListingSearch({
-    onFound: showResult,
-  });
+  const { url, rejection, status, changeUrl, submit, cancel } =
+    useListingSearch({
+      onFound: showResult,
+    });
 
   const message = linkMessage({ status, rejection });
   const isError = message?.tone === 'error';
@@ -123,6 +146,7 @@ export function ListingUrlForm({
             >
               <div className="flex-1">
                 <Input
+                  ref={inputRef}
                   type="url"
                   inputMode="url"
                   autoComplete="off"
@@ -134,9 +158,7 @@ export function ListingUrlForm({
                   placeholder={t('placeholder')}
                   aria-label={t('heading')}
                   aria-invalid={isError}
-                  aria-describedby={
-                    message === null ? undefined : 'listing-url-status'
-                  }
+                  aria-describedby={describedBy({ message, address })}
                   className="h-9"
                 />
               </div>
@@ -152,7 +174,7 @@ export function ListingUrlForm({
             </form>
             {message !== null && (
               <p
-                id="listing-url-status"
+                id={LINK_STATUS_ID}
                 aria-live="polite"
                 className={
                   isError
@@ -167,6 +189,11 @@ export function ListingUrlForm({
           {address !== null && <AddressSection message={address} />}
         </div>
       )}
+      <SearchProgressOverlay
+        step={searchStep(status)}
+        onCancel={cancel}
+        returnFocusTo={() => inputRef.current}
+      />
       <p className="sr-only" aria-live="polite">
         {found !== null
           ? t('addressFoundAnnouncement', {
@@ -188,6 +215,7 @@ function AddressSection({ message }: { message: SearchMessage }) {
         {t('addressHeading')}
       </h2>
       <p
+        id={ADDRESS_STATUS_ID}
         className={
           message.tone === 'error'
             ? 'mt-2 text-[13px] tracking-[-0.08px] text-destructive'

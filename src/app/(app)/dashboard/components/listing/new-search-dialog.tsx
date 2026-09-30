@@ -15,12 +15,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { SearchProgressOverlay } from './search-progress-overlay';
 import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
 import {
   isSearching,
   type ListingSearchResult,
   linkMessage,
   searchMessage,
+  searchStep,
   useListingSearch,
 } from './use-listing-search';
 
@@ -131,6 +133,11 @@ export function NewSearchDialog({
         >
           <XIcon />
         </DialogClose>
+        <SearchProgressOverlay
+          step={searchStep(search.status)}
+          onCancel={search.cancel}
+          returnFocusTo={() => (open ? inputRef.current : null)}
+        />
       </DialogContent>
     </Dialog>
   );

@@ -133,19 +133,26 @@ function hasAddresses(match: AddressMatch): boolean {
   return match.refusedFor === null && match.candidates.length > 0;
 }
 
+// why: a running search is shown only by the progress overlay, so the step
+// is never also a message under the link (one live region, one announcement).
+export type SearchStep = 'analyzing' | 'addressSearching';
+
+export function searchStep(status: ListingSearchStatus): SearchStep | null {
+  if (status.kind === 'pending') return 'analyzing';
+  if (status.kind === 'extracted' && status.match.kind === 'pending') {
+    return 'addressSearching';
+  }
+  return null;
+}
+
 export function isSearching(status: ListingSearchStatus): boolean {
-  return (
-    status.kind === 'pending' ||
-    (status.kind === 'extracted' && status.match.kind === 'pending')
-  );
+  return searchStep(status) !== null;
 }
 
 type SearchMessageKey =
   | (typeof REJECTION_KEY)[ListingUrlRejection]
   | (typeof FAILURE_KEY)[ExtractionFailure]
   | (typeof MATCH_FAILURE_KEY)[MatchFailure]
-  | 'analyzing'
-  | 'addressSearching'
   | 'addressNone'
   | 'addressInsufficientEvidence';
 
@@ -154,10 +161,8 @@ export type SearchMessage = {
   tone: 'neutral' | 'error';
 };
 
-function matchMessage(state: MatchState): SearchMessage {
-  if (state.kind === 'pending') {
-    return { key: 'addressSearching', tone: 'neutral' };
-  }
+function matchMessage(state: MatchState): SearchMessage | null {
+  if (state.kind === 'pending') return null;
   if (state.kind === 'failed') {
     return { key: MATCH_FAILURE_KEY[state.failure], tone: 'error' };
   }
@@ -182,7 +187,6 @@ export function linkMessage({
   if (rejection !== null) {
     return { key: REJECTION_KEY[rejection], tone: 'error' };
   }
-  if (status.kind === 'pending') return { key: 'analyzing', tone: 'neutral' };
   if (status.kind === 'failed') {
     return { key: FAILURE_KEY[status.failure], tone: 'error' };
   }
@@ -205,6 +209,7 @@ export type ListingSearch = {
   status: ListingSearchStatus;
   changeUrl: (url: string) => void;
   submit: () => Promise<void>;
+  cancel: () => void;
   reset: () => void;
 };
 
@@ -231,11 +236,17 @@ export function useListingSearch({
     setStatus({ kind: 'idle' });
   }
 
-  function reset(): void {
+  // why: cancelling abandons the search in flight but keeps the link, so it
+  // can be corrected or searched again.
+  function cancel(): void {
     latestSubmission.current += 1;
-    setUrl('');
     setRejection(null);
     setStatus({ kind: 'idle' });
+  }
+
+  function reset(): void {
+    cancel();
+    setUrl('');
   }
 
   async function submit(): Promise<void> {
@@ -283,5 +294,5 @@ export function useListingSearch({
     });
   }
 
-  return { url, rejection, status, changeUrl, submit, reset };
+  return { url, rejection, status, changeUrl, submit, cancel, reset };
 }

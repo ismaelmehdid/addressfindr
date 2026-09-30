@@ -24,6 +24,9 @@ import { ListingUrlForm } from './listing-url-form';
 // why: jsdom implements neither. Every media query matches, so the results
 // lay themselves out as on a wide screen, detail panel open.
 HTMLElement.prototype.scrollTo = vi.fn();
+// why: jsdom has no 2D canvas; without this stub it logs a "not implemented"
+// error each time the search progress animation mounts.
+HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null);
 window.matchMedia = (query: string): MediaQueryList => ({
   matches: true,
   media: query,
@@ -250,6 +253,39 @@ function dialogStatus(): string {
   return openDialog().querySelector('[aria-live="polite"]')?.textContent ?? '';
 }
 
+function progressOverlay(): HTMLElement | null {
+  return (
+    [...document.querySelectorAll<HTMLElement>('[role="dialog"]')].find(
+      (element) =>
+        element.textContent?.includes(messages.Listing.searchProgressTitle),
+    ) ?? null
+  );
+}
+
+function openProgressOverlay(): HTMLElement {
+  const overlay = progressOverlay();
+  if (overlay === null) throw new Error('no search progress on screen');
+  return overlay;
+}
+
+function progressStep(): string {
+  return (
+    openProgressOverlay().querySelector('[aria-live="polite"]')?.textContent ??
+    ''
+  );
+}
+
+async function cancelSearch(): Promise<void> {
+  const cancel = buttonNamed(
+    openProgressOverlay(),
+    messages.Listing.searchCancel,
+  );
+  await act(async () => {
+    cancel.click();
+    await settle();
+  });
+}
+
 function submitLoading(scope: ParentNode): boolean {
   const button = scope.querySelector('button[type="submit"]');
   if (button === null) throw new Error('no submit button');
@@ -372,7 +408,8 @@ describe('New search dialog', () => {
     await pressNewSearch();
 
     await searchInDialog(SECOND_URL);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
+    expect(dialogStatus()).toBe('');
     expect(
       openDialog()
         .querySelector('button[type="submit"]')
@@ -380,7 +417,8 @@ describe('New search dialog', () => {
     ).toBe(true);
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
-    expect(dialogStatus()).toBe(messages.Listing.addressSearching);
+    expect(progressStep()).toBe(messages.Listing.addressSearching);
+    expect(dialogStatus()).toBe('');
     expect(
       openDialog()
         .querySelector('button[type="submit"]')
@@ -455,11 +493,11 @@ describe('New search dialog', () => {
       { url: MISTYPED_URL },
       { url: SECOND_URL },
     ]);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(MISTYPED_URL));
     expect(held.map((request) => request.body)).toEqual([{ url: SECOND_URL }]);
-    expect(dialogStatus()).toBe(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
     await answer(MATCH, 200, SECOND_MATCH);
@@ -495,7 +533,7 @@ describe('New search dialog', () => {
     expect(dialogInput().getAttribute('aria-invalid')).toBe('false');
   });
 
-  it('keeps the submit button focusable while the search runs, and Escape on it abandons the search', async () => {
+  it('keeps the submit button focusable while the search runs, and Escape on it abandons only the search', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
@@ -514,7 +552,8 @@ describe('New search dialog', () => {
       button.focus();
     });
     await pressKey('Escape', button);
-    expect(dialog()).toBeNull();
+    expect(progressOverlay()).toBeNull();
+    expect(dialogInput().value).toBe(SECOND_URL);
     await answer(EXTRACT, 200, listing(SECOND_URL));
     expect(held).toHaveLength(0);
     expect(resultsColumn().textContent).toContain(FIRST_STREET);
@@ -534,16 +573,41 @@ describe('New search dialog', () => {
     );
   });
 
-  it('ignores the answer of a search abandoned with Escape', async () => {
+  it('ignores the answer of a search abandoned with Escape, and a second Escape closes the dialog', async () => {
     await showFirstResult();
     await pressNewSearch();
     await searchInDialog(SECOND_URL);
 
     await pressKey('Escape', dialogInput());
-    expect(dialog()).toBeNull();
+    expect(progressOverlay()).toBeNull();
+    expect(dialogInput().value).toBe(SECOND_URL);
+    expect(dialogStatus()).toBe('');
 
     await answer(EXTRACT, 200, listing(SECOND_URL));
     expect(held).toHaveLength(0);
+    expect(resultsColumn().textContent).toContain(FIRST_STREET);
+    expect(resultsColumn().textContent).not.toContain(SECOND_STREET);
+
+    await pressKey('Escape', dialogInput());
+    expect(dialog()).toBeNull();
+  });
+
+  it('covers the dialog with the search progress, and cancelling keeps the dialog open with its link', async () => {
+    await showFirstResult();
+    await pressNewSearch();
+    await searchInDialog(SECOND_URL);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
+
+    await answer(EXTRACT, 200, listing(SECOND_URL));
+    expect(progressStep()).toBe(messages.Listing.addressSearching);
+
+    await cancelSearch();
+    expect(progressOverlay()).toBeNull();
+    expect(dialogInput().value).toBe(SECOND_URL);
+    expect(dialogStatus()).toBe('');
+    expect(submitLoading(openDialog())).toBe(false);
+
+    await answer(MATCH, 200, SECOND_MATCH);
     expect(resultsColumn().textContent).toContain(FIRST_STREET);
     expect(resultsColumn().textContent).not.toContain(SECOND_STREET);
   });
@@ -591,6 +655,97 @@ describe('New search dialog', () => {
 });
 
 describe('Home search form', () => {
+  it('covers the page with the search progress until addresses are found', async () => {
+    await renderForm();
+    expect(progressOverlay()).toBeNull();
+
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
+    expect(container.textContent).not.toContain(messages.Listing.analyzing);
+
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+    expect(progressStep()).toBe(messages.Listing.addressSearching);
+    expect(container.textContent).not.toContain(
+      messages.Listing.addressSearching,
+    );
+
+    await answer(MATCH, 200, FIRST_MATCH);
+    expect(progressOverlay()).toBeNull();
+    expect(resultsColumn().textContent).toContain(FIRST_STREET);
+    expect(document.activeElement).toBe(
+      container.querySelector('#results-heading'),
+    );
+  });
+
+  it('cancelling keeps the link, returns focus to it and ignores the late answer', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+
+    await cancelSearch();
+    expect(progressOverlay()).toBeNull();
+    expect(homeInput().value).toBe(FIRST_URL);
+    expect(document.activeElement).toBe(homeInput());
+    expect(submitLoading(container)).toBe(false);
+
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+    expect(held).toHaveLength(0);
+    expect(
+      container.querySelector('section[aria-labelledby="results-heading"]'),
+    ).toBeNull();
+  });
+
+  it('focuses the progress itself, so pressing Enter again does not cancel the search', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await act(async () => {
+      await nextFrame();
+    });
+
+    const overlay = openProgressOverlay();
+    expect(document.activeElement).toBe(overlay);
+    await pressKey('Enter', overlay);
+
+    expect(progressOverlay()).not.toBeNull();
+    expect(held.map((request) => request.path)).toEqual([EXTRACT]);
+  });
+
+  it('describes the field with the outcome when no address can be named', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+    await answer(EXTRACT, 200, listing(FIRST_URL));
+    await answer(MATCH, 200, {
+      candidates: [],
+      inspected: 30,
+      truncated: false,
+      refusedFor: 'insufficient-evidence',
+    });
+
+    expect(progressOverlay()).toBeNull();
+    expect(document.activeElement).toBe(homeInput());
+    const described = (homeInput().getAttribute('aria-describedby') ?? '')
+      .split(' ')
+      .map((id) => document.getElementById(id)?.textContent ?? '')
+      .join(' ');
+    expect(described).toContain(messages.Listing.addressInsufficientEvidence);
+  });
+
+  it('removes the search progress when the search fails, and explains under the link', async () => {
+    await renderForm();
+    typeInto(homeInput(), FIRST_URL);
+    await submit(container);
+
+    await answer(EXTRACT, 422, { error: 'validation' });
+    expect(progressOverlay()).toBeNull();
+    expect(container.textContent).toContain(
+      messages.Listing.errorNotExtractable,
+    );
+    expect(document.activeElement).toBe(homeInput());
+  });
+
   function homeInput(): HTMLInputElement {
     const input = container.querySelector('input');
     if (input === null) throw new Error('no link field on the home page');
@@ -620,10 +775,10 @@ describe('Home search form', () => {
     await renderForm();
     typeInto(homeInput(), MISTYPED_URL);
     await submit(container);
-    expect(container.textContent).toContain(messages.Listing.analyzing);
+    expect(progressStep()).toBe(messages.Listing.analyzing);
 
     typeInto(homeInput(), SECOND_URL);
-    expect(container.textContent).not.toContain(messages.Listing.analyzing);
+    expect(progressOverlay()).toBeNull();
     expect(submitLoading(container)).toBe(false);
 
     await submit(container);
@@ -652,9 +807,7 @@ describe('Home search form', () => {
     expect(
       container.querySelector('section[aria-labelledby="results-heading"]'),
     ).toBeNull();
-    expect(container.textContent).not.toContain(
-      messages.Listing.addressSearching,
-    );
+    expect(progressOverlay()).toBeNull();
     expect(homeInput().value).toBe(SECOND_URL);
   });
 
