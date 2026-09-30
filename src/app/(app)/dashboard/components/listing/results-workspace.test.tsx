@@ -24,6 +24,7 @@ import {
 import messages from '@/i18n/messages/fr.json';
 import type { MapView } from './map-view';
 import { type DetailPreference, ResultsWorkspace } from './results-workspace';
+import type { ListingSearch } from './use-listing-search';
 
 // why: Mapbox needs WebGL, which jsdom lacks. The stand-in keeps the map's
 // role and shows which view the workspace asked it to draw.
@@ -149,6 +150,16 @@ afterEach(() => {
 
 type WorkspaceProps = ComponentProps<typeof ResultsWorkspace>;
 
+const IDLE_SEARCH: ListingSearch = {
+  url: '',
+  rejection: null,
+  status: { kind: 'idle' },
+  changeUrl: () => {},
+  submit: async () => {},
+  cancel: () => {},
+  reset: () => {},
+};
+
 const DEFAULT_PROPS: WorkspaceProps = {
   listing: LISTING,
   match: match([FIRST, SECOND, THIRD]),
@@ -162,7 +173,7 @@ const DEFAULT_PROPS: WorkspaceProps = {
   onSelect: () => {},
   onCloseDetail: () => {},
   onMapFailure: () => {},
-  onNewSearch: () => {},
+  newSearch: IDLE_SEARCH,
 };
 
 // why: mirrors the dashboard, where closing the detail sets the preference to

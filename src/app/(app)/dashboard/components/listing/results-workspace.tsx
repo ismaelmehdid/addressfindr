@@ -32,7 +32,7 @@ import { MapViewSwitch } from './map-view-switch';
 import { NewSearchDialog } from './new-search-dialog';
 import { ResultDetailPanel } from './result-detail-panel';
 import { useDetailShortcuts } from './use-detail-shortcuts';
-import type { ListingSearchResult } from './use-listing-search';
+import type { ListingSearch } from './use-listing-search';
 
 // why: mapbox-gl weighs about 500 KB compressed. It is only downloaded the
 // first time a map is shown, not on every dashboard visit.
@@ -94,7 +94,7 @@ export function ResultsWorkspace({
   onSelect,
   onCloseDetail,
   onMapFailure,
-  onNewSearch,
+  newSearch,
 }: {
   listing: ExtractedListing;
   match: AddressMatch;
@@ -108,7 +108,7 @@ export function ResultsWorkspace({
   onSelect: (dpeNumber: string) => void;
   onCloseDetail: () => void;
   onMapFailure: () => void;
-  onNewSearch: (result: ListingSearchResult) => void;
+  newSearch: ListingSearch;
 }) {
   const t = useTranslations('Listing');
   const isLg = useMediaQuery(LG_QUERY);
@@ -210,7 +210,7 @@ export function ResultsWorkspace({
   return (
     <div
       className={cn(
-        'relative grid min-h-0 flex-1 grid-rows-[45%_minmax(0,1fr)] lg:grid-cols-[360px_minmax(0,1fr)] lg:grid-rows-1',
+        'relative grid min-h-0 flex-1 grid-rows-[45%_minmax(0,1fr)] transition-opacity duration-500 starting:opacity-0 lg:grid-cols-[360px_minmax(0,1fr)] lg:grid-rows-1',
         detailOpen && 'xl:grid-cols-[360px_minmax(0,1fr)_420px]',
       )}
     >
@@ -221,7 +221,7 @@ export function ResultsWorkspace({
       >
         <ScrollArea className="min-h-0 flex-1">
           <div className="flex flex-col gap-4 p-3">
-            <NewSearchDialog onFound={onNewSearch} />
+            <NewSearchDialog search={newSearch} />
             <AnalysedListingCard listing={listing} />
             <h2
               id="results-heading"

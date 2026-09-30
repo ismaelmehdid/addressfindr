@@ -85,7 +85,7 @@
     "streetViewAlt": "Street View vers {address}",
     "resultsNewSearch": "Nouvelle recherche",
     "newSearchTitle": "Nouvelle recherche",
-    "newSearchDescription": "Collez le lien d’une autre annonce. Les résultats actuels restent affichés jusqu’à ce que les nouveaux soient trouvés.",
+    "newSearchDescription": "Collez le lien d’une autre annonce. Les résultats actuels sont conservés si aucune adresse n’est trouvée.",
     "newSearchClose": "Fermer",
     "listingAnalysedLabel": "Annonce analysée",
     "listingUntitled": "Annonce",

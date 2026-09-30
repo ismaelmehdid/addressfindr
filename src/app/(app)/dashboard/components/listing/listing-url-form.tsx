@@ -6,6 +6,7 @@ import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { candidateOnMap } from '@/core/ademe/candidate-on-map';
+import { cn } from '@/lib/utils';
 import {
   type DetailPreference,
   mapAvailability,
@@ -14,6 +15,7 @@ import {
 import { SearchProgressOverlay } from './search-progress-overlay';
 import {
   addressMessage,
+  isSearching,
   type ListingSearchResult,
   linkMessage,
   type SearchMessage,
@@ -80,6 +82,13 @@ export function ListingUrlForm({
     useListingSearch({
       onFound: showResult,
     });
+  const newSearch = useListingSearch({ onFound: showResult });
+  const homeSearching = isSearching(status);
+
+  function cancelSearch(): void {
+    if (homeSearching) cancel();
+    else newSearch.cancel();
+  }
 
   const message = linkMessage({ status, rejection });
   const isError = message?.tone === 'error';
@@ -129,10 +138,17 @@ export function ListingUrlForm({
           onMapFailure={() => {
             setMapFailed(true);
           }}
-          onNewSearch={showResult}
+          newSearch={newSearch}
         />
       ) : (
-        <div className="w-full max-w-xl">
+        // why: the form fades out under the progress, on the same background,
+        // and back in with the outcome when the search ends without addresses.
+        <div
+          className={cn(
+            'w-full max-w-xl transition-opacity duration-300',
+            homeSearching && 'opacity-0',
+          )}
+        >
           <h1 className="text-center text-[22px] font-semibold leading-[1.3] tracking-[-0.18px] text-ink">
             {t('heading')}
           </h1>
@@ -190,8 +206,8 @@ export function ListingUrlForm({
         </div>
       )}
       <SearchProgressOverlay
-        step={searchStep(status)}
-        onCancel={cancel}
+        step={searchStep(status) ?? searchStep(newSearch.status)}
+        onCancel={cancelSearch}
         returnFocusTo={() => inputRef.current}
       />
       <p className="sr-only" aria-live="polite">

@@ -15,31 +15,22 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { SearchProgressOverlay } from './search-progress-overlay';
 import { SUSPENDS_DETAIL_SHORTCUTS } from './use-detail-shortcuts';
 import {
   isSearching,
-  type ListingSearchResult,
+  type ListingSearch,
   linkMessage,
   searchMessage,
-  searchStep,
-  useListingSearch,
 } from './use-listing-search';
 
-export function NewSearchDialog({
-  onFound,
-}: {
-  onFound: (result: ListingSearchResult) => void;
-}) {
+// why: the search is owned above the results, which remount for each new
+// result, so its progress can fade out over the new results. The dialog steps
+// aside while the search runs and comes back with its link when the search
+// fails or is cancelled.
+export function NewSearchDialog({ search }: { search: ListingSearch }) {
   const t = useTranslations('Listing');
   const [open, setOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const search = useListingSearch({
-    onFound: (result) => {
-      setOpen(false);
-      onFound(result);
-    },
-  });
   const searching = isSearching(search.status);
   const message = searchMessage({
     status: search.status,
@@ -57,7 +48,7 @@ export function NewSearchDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={changeOpen}>
+    <Dialog open={open && !searching} onOpenChange={changeOpen}>
       <DialogTrigger render={<Button variant="outline" className="w-full" />}>
         <Search />
         {t('resultsNewSearch')}
@@ -66,6 +57,9 @@ export function NewSearchDialog({
         {...SUSPENDS_DETAIL_SHORTCUTS}
         showCloseButton={false}
         initialFocus={inputRef}
+        // why: stepping aside for the search must not send focus to the
+        // trigger, behind the progress overlay.
+        finalFocus={() => !searching}
         className="sm:max-w-[480px]"
       >
         <DialogHeader className="pr-8">
@@ -133,11 +127,6 @@ export function NewSearchDialog({
         >
           <XIcon />
         </DialogClose>
-        <SearchProgressOverlay
-          step={searchStep(search.status)}
-          onCancel={search.cancel}
-          returnFocusTo={() => (open ? inputRef.current : null)}
-        />
       </DialogContent>
     </Dialog>
   );
